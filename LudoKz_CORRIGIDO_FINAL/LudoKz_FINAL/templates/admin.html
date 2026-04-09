@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>LudoKz — Admin</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#07080f;color:#eee;min-height:100vh}
+nav{background:#0f1020;border-bottom:1px solid #1e2040;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:18px;font-weight:700;color:#f5c518;letter-spacing:1px}
+.logo span{color:#00e676;font-size:13px;margin-left:6px}
+.nav-r{display:flex;align-items:center;gap:12px}
+.notif-badge{background:#ff1744;color:#fff;border-radius:50%;width:20px;height:20px;display:none;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.notif-badge.show{display:flex}
+.key-row{display:flex;align-items:center;gap:8px;font-size:13px;color:#888}
+.key-row input{background:#111;border:1px solid #333;border-radius:6px;color:#f5c518;padding:6px 10px;font-size:13px;font-family:monospace;width:200px}
+.key-row button{background:#f5c518;color:#111;border:none;border-radius:6px;padding:7px 16px;font-weight:700;cursor:pointer;font-size:13px}
+.wrap{padding:20px;max-width:1200px;margin:0 auto}
+.tabs{display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap}
+.tb{background:#1a1d35;border:1px solid #252a50;border-radius:8px;padding:9px 18px;cursor:pointer;font-size:13px;font-weight:600;color:#888;transition:all .15s;position:relative}
+.tb:hover{color:#eee;border-color:#333}
+.tb.on{background:#f5c518;color:#111;border-color:#f5c518}
+.tb .cnt{position:absolute;top:-5px;right:-5px;background:#ff1744;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center}
+.tb .cnt.show{display:flex}
+.panel{display:none}.panel.on{display:block}
+.card{background:#111428;border:1px solid #1e2040;border-radius:12px;padding:18px;margin-bottom:14px}
+.card h2{font-size:15px;font-weight:600;margin-bottom:14px;color:#f5c518;display:flex;align-items:center;gap:8px}
+.item{background:#0d0f20;border:1px solid #1e2040;border-radius:9px;padding:14px;margin-bottom:10px;transition:border-color .15s}
+.item:hover{border-color:#2e3255}
+.item:last-child{margin-bottom:0}
+.it{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:10px;flex-wrap:wrap}
+.iname{font-weight:600;font-size:15px}
+.iemail{font-size:12px;color:#666;margin-top:2px}
+.iamt{font-size:22px;font-weight:700;color:#f5c518;font-family:monospace;white-space:nowrap}
+.iref{font-size:12px;color:#888;margin-bottom:8px;word-break:break-all}
+.idt{font-size:11px;color:#444}
+.irow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.noteinp{background:#0a0b18;border:1px solid #252a50;border-radius:6px;color:#eee;padding:6px 10px;font-size:12px;flex:1;min-width:120px;font-family:system-ui}
+.btn-ok{background:#00e676;color:#002010;border:none;border-radius:7px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:13px;transition:all .15s}
+.btn-ok:hover{background:#00ff87;transform:translateY(-1px)}
+.btn-no{background:#ff1744;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:13px}
+.btn-no:hover{transform:translateY(-1px)}
+.btn-blue{background:#2979ff;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:13px}
+.reload{background:#1a1d35;border:1px solid #252a50;border-radius:7px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;color:#888;margin-bottom:12px}
+.reload:hover{color:#eee;border-color:#333}
+
+/* ══════════════════════════════════════
+   LUDO BOARD — IGUAL À IMAGEM
+   Verde=cima-esq, Amarelo=cima-dir
+   Vermelho=baixo-esq, Azul=baixo-dir
+══════════════════════════════════════ */
+
+/* BASES (quadrados grandes nos cantos) */
+.bg { background:#43a047 }   /* verde - cima esquerda */
+.by { background:#f9a825 }   /* amarelo - cima direita */
+.br2{ background:#e53935 }   /* vermelho - baixo esquerda */
+.bb { background:#1565c0 }   /* azul - baixo direita */
+
+/* Interior das bases (círculos onde ficam as peças) */
+.bg-in { background:#c8e6c9; border-radius:50%; width:80%; height:80% }
+.by-in { background:#fff9c4; border-radius:50%; width:80%; height:80% }
+.br-in { background:#ffcdd2; border-radius:50%; width:80%; height:80% }
+.bb-in { background:#bbdefb; border-radius:50%; width:80%; height:80% }
+
+/* CASAS DO CAMINHO */
+.cw { background:#ffffff }
+.ci { background:#f5f5f5 }
+
+/* CASAS COLORIDAS DO CAMINHO (reta final) */
+.hpg { background:#a5d6a7 }  /* verde */
+.hpy { background:#fff59d }  /* amarelo */
+.hpr { background:#ef9a9a }  /* vermelho */
+.hpb { background:#90caf9 }  /* azul */
+
+/* CENTRO TRIANGULAR */
+.tg  { background:#43a047 }
+.ty  { background:#f9a825 }
+.tr2 { background:#e53935 }
+.tb  { background:#1565c0 }
+.ch  { background:#ffffff }
+
+/* CASAS SEGURAS (estrela) */
+.sf { background:#ffffff }
+.sf::after { content:"★"; position:absolute; font-size:55%; color:rgba(0,0,0,.25); pointer-events:none }
+
+/* SETAS DE DIRECÇÃO */
+.ar::after { content:"→"; position:absolute; font-size:55%; color:#e53935; font-weight:900; pointer-events:none }
+.ag::after { content:"↓"; position:absolute; font-size:55%; color:#43a047; font-weight:900; pointer-events:none }
+.ab::after { content:"←"; position:absolute; font-size:55%; color:#1565c0; font-weight:900; pointer-events:none }
+.ay::after { content:"↑"; position:absolute; font-size:55%; color:#f9a825; font-weight:900; pointer-events:none }
+
+/* CÉLULA BASE */
+#test-board .c {
+  display:flex; align-items:center; justify-content:center;
+  position:relative; border:.5px solid rgba(0,0,0,.18);
+}
+
+/* PEÇAS */
+.tpiece {
+  position:absolute; width:70%; height:70%; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; cursor:pointer; z-index:5;
+  border:2.5px solid rgba(255,255,255,.95);
+  font-family:monospace; transition:transform .2s, box-shadow .2s;
+}
+.p-g { background:radial-gradient(circle at 35% 30%,#81c784,#1b5e20); color:#fff; box-shadow:0 3px 10px rgba(27,94,32,.7) }
+.p-y { background:radial-gradient(circle at 35% 30%,#fff176,#f57f17); color:#333; box-shadow:0 3px 10px rgba(245,127,23,.7) }
+.p-r { background:radial-gradient(circle at 35% 30%,#ef9a9a,#b71c1c); color:#fff; box-shadow:0 3px 10px rgba(183,28,28,.7) }
+.p-b { background:radial-gradient(circle at 35% 30%,#90caf9,#0d47a1); color:#fff; box-shadow:0 3px 10px rgba(13,71,161,.7) }
+
+.tpiece:hover { transform:scale(1.1) }
+.tpiece.sel {
+  animation:pglow2 .5s ease-in-out infinite alternate;
+  cursor:pointer !important;
+  z-index:10;
+}
+@keyframes pglow2 {
+  from { box-shadow:0 0 4px rgba(255,255,255,.5); transform:scale(1) }
+  to   { box-shadow:0 0 18px #fff, 0 0 8px gold; transform:scale(1.2) }
+}
+
+
+.empty{color:#444;text-align:center;padding:30px;font-size:14px}
+.badge{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;display:inline-block}
+.bp{background:rgba(249,168,37,.12);color:#ff9100;border:1px solid rgba(249,168,37,.2)}
+.ba{background:rgba(0,230,118,.1);color:#00e676;border:1px solid rgba(0,230,118,.2)}
+.br2{background:rgba(255,23,68,.1);color:#ff1744;border:1px solid rgba(255,23,68,.2)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:#111428;border:1px solid #1e2040;border-radius:10px;padding:16px;text-align:center}
+.stat-v{font-size:26px;font-weight:700;font-family:monospace;color:#f5c518}
+.stat-l{font-size:11px;color:#555;margin-top:3px;letter-spacing:.5px;text-transform:uppercase}
+.user-table{width:100%;border-collapse:collapse;font-size:13px}
+.user-table th{text-align:left;padding:8px 12px;color:#555;border-bottom:1px solid #1e2040;font-size:11px;letter-spacing:.5px;text-transform:uppercase}
+.user-table td{padding:8px 12px;border-bottom:1px solid #0d0f20;vertical-align:top}
+.user-table tr:hover td{background:#0d0f20}
+.notif-list{max-height:400px;overflow-y:auto}
+.notif-item{padding:12px 14px;border-bottom:1px solid #1e2040;font-size:13px;line-height:1.5;cursor:pointer}
+.notif-item:hover{background:#0d0f20}
+.notif-item.unread{border-left:3px solid #f5c518}
+.notif-item.dep{border-left:3px solid #00e676}
+.notif-item.wit{border-left:3px solid #2979ff}
+.notif-time{font-size:11px;color:#444;margin-top:3px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#00e676;display:inline-block;animation:pulse 1.5s ease-in-out infinite;margin-right:6px}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.express-highlight{font-family:monospace;font-size:16px;color:#00e676;font-weight:700;padding:4px 10px;background:rgba(0,230,118,.06);border-radius:6px;display:inline-block;margin-top:4px}
+.alert-box{background:rgba(255,23,68,.08);border:1px solid rgba(255,23,68,.2);border-radius:9px;padding:12px 14px;font-size:13px;color:#ff6b6b;margin-bottom:14px;display:none}
+.alert-box.show{display:block}
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo">🎲 LudoKz <span>ADMIN</span></div>
+  <div class="nav-r">
+    <span id="live-ind" style="font-size:12px;color:#555">
+      <span class="live-dot" style="display:none" id="live-dot"></span>
+      <span id="live-txt">offline</span>
+    </span>
+    <div id="notif-badge" class="notif-badge">0</div>
+    <div class="key-row">
+      <input id="akey" type="password" value="ludokz2025" placeholder="Chave Admin">
+      <button onclick="connect()">Ligar</button>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div id="alert" class="alert-box"></div>
+
+  <!-- STATS -->
+  <div class="stat-grid" id="stats-grid"></div>
+
+  <div class="tabs">
+    <div class="tb on" onclick="tab('deps')">💰 Depósitos <span class="cnt" id="cnt-dep">0</span></div>
+    <div class="tb" onclick="tab('wits')">💸 Levantamentos <span class="cnt" id="cnt-wit">0</span></div>
+    <div class="tb" onclick="tab('notifs')">🔔 Notificações <span class="cnt" id="cnt-not">0</span></div>
+    <div class="tb" onclick="tab('users')">👥 Utilizadores</div>
+    <div class="tb" onclick="tab('reset')">🔑 Reset Senha</div>
+    <div class="tb" onclick="tab('promos')">🎟️ Promo Codes</div>
+    <div class="tb" onclick="tab('tickets')">💬 Suporte <span class="cnt" id="cnt-tkt">0</span></div>
+    <div class="tb" onclick="tab('usermgmt')">⚙️ Gestão</div>
+    <div class="tb" onclick="tab('playgame')">🎮 Jogar (Teste)</div>
+  </div>
+
+  <!-- DEPÓSITOS -->
+  <div id="panel-deps" class="panel on">
+    <div class="card">
+      <h2>💰 Depósitos Pendentes</h2>
+      <button class="reload" onclick="loadDeps()">↻ Actualizar</button>
+      <div id="dep-list"></div>
+    </div>
+  </div>
+
+  <!-- LEVANTAMENTOS -->
+  <div id="panel-wits" class="panel">
+    <div class="card">
+      <h2>💸 Levantamentos Pendentes</h2>
+      <button class="reload" onclick="loadWits()">↻ Actualizar</button>
+      <div id="wit-list"></div>
+    </div>
+  </div>
+
+  <!-- NOTIFICAÇÕES -->
+  <div id="panel-notifs" class="panel">
+    <div class="card">
+      <h2>🔔 Notificações em Tempo Real</h2>
+      <button class="reload" onclick="loadNotifs()">↻ Actualizar</button>
+      <button class="reload" onclick="markRead()" style="margin-left:6px">✓ Marcar lidas</button>
+      <div class="notif-list" id="notif-list"></div>
+    </div>
+  </div>
+
+  <!-- UTILIZADORES -->
+  <div id="panel-users" class="panel">
+    <div class="card">
+      <h2>👥 Todos os Utilizadores</h2>
+      <button class="reload" onclick="loadUsers()">↻ Actualizar</button>
+      <div style="overflow-x:auto">
+        <table class="user-table">
+          <thead><tr><th>Nome</th><th>Email</th><th>Saldo</th><th>Partidas</th><th>Vitórias</th><th>Express</th><th>Registado</th></tr></thead>
+          <tbody id="user-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESET SENHA -->
+  <div id="panel-reset" class="panel">
+    <div class="card">
+      <h2>🔑 Tokens de Reset de Senha</h2>
+      <p style="font-size:13px;color:#666;margin-bottom:14px">Quando um utilizador pede reset de senha, o token aparece aqui em tempo real.</p>
+      <div id="reset-list"><div class="empty">Nenhum pedido de reset ainda.</div></div>
+    </div>
+  </div>
+
+  <!-- PROMO CODES -->
+  <div id="panel-promos" class="panel">
+    <div class="card">
+      <h2>🎟️ Códigos Promocionais</h2>
+      <div style="background:#0d0f20;border:1px solid #1e2040;border-radius:10px;padding:16px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:#f5c518;margin-bottom:12px">Criar Novo Código</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;flex-wrap:wrap">
+          <div><label style="font-size:11px;color:#555;display:block;margin-bottom:4px">CÓDIGO</label>
+            <input id="pc-code" placeholder="ANGOLA2025" style="background:#0a0b18;border:1px solid #252a50;border-radius:6px;color:#eee;padding:8px 10px;font-size:13px;width:100%;font-family:monospace"></div>
+          <div><label style="font-size:11px;color:#555;display:block;margin-bottom:4px">BÓNUS (Kz)</label>
+            <input id="pc-amount" type="number" placeholder="1000" style="background:#0a0b18;border:1px solid #252a50;border-radius:6px;color:#eee;padding:8px 10px;font-size:13px;width:100%"></div>
+          <div><label style="font-size:11px;color:#555;display:block;margin-bottom:4px">MAX USOS</label>
+            <input id="pc-uses" type="number" placeholder="100" value="100" style="background:#0a0b18;border:1px solid #252a50;border-radius:6px;color:#eee;padding:8px 10px;font-size:13px;width:100%"></div>
+          <div><label style="font-size:11px;color:#555;display:block;margin-bottom:4px">EXPIRA</label>
+            <input id="pc-exp" type="date" style="background:#0a0b18;border:1px solid #252a50;border-radius:6px;color:#eee;padding:8px 10px;font-size:13px;width:100%"></div>
+        </div>
+        <button class="btn-ok" onclick="createPromo()" style="margin-top:12px">+ Criar Código</button>
+      </div>
+      <button class="reload" onclick="loadPromos()">↻ Actualizar</button>
+      <div id="promo-list"></div>
+    </div>
+  </div>
+
+  <!-- SUPORTE -->
+  <div id="panel-tickets" class="panel">
+    <div class="card">
+      <h2>💬 Pedidos de Suporte</h2>
+      <button class="reload" onclick="loadTickets2()">↻ Actualizar</button>
+      <div id="ticket-list"></div>
+    </div>
+  </div>
+
+  <!-- GESTÃO -->
+  <div id="panel-usermgmt" class="panel">
+    <div class="card" style="margin-bottom:16px">
+      <h2>💰 Ajustar Saldo de Utilizador</h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="font-size:11px;color:#555;display:block;margin-bottom:4px">ID DO UTILIZADOR</label>
+          <input id="adj-uid" type="number" placeholder="1" style="background:#0a0b18;border:1px solid #252a50;border-radius:6px;color:#eee;padding:8px 12px;font-size:14px;width:120px"></div>
+        <div><label style="font-size:11px;color:#555;display:block;margin-bottom:4px">VALOR (Kz, pode ser negativo)</label>
+          <input id="adj-amt" type="number" placeholder="1000" style="background:#0a0b18;border:1px solid #252a50;border-radius:6px;color:#eee;padding:8px 12px;font-size:14px;width:160px"></div>
+        <div style="flex:1"><label style="font-size:11px;color:#555;display:block;margin-bottom:4px">MOTIVO</label>
+          <input id="adj-reason" placeholder="Motivo do ajuste" style="background:#0a0b18;border:1px solid #252a50;border-radius:6px;color:#eee;padding:8px 12px;font-size:14px;width:100%"></div>
+        <button class="btn-ok" onclick="adjustBalance()">Ajustar</button>
+      </div>
+      <div id="adj-msg" style="margin-top:10px;font-size:13px"></div>
+    </div>
+    <div class="card">
+      <h2>👥 Todos os Utilizadores</h2>
+      <button class="reload" onclick="loadUsers()">↻ Actualizar</button>
+      <div style="overflow-x:auto">
+        <table class="user-table">
+          <thead><tr><th>ID</th><th>Nome</th><th>Email</th><th>Saldo</th><th>Jogos</th><th>Vitórias</th><th>Express</th></tr></thead>
+          <tbody id="user-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODO JOGO ADMIN -->
+  <div id="panel-playgame" class="panel">
+    <div class="card">
+      <h2>🎮 Jogar sem Dinheiro (Modo Teste)</h2>
+      <p style="font-size:13px;color:#888;margin-bottom:16px">Testa o jogo como admin sem usar dinheiro real. Podes simular até 4 jogadores.</p>
+
+      <!-- Admin joga como jogador regular -->
+      <div style="background:linear-gradient(135deg,rgba(245,197,24,.1),rgba(245,197,24,.05));border:1.5px solid rgba(245,197,24,.3);border-radius:10px;padding:16px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:#f5c518;margin-bottom:8px">🎮 Jogar como Jogador Regular</div>
+        <p style="font-size:12px;color:#888;margin-bottom:12px">Entra no site como admin-jogador e joga nas salas reais com outros utilizadores. Saldo ilimitado.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="admin-player-name" value="Admin" style="background:#0a0b18;border:1px solid #252a50;border-radius:6px;color:#eee;padding:8px 12px;font-size:14px;width:160px" placeholder="Nome">
+          <button class="btn-ok" onclick="loginAsPlayer()">🚀 Entrar no Site como Jogador</button>
+        </div>
+        <p style="font-size:11px;color:#555;margin-top:8px">Abre uma nova aba com o site de jogo já com sessão iniciada.</p>
+      </div>
+
+      <!-- Criar sala de teste -->
+      <div style="background:#0d0f20;border:1px solid #1e2040;border-radius:10px;padding:16px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:#f5c518;margin-bottom:12px">1. Criar Sala de Teste</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div>
+            <label style="font-size:11px;color:#555;display:block;margin-bottom:4px">NÚMERO DE JOGADORES</label>
+            <select id="test-maxp" style="background:#0a0b18;border:1px solid #252a50;border-radius:6px;color:#eee;padding:8px 12px;font-size:14px">
+              <option value="2">2 Jogadores</option>
+              <option value="3">3 Jogadores</option>
+              <option value="4">4 Jogadores</option>
+            </select>
+          </div>
+          <button class="btn-ok" onclick="createTestRoom()" style="margin-top:20px">Criar Sala</button>
+        </div>
+        <div id="test-rid" style="display:none;margin-top:12px;font-size:14px">
+          <span style="color:#888">Sala criada:</span>
+          <span id="test-rid-val" style="color:#f5c518;font-family:monospace;font-size:18px;margin-left:8px;letter-spacing:2px"></span>
+        </div>
+      </div>
+
+      <!-- Adicionar jogadores -->
+      <div id="test-players-section" style="display:none;background:#0d0f20;border:1px solid #1e2040;border-radius:10px;padding:16px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:#f5c518;margin-bottom:12px">2. Adicionar Jogadores à Sala</div>
+        <div id="test-player-btns" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+        <div style="margin-top:12px">
+          <button class="btn-ok" id="btn-start-test" onclick="startTestGame()" style="display:none">▶ Iniciar Jogo</button>
+        </div>
+      </div>
+
+      <!-- Tabuleiro de teste -->
+      <div id="test-game-section" style="display:none">
+        <div style="font-size:13px;font-weight:600;color:#f5c518;margin-bottom:12px">3. Jogo em Andamento</div>
+
+        <!-- Player cards -->
+        <div id="test-pcards" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+
+        <!-- Tabuleiro -->
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+          <div style="flex-shrink:0">
+            <canvas id="test-board-canvas" style="border-radius:12px;box-shadow:0 0 40px rgba(0,0,0,.7);display:block"></canvas>
+          </div>
+
+          <!-- Controlos -->
+          <div style="display:flex;flex-direction:column;gap:12px;min-width:180px;flex:1">
+            <div style="background:#0d0f20;border:1px solid #1e2040;border-radius:10px;padding:14px;text-align:center">
+              <div style="font-size:10px;color:#555;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Turno</div>
+              <div id="test-turn-name" style="font-size:16px;font-weight:600;color:#f5c518;margin-bottom:10px">—</div>
+              <div id="test-dice-face" style="font-size:52px;margin:6px 0;filter:drop-shadow(0 0 8px rgba(245,197,24,.4))">⚀</div>
+              <div id="test-dice-num" style="font-family:monospace;font-size:28px;color:#f5c518;font-weight:700;margin-bottom:10px">—</div>
+              <button class="btn-ok" id="test-roll-btn" onclick="testRoll()" style="width:100%;font-size:14px">🎲 Lançar</button>
+              <div style="margin-top:8px;display:flex;gap:6px">
+                <button onclick="toggleAutoBot()" id="btn-autobot" style="flex:1;background:#1a1d35;border:1px solid #252a50;border-radius:7px;padding:7px;font-size:12px;color:#888;cursor:pointer" title="Bot joga automaticamente">🤖 Auto-Bot: OFF</button>
+                <button onclick="skipBotTurn()" style="flex:1;background:#1a1d35;border:1px solid #252a50;border-radius:7px;padding:7px;font-size:12px;color:#888;cursor:pointer">⏭ Skip</button>
+              </div>
+            </div>
+
+            <!-- Log -->
+            <div style="background:#0d0f20;border:1px solid #1e2040;border-radius:10px;padding:12px;max-height:200px;overflow-y:auto" id="test-log">
+              <div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Registo</div>
+            </div>
+
+            <button class="btn-no" onclick="resetTestGame()" style="font-size:13px">🔄 Novo Jogo</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="test-msg" style="margin-top:12px;font-size:13px;color:#888"></div>
+    </div>
+  </div>
+
+
+</div>
+
+<script>
+const fmt=n=>Number(n).toLocaleString('pt-AO');
+const fmtD=s=>s?new Date(s).toLocaleString('pt-AO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+let SSE=null, resetTokens=[];
+
+function key(){ return document.getElementById('akey').value.trim() }
+
+async function adminApi(url,method='GET',body=null){
+  const o={method,headers:{'Content-Type':'application/json','X-Admin-Key':key()}};
+  if(body)o.body=JSON.stringify(body);
+  const r=await fetch(url,o);
+  return r.json();
+}
+
+function showAlert(msg,ok=false){
+  const el=document.getElementById('alert');
+  el.textContent=msg;el.style.color=ok?'#00e676':'#ff6b6b';
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),4000);
+}
+
+function tab(name){
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  event.target.closest('.tb').classList.add('on');
+  document.getElementById('panel-'+name).classList.add('on');
+  if(name==='deps')loadDeps();
+  if(name==='wits')loadWits();
+  if(name==='notifs')loadNotifs();
+  if(name==='users'||name==='usermgmt')loadUsers();
+  if(name==='promos')loadPromos();
+  if(name==='tickets')loadTickets2();
+  if(name==='playgame')resetTestGame();
+}
+
+function connect(){
+  if(SSE)SSE.close();
+  SSE=new EventSource('/api/admin/events',{withCredentials:false});
+  // Passar key via header nao funciona com SSE, usamos param
+  SSE.addEventListener('connected',()=>{
+    document.getElementById('live-dot').style.display='inline-block';
+    document.getElementById('live-txt').textContent='online';
+    document.getElementById('live-txt').style.color='#00e676';
+    loadAll();
+  });
+  SSE.addEventListener('support_ticket',e=>{
+    const d=JSON.parse(e.data);
+    playBeep();
+    showAlert(`🎫 SUPORTE: ${d.name} — ${d.message}`);
+    loadTickets2();
+    bumpCnt('tkt');
+  });
+  SSE.addEventListener('new_deposit',e=>{
+    const d=JSON.parse(e.data);
+    playBeep();
+    showAlert(`💰 NOVO DEPÓSITO: ${fmt(d.amount)} Kz — ref: ${d.ref}`);
+    loadDeps();loadStats();
+    bumpCnt('dep');
+  });
+  SSE.addEventListener('new_withdrawal',e=>{
+    const d=JSON.parse(e.data);
+    playBeep();
+    showAlert(`💸 NOVO LEVANTAMENTO: ${fmt(d.amount)} Kz → ${d.express} (${d.account_name})`);
+    loadWits();loadStats();
+    bumpCnt('wit');
+  });
+  SSE.addEventListener('password_reset',e=>{
+    const d=JSON.parse(e.data);
+    resetTokens.unshift(d);
+    renderResets();
+    bumpCnt('not');
+  });
+  SSE.onerror=()=>{
+    document.getElementById('live-txt').textContent='reconectando...';
+    document.getElementById('live-txt').style.color='#ff9100';
+    document.getElementById('live-dot').style.display='none';
+    setTimeout(connect,3000);
+  };
+}
+
+function bumpCnt(type){
+  const el=document.getElementById('cnt-'+type);
+  if(!el)return;
+  el.classList.add('show');
+  el.textContent=(parseInt(el.textContent)||0)+1;
+  document.getElementById('notif-badge').classList.add('show');
+  document.getElementById('notif-badge').textContent=
+    (parseInt(document.getElementById('notif-badge').textContent)||0)+1;
+}
+
+function playBeep(){
+  try{
+    const ctx=new AudioContext();
+    const o=ctx.createOscillator();
+    o.connect(ctx.destination);
+    o.frequency.value=880;
+    o.start();o.stop(ctx.currentTime+0.15);
+  }catch(e){}
+}
+
+function loadAll(){loadStats();loadDeps();loadWits();loadNotifs();loadPromos();loadTickets2();}
+
+async function loadStats(){
+  const d=await adminApi('/admin/stats');
+  if(!d.stats)return;
+  const s=d.stats;
+  document.getElementById('stats-grid').innerHTML=`
+    <div class="stat"><div class="stat-v">${s.users}</div><div class="stat-l">Utilizadores</div></div>
+    <div class="stat"><div class="stat-v" style="color:#00e676">${fmt(s.total_balance)}</div><div class="stat-l">Saldo Total Kz</div></div>
+    <div class="stat"><div class="stat-v">${s.deposits.count}</div><div class="stat-l">Depósitos aprovados</div></div>
+    <div class="stat"><div class="stat-v">${fmt(s.deposits.total)}</div><div class="stat-l">Total Depositado Kz</div></div>
+    <div class="stat"><div class="stat-v">${s.withdrawals.count}</div><div class="stat-l">Levantamentos</div></div>
+    <div class="stat"><div class="stat-v">${s.games}</div><div class="stat-l">Partidas Jogadas</div></div>
+    <div class="stat"><div class="stat-v" style="color:#ff9100">${s.pending_deposits}</div><div class="stat-l">Depósitos Pendentes</div></div>
+    <div class="stat"><div class="stat-v" style="color:#2979ff">${s.pending_withdrawals}</div><div class="stat-l">Levantamentos Pendentes</div></div>
+  `;
+}
+
+async function loadDeps(){
+  document.getElementById('dep-list').innerHTML='<div class="empty">A carregar...</div>';
+  const d=await adminApi('/admin/deposits');
+  if(d.error){document.getElementById('dep-list').innerHTML=`<div class="empty" style="color:#ff4569">${d.error}</div>`;return;}
+  const cnt=document.getElementById('cnt-dep');
+  if(d.deposits.length){cnt.textContent=d.deposits.length;cnt.classList.add('show');}
+  else{cnt.classList.remove('show');}
+  if(!d.deposits.length){document.getElementById('dep-list').innerHTML='<div class="empty">Nenhum depósito pendente ✓</div>';return;}
+  document.getElementById('dep-list').innerHTML=d.deposits.map(dep=>`
+    <div class="item" id="dep-${dep.id}">
+      <div class="it">
+        <div>
+          <div class="iname">${dep.name}</div>
+          <div class="iemail">${dep.email} · Saldo actual: ${fmt(dep.balance)} Kz</div>
+        </div>
+        <div class="iamt">${fmt(dep.amount)} Kz</div>
+      </div>
+      <div class="iref">📋 Ref: <strong>${dep.express_ref}</strong>${dep.payer_name?` · Pagador: <strong>${dep.payer_name}</strong>`:''}</div>
+      <div class="idt">📅 ${fmtD(dep.created_at)}</div>
+      <div class="irow">
+        <input class="noteinp" id="dn-${dep.id}" placeholder="Nota (opcional)">
+        <button class="btn-ok" onclick="approveDep(${dep.id})">✅ Aprovar</button>
+        <button class="btn-no" onclick="rejectDep(${dep.id})">❌ Rejeitar</button>
+      </div>
+    </div>`).join('');
+}
+
+async function approveDep(id){
+  const note=document.getElementById('dn-'+id)?.value||'';
+  const d=await adminApi(`/admin/deposits/${id}/approve`,'POST',{note});
+  if(d.ok){
+    document.getElementById('dep-'+id).innerHTML='<div style="color:#00e676;padding:10px;font-weight:600">✅ Aprovado! Saldo actualizado.</div>';
+    loadStats();setTimeout(loadDeps,1500);
+  } else showAlert('Erro: '+(d.error||'Falhou'));
+}
+async function rejectDep(id){
+  const note=document.getElementById('dn-'+id)?.value||'';
+  const d=await adminApi(`/admin/deposits/${id}/reject`,'POST',{note});
+  if(d.ok){
+    document.getElementById('dep-'+id).innerHTML='<div style="color:#ff4569;padding:10px;font-weight:600">❌ Rejeitado.</div>';
+    setTimeout(loadDeps,1500);
+  }
+}
+
+async function loadWits(){
+  document.getElementById('wit-list').innerHTML='<div class="empty">A carregar...</div>';
+  const d=await adminApi('/admin/withdrawals');
+  if(d.error){document.getElementById('wit-list').innerHTML=`<div class="empty" style="color:#ff4569">${d.error}</div>`;return;}
+  const cnt=document.getElementById('cnt-wit');
+  if(d.withdrawals.length){cnt.textContent=d.withdrawals.length;cnt.classList.add('show');}
+  else cnt.classList.remove('show');
+  if(!d.withdrawals.length){document.getElementById('wit-list').innerHTML='<div class="empty">Nenhum levantamento pendente ✓</div>';return;}
+  document.getElementById('wit-list').innerHTML=d.withdrawals.map(w=>`
+    <div class="item" id="wit-${w.id}">
+      <div class="it">
+        <div>
+          <div class="iname">${w.name}</div>
+          <div class="iemail">${w.email}</div>
+        </div>
+        <div>
+          <div class="iamt">${fmt(w.amount)} Kz</div>
+          <div style="font-size:12px;color:#666">Líquido: ${fmt(w.net_amount)} Kz</div>
+        </div>
+      </div>
+      <div style="margin-bottom:8px">
+        📲 Enviar para: <span class="express-highlight">${w.express_number}</span><br>
+        👤 Nome da conta: <strong style="color:#eee">${w.account_name}</strong>
+      </div>
+      <div class="idt">📅 ${fmtD(w.created_at)}</div>
+      <div class="irow">
+        <input class="noteinp" id="wn-${w.id}" placeholder="Nota (opcional)">
+        <button class="btn-blue" onclick="completeWit(${w.id})">💸 Enviado</button>
+        <button class="btn-no" onclick="rejectWit(${w.id})">❌ Rejeitar</button>
+      </div>
+    </div>`).join('');
+}
+
+async function completeWit(id){
+  const note=document.getElementById('wn-'+id)?.value||'';
+  const d=await adminApi(`/admin/withdrawals/${id}/complete`,'POST',{note});
+  if(d.ok){
+    document.getElementById('wit-'+id).innerHTML='<div style="color:#2979ff;padding:10px;font-weight:600">💸 Marcado como enviado!</div>';
+    loadStats();setTimeout(loadWits,1500);
+  } else showAlert('Erro: '+(d.error||'Falhou'));
+}
+async function rejectWit(id){
+  if(!confirm('Rejeitar e devolver saldo ao jogador?'))return;
+  const note=document.getElementById('wn-'+id)?.value||'';
+  const d=await adminApi(`/admin/withdrawals/${id}/reject`,'POST',{note});
+  if(d.ok){
+    document.getElementById('wit-'+id).innerHTML='<div style="color:#ff4569;padding:10px;font-weight:600">❌ Rejeitado. Saldo devolvido.</div>';
+    setTimeout(loadWits,1500);
+  }
+}
+
+async function loadNotifs(){
+  const d=await adminApi('/admin/notifications');
+  if(!d.notifications)return;
+  const unread=d.notifications.filter(n=>!n.read).length;
+  const cnt=document.getElementById('cnt-not');
+  if(unread){cnt.textContent=unread;cnt.classList.add('show');}
+  else cnt.classList.remove('show');
+  document.getElementById('notif-list').innerHTML=d.notifications.length?
+    d.notifications.map(n=>`
+      <div class="notif-item ${n.read?'':'unread'} ${n.type.includes('dep')?'dep':n.type.includes('wit')?'wit':''}">
+        ${n.message}
+        <div class="notif-time">${fmtD(n.created_at)}</div>
+      </div>`).join(''):
+    '<div class="empty">Sem notificações</div>';
+}
+
+async function markRead(){
+  await adminApi('/admin/notifications/read','POST');
+  loadNotifs();
+  document.getElementById('notif-badge').classList.remove('show');
+  document.getElementById('cnt-not').classList.remove('show');
+}
+
+async function loadUsers(){
+  const d=await adminApi('/admin/users');
+  if(!d.users)return;
+  document.getElementById('user-tbody').innerHTML=d.users.map(u=>`
+    <tr>
+      <td style="font-weight:600">${u.name}</td>
+      <td style="color:#888">${u.email}</td>
+      <td style="color:#f5c518;font-family:monospace">${fmt(u.balance)} Kz</td>
+      <td>${u.games_played}</td>
+      <td style="color:#00e676">${u.wins}</td>
+      <td style="font-family:monospace;color:#888">${u.express_number||'—'}</td>
+      <td style="color:#444;font-size:12px">${fmtD(u.created_at)}</td>
+    </tr>`).join('');
+}
+
+function renderResets(){
+  document.getElementById('reset-list').innerHTML=resetTokens.length?
+    resetTokens.map(r=>`
+      <div class="item">
+        <div class="iname">🔑 ${r.name} — ${r.email}</div>
+        <div class="iref" style="margin-top:6px">Token: <strong style="color:#f5c518">${r.token}</strong></div>
+        <div class="idt">Link: ${location.origin}/?reset=${r.token}</div>
+      </div>`).join(''):
+    '<div class="empty">Nenhum pedido de reset.</div>';
+}
+
+async function loadPromos(){
+  document.getElementById("promo-list").innerHTML="<div class='empty'>A carregar...</div>";
+  const d=await adminApi("/admin/promos");
+  if(!d.promos){return}
+  if(!d.promos.length){document.getElementById("promo-list").innerHTML="<div class='empty'>Sem códigos</div>";return}
+  document.getElementById("promo-list").innerHTML=d.promos.map(p=>`
+    <div class="item">
+      <div class="it">
+        <div>
+          <div class="iname" style="font-family:monospace;font-size:18px;color:#f5c518">${p.code}</div>
+          <div class="iemail">Usos: ${p.uses}/${p.max_uses} · ${p.active?"✅ Activo":"❌ Inactivo"}</div>
+        </div>
+        <div class="iamt">${fmt(p.bonus_amount)} Kz</div>
+      </div>
+      <div class="idt">Expira: ${p.expires_at||"Sem expiração"}</div>
+      <div class="irow" style="margin-top:8px">
+        ${p.active?`<button class="btn-no" onclick="deactivatePromo('${p.code}')">Desactivar</button>`:""}
+      </div>
+    </div>`).join("");
+}
+async function createPromo(){
+  const code=document.getElementById("pc-code").value.trim();
+  const amount=parseFloat(document.getElementById("pc-amount").value);
+  const uses=parseInt(document.getElementById("pc-uses").value)||100;
+  const exp=document.getElementById("pc-exp").value||"";
+  if(!code||!amount){showAlert("Preenche o código e o valor.");return}
+  const d=await adminApi("/admin/promos/create","POST",{code,amount,max_uses:uses,expires:exp});
+  if(d.ok){showAlert("✅ Código criado!",true);loadPromos();}
+  else showAlert("Erro: "+(d.error||"Falhou"));
+}
+async function deactivatePromo(code){
+  await adminApi(`/admin/promos/${code}/deactivate`,"POST",{});
+  loadPromos();
+}
+async function loadTickets2(){
+  document.getElementById("ticket-list").innerHTML="<div class='empty'>A carregar...</div>";
+  const d=await adminApi("/admin/tickets");
+  if(!d.tickets){return}
+  const cnt=document.getElementById("cnt-tkt");
+  const open=d.tickets.filter(t=>t.status==="open");
+  if(open.length){cnt.textContent=open.length;cnt.classList.add("show");}
+  if(!d.tickets.length){document.getElementById("ticket-list").innerHTML="<div class='empty'>Sem pedidos ✓</div>";return}
+  document.getElementById("ticket-list").innerHTML=d.tickets.map(t=>`
+    <div class="item" id="tkt-${t.id}">
+      <div class="it">
+        <div>
+          <div class="iname">${t.name}</div>
+          <div class="iemail">${t.email}</div>
+        </div>
+        <div><span class="badge ${t.status==="closed"?"ba":"bp"}">${t.status==="closed"?"Respondido":"Aberto"}</span></div>
+      </div>
+      <div class="iref">${t.message}</div>
+      ${t.reply?`<div style="color:#00e676;font-size:13px;margin-top:6px">💬 Resposta: ${t.reply}</div>`:""}
+      <div class="idt">📅 ${fmtD(t.created_at)}</div>
+      ${t.status==="open"?`
+      <div class="irow" style="margin-top:10px">
+        <input class="noteinp" id="tr-${t.id}" placeholder="Resposta ao utilizador..." style="flex:2">
+        <button class="btn-ok" onclick="replyTicket(${t.id})">💬 Responder</button>
+      </div>`:""}
+    </div>`).join("");
+}
+async function replyTicket(id){
+  const reply=document.getElementById("tr-"+id)?.value.trim();
+  if(!reply){showAlert("Insere a resposta.");return}
+  const d=await adminApi(`/admin/tickets/${id}/reply`,"POST",{reply});
+  if(d.ok){showAlert("✅ Resposta enviada!",true);loadTickets2();}
+}
+async function adjustBalance(){
+  const uid=parseInt(document.getElementById("adj-uid").value);
+  const amt=parseFloat(document.getElementById("adj-amt").value);
+  const reason=document.getElementById("adj-reason").value.trim()||"Ajuste manual";
+  const el=document.getElementById("adj-msg");
+  if(!uid||!amt){el.textContent="❌ Preenche ID e valor.";el.style.color="#ff4569";return}
+  const d=await adminApi("/admin/balance/add","POST",{user_id:uid,amount:amt,reason});
+  if(d.ok){el.textContent=`✅ Saldo ajustado para utilizador ${uid}`;el.style.color="#00e676";loadUsers();}
+  else{el.textContent="❌ "+(d.error||"Falhou");el.style.color="#ff4569";}
+}
+
+/* ══ MODO JOGO ADMIN ══ */
+let TEST_RID = null;
+let TEST_PLAYERS = []; // [{uid, name, idx, color}]
+let TEST_MAXP = 2;
+let TEST_STATE = null;
+
+const TEST_COLORS = { r:'#e53935', g:'#43a047', b:'#1565c0', y:'#f9a825' };
+const TEST_CNAMES = { r:'Vermelho', g:'Verde', b:'Azul', y:'Amarelo' };
+const TEST_UIDS = [-999, -1000, -1001, -1002]; // admin + bots
+const TEST_NAMES = ['Admin','Jogador 2','Jogador 3','Jogador 4'];
+
+async function createTestRoom() {
+  const maxp = parseInt(document.getElementById('test-maxp').value);
+  TEST_MAXP = maxp;
+  TEST_PLAYERS = [];
+  const d = await adminApi('/api/admin/play/create','POST',{name:TEST_NAMES[0],max_players:maxp});
+  if(!d.ok) { showAlert('Erro: '+(d.error||'Falhou')); return; }
+  TEST_RID = d.room_id;
+  TEST_PLAYERS.push({uid:TEST_UIDS[0], name:TEST_NAMES[0], idx:0});
+
+  // Mostrar ID da sala
+  document.getElementById('test-rid').style.display='block';
+  document.getElementById('test-rid-val').textContent = TEST_RID;
+
+  // Mostrar botões para adicionar jogadores
+  document.getElementById('test-players-section').style.display='block';
+  renderTestPlayerBtns();
+}
+
+function renderTestPlayerBtns() {
+  const el = document.getElementById('test-player-btns');
+  let html = '';
+  for(let i=1; i<TEST_MAXP; i++) {
+    const added = TEST_PLAYERS.find(p=>p.uid===TEST_UIDS[i]);
+    if(added) {
+      html += `<div style="padding:8px 14px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.2);border-radius:8px;font-size:13px;color:#00e676">${added.name} ✓</div>`;
+    } else {
+      html += `<button class="btn-ok" onclick="addTestPlayer(${i})" style="font-size:13px">+ ${TEST_NAMES[i]}</button>`;
+    }
+  }
+  el.innerHTML = html;
+
+  // Mostrar botão iniciar se tiver pelo menos 2
+  const startBtn = document.getElementById('btn-start-test');
+  if(TEST_PLAYERS.length >= 2) startBtn.style.display='inline-block';
+  else startBtn.style.display='none';
+}
+
+async function addTestPlayer(idx) {
+  const d = await adminApi('/api/admin/play/join','POST',{room_id:TEST_RID,name:TEST_NAMES[idx],player_idx:idx});
+  if(!d.ok) { showAlert('Erro: '+(d.error||'Falhou')); return; }
+  TEST_PLAYERS.push({uid:TEST_UIDS[idx], name:TEST_NAMES[idx], idx});
+  renderTestPlayerBtns();
+  showAlert('✅ '+TEST_NAMES[idx]+' adicionado!',true);
+}
+
+async function startTestGame() {
+  const d = await adminApi('/api/admin/play/start','POST',{room_id:TEST_RID});
+  if(!d.ok) { showAlert('Erro: '+(d.error||'Falhou')); return; }
+  TEST_STATE = d.state;
+  document.getElementById('test-game-section').style.display='block';
+  document.getElementById('test-players-section').style.display='none';
+  buildTestBoard();
+  renderTestState(TEST_STATE);
+  showAlert('✅ Jogo iniciado!',true);
+}
+
+// ── TABULEIRO ──────────────────────────────────────────────────────
+const TSAFE = new Set(['2_6','6_12','12_8','8_2','2_8','6_2','12_6','8_12']);
+function tccls(r,c){
+  // LAYOUT DA IMAGEM:
+  // Verde=cima-esquerda  (rows 0-5, cols 0-5)
+  // Amarelo=cima-direita  (rows 0-5, cols 9-14)
+  // Vermelho=baixo-esquerda (rows 9-14, cols 0-5)
+  // Azul=baixo-direita   (rows 9-14, cols 9-14)
+
+  // BASE VERDE (cima-esquerda)
+  if(r<=5 && c<=5){
+    if(r>=1&&r<=4&&c>=1&&c<=4) return 'bg-in'; // interior
+    return 'bg'; // borda verde
+  }
+  // BASE AMARELA (cima-direita)
+  if(r<=5 && c>=9){
+    if(r>=1&&r<=4&&c>=10&&c<=13) return 'by-in'; // interior
+    return 'by'; // borda amarela
+  }
+  // BASE VERMELHA (baixo-esquerda)
+  if(r>=9 && c<=5){
+    if(r>=10&&r<=13&&c>=1&&c<=4) return 'br-in'; // interior
+    return 'br2'; // borda vermelha
+  }
+  // BASE AZUL (baixo-direita)
+  if(r>=9 && c>=9){
+    if(r>=10&&r<=13&&c>=10&&c<=13) return 'bb-in'; // interior
+    return 'bb'; // borda azul
+  }
+  // CENTRO (casa final - triângulos coloridos)
+  if(r>=6&&r<=8&&c>=6&&c<=8){
+    if(r===6&&c===6) return 'tg';  // triângulo verde
+    if(r===6&&c===8) return 'ty';  // triângulo amarelo
+    if(r===8&&c===6) return 'tr2'; // triângulo vermelho
+    if(r===8&&c===8) return 'tb';  // triângulo azul
+    return 'ch'; // centro branco/estrela
+  }
+  // RETA FINAL VERDE (cima, col 7, rows 1-5) - desce para centro
+  if(c===7&&r>=1&&r<=5) return 'hpg';
+  // RETA FINAL AMARELA (direita, row 7, cols 9-13) - vai para esquerda
+  if(r===7&&c>=9&&c<=13) return 'hpy';
+  // RETA FINAL VERMELHA (baixo, col 7, rows 9-13) - sobe para centro
+  if(c===7&&r>=9&&r<=13) return 'hpr';
+  // RETA FINAL AZUL (esquerda, row 7, cols 1-5) - vai para direita
+  if(r===7&&c>=1&&c<=5) return 'hpb';
+  // CASAS SEGURAS
+  if(TSAFE.has(r+'_'+c)) return 'sf';
+  // SETAS DE ENTRADA
+  if(r===6&&c===0) return 'cw ar';   // entrada verde (→)
+  if(r===0&&c===8) return 'cw ag';   // entrada amarela (↓)  
+  if(r===8&&c===14) return 'cw ab';  // entrada azul (←)
+  if(r===14&&c===7) return 'cw ay';  // entrada vermelha (↑)
+  // CAMINHO NORMAL
+  return 'cw';
+}
+let TEST_BOARD_OBJ = null;
+
+function buildTestBoard(){
+  const canvas = document.getElementById('test-board-canvas');
+  if(!canvas) return;
+  const size = Math.min(400, window.innerWidth - 80);
+  canvas.width = size;
+  canvas.height = size;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  
+  if(typeof LudoBoard !== 'undefined') {
+    TEST_BOARD_OBJ = new LudoBoard(canvas, size);
+    canvas.addEventListener('click', onTestCanvasClick);
+    startTestRenderLoop();
+  }
+}
+
+let TEST_RENDER_FRAME = null;
+let TEST_PULSE_T = 0;
+let TEST_SELECTABLE = [];
+
+function startTestRenderLoop() {
+  cancelAnimationFrame(TEST_RENDER_FRAME);
+  function loop() {
+    TEST_PULSE_T += 0.05;
+    if(TEST_STATE && TEST_BOARD_OBJ) drawTestState(TEST_STATE);
+    TEST_RENDER_FRAME = requestAnimationFrame(loop);
+  }
+  TEST_RENDER_FRAME = requestAnimationFrame(loop);
+}
+
+function drawTestState(state) {
+  if(!TEST_BOARD_OBJ || !state || !state.players) return;
+  const canvas = document.getElementById('test-board-canvas');
+  if(!canvas) return;
+  TEST_BOARD_OBJ.drawBoard();
+  state.players.forEach(pl => {
+    pl.pos.forEach((pos, i) => {
+      const coord = TEST_BOARD_OBJ.getPieceCoord(pl.color, pos, !!pl.in_base[i], i);
+      const key = pl.color+'_'+i;
+      if(!TEST_BOARD_OBJ.pieces[key]) TEST_BOARD_OBJ.pieces[key]={x:coord.x,y:coord.y,animating:false};
+      const piece = TEST_BOARD_OBJ.pieces[key];
+      if(!piece.animating) { piece.x=coord.x; piece.y=coord.y; }
+      const isSel = TEST_SELECTABLE.includes(i) && pl.idx===state.turn;
+      TEST_BOARD_OBJ.drawPiece(piece.x, piece.y, pl.color, i+1, isSel, TEST_PULSE_T);
+    });
+  });
+}
+
+function onTestCanvasClick(e) {
+  if(!TEST_STATE || !TEST_BOARD_OBJ) return;
+  if(TEST_STATE.phase !== 1) return;
+  const curPlayer = TEST_STATE.players[TEST_STATE.turn];
+  if(!curPlayer || curPlayer.user_id !== -999) return;
+  
+  const rect = e.target.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const cs = e.target.width / 15;
+  
+  curPlayer.pos.forEach((pos, i) => {
+    if(!TEST_SELECTABLE.includes(i)) return;
+    const coord = TEST_BOARD_OBJ.getPieceCoord(curPlayer.color, pos, !!curPlayer.in_base[i], i);
+    const r = cs * 0.35;
+    if(Math.sqrt((x-coord.x)**2+(y-coord.y)**2) <= r+8) testMove(i);
+  });
+}
+function buildTPath(){
+  const p=[];
+  for(let c=1;c<=5;c++)p.push([6,c]);
+  for(let r=5;r>=0;r--)p.push([r,5]);
+  for(let c=6;c<=8;c++)p.push([0,c]);
+  for(let r=1;r<=5;r++)p.push([r,9]);
+  for(let c=9;c<=14;c++)p.push([6,c]);
+  for(let r=7;r<=8;r++)p.push([r,14]);
+  for(let c=13;c>=9;c--)p.push([8,c]);
+  for(let r=9;r<=14;r++)p.push([r,9]);
+  for(let c=8;c>=6;c--)p.push([14,c]);
+  for(let r=13;r>=9;r--)p.push([r,5]);
+  for(let c=5;c>=0;c--)p.push([8,c]);
+  for(let r=7;r>=6;r--)p.push([r,0]);
+  return p.slice(0,52);
+}
+const TOUTER=buildTPath();
+// HOME PATHS - retas finais de cada cor
+// Verde (g): col 7, rows 1->6 (desce para centro)
+// Amarelo (y): row 7, cols 9->7 (vem da direita)  
+// Vermelho (r): col 7, rows 13->8 (sobe para centro)
+// Azul (b): row 7, cols 5->7 (vem da esquerda)
+const THOMES={
+  0:[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],   // verde (g) - col 7 desce
+  1:[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]], // amarelo (y) - row 7 da direita
+  2:[[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]], // vermelho (r) - col 7 sobe
+  3:[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]]     // azul (b) - row 7 da esquerda
+};
+// BASES (onde ficam as peças em espera)
+const TBASES={
+  0:[[2,2],[2,4],[4,2],[4,4]],    // verde - canto cima-esq
+  1:[[2,10],[2,12],[4,10],[4,12]], // amarelo - canto cima-dir
+  2:[[10,2],[10,4],[12,2],[12,4]], // vermelho - canto baixo-esq
+  3:[[10,10],[10,12],[12,10],[12,12]] // azul - canto baixo-dir
+};
+// Posições de saída no caminho externo (52 casas)
+// Verde sai em col 6, row 6 = posição 0 no path
+// Amarelo sai em row 6, col 8 = posição 13
+// Vermelho sai em col 8, row 8 = posição 26  
+// Azul sai em row 8, col 6 = posição 39
+const TCSTART=[0,13,26,39]; // g, y, r, b
+function tpCoord(ci,pos,inBase,idx){
+  if(inBase||pos===0) return TBASES[ci][idx];
+  if(pos>=58) return THOMES[ci][5];
+  if(pos>=52) return THOMES[ci][Math.min(pos-52,5)];
+  return TOUTER[(TCSTART[ci]+pos-1)%52]||[7,7];
+}
+
+function renderTestState(state){
+  TEST_STATE = state;
+  if(!state||!state.players) return;
+  // Player cards
+  const pc = document.getElementById('test-pcards');
+  if(pc){
+    pc.innerHTML = state.players.map(p=>{
+      const isT = p.idx === state.turn;
+      const ci = ['r','g','b','y'].indexOf(p.color);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#0d0f20;border:1.5px solid ${isT?'#f5c518':'#1e2040'};border-radius:10px;${isT?'box-shadow:0 0 14px rgba(245,197,24,.2)':''}">
+        <div style="width:10px;height:10px;border-radius:50%;background:${TEST_COLORS[p.color]}"></div>
+        <div style="font-size:13px;font-weight:600;color:${isT?'#f5c518':'#888'}">${p.name}</div>
+        <div style="font-size:11px;color:#555">${p.fin}/4</div>
+      </div>`;
+    }).join('');
+  }
+  // Turn info
+  const curP = state.players[state.turn];
+  const tname = document.getElementById('test-turn-name');
+  if(tname&&curP) tname.textContent = curP.name + ' — ' + (state.phase===0?'lança o dado':'escolhe peça');
+  // Roll button
+  const rb = document.getElementById('test-roll-btn');
+  if(rb) rb.disabled = state.phase !== 0 || state.over;
+  // Peças
+  renderTestPieces(state);
+  // Log
+  if(state.log&&state.log.length){
+    const le=document.getElementById('test-log');
+    const msgs = state.log.slice(-15).reverse();
+    le.innerHTML='<div style="font-size:10px;color:#555;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Registo</div>'+
+      msgs.map(l=>`<div style="padding:3px 0;border-bottom:1px solid #1e2040;font-size:12px;color:#888">${l}</div>`).join('');
+  }
+  // Game over
+  if(state.over && state.players[state.turn]) {
+    const winner = state.players.find(p=>p.fin===4) || state.players[state.turn];
+    document.getElementById('test-msg').textContent = '🏆 ' + winner.name + ' VENCEU!';
+    document.getElementById('test-msg').style.color = '#f5c518';
+  }
+}
+
+function renderTestPieces(state){
+  TEST_SELECTABLE = [];
+  // Canvas handles rendering
+  if(!state||!state.players) return;
+  const COLORS=['r','g','b','y'];
+  const COLORS_ORDER=['g','y','r','b'];
+  state.players.forEach(pl=>{
+    const ci=COLORS_ORDER.indexOf(pl.color);
+    if(ci<0) return;
+    pl.pos.forEach((pos,i)=>{
+      const coord=tpCoord(ci,pos,!!pl.in_base[i],i);
+      const cell=document.getElementById(`tc${coord[0]}_${coord[1]}`);
+      if(!cell) return;
+      const el=document.createElement('div');
+      el.className='tpiece p-'+pl.color;
+      const isMyTurn = pl.idx === state.turn;
+      // Verificar se é movível
+      const curUid = TEST_UIDS[state.turn];
+      if(isMyTurn && state.phase===1) {
+        el.onclick = () => testMove(i);
+        el.style.cursor = 'pointer';
+      }
+      el.textContent = i+1;
+      cell.appendChild(el);
+    });
+  });
+  // Destacar peças movíveis
+  if(state.phase===1) highlightTestMovable();
+}
+
+async function highlightTestMovable(){
+  const curUid = TEST_UIDS[TEST_STATE?.turn||0];
+  const d = await adminApi('/api/admin/play/movable','POST',{room_id:TEST_RID,uid:curUid});
+  TEST_SELECTABLE = d.movable||[];
+}
+
+async function testRoll(){
+  const curUid = TEST_UIDS[TEST_STATE?.turn||0];
+  const d = await adminApi('/api/admin/play/roll','POST',{room_id:TEST_RID,uid:curUid});
+  if(d.error){ showAlert(d.error); return; }
+  // Animar dado
+  const df=document.getElementById('test-dice-face');
+  const dn=document.getElementById('test-dice-num');
+  let i=0;
+  const faces=['⚀','⚁','⚂','⚃','⚄','⚅'];
+  const spin=setInterval(()=>{ df.textContent=faces[Math.floor(Math.random()*6)]; i++; if(i>8)clearInterval(spin); },80);
+  setTimeout(()=>{
+    df.textContent=faces[(d.dice||1)-1];
+    dn.textContent=d.dice||'?';
+  },720);
+  renderTestState(d);
+  setTimeout(highlightTestMovable, 750);
+}
+
+async function testMove(piece){
+  const curUid = TEST_UIDS[TEST_STATE?.turn||0];
+  const d = await adminApi('/api/admin/play/move','POST',{room_id:TEST_RID,uid:curUid,piece});
+  if(d.error){ showAlert(d.error); return; }
+  renderTestState(d);
+}
+
+function resetTestGame(){
+  TEST_RID=null; TEST_PLAYERS=[]; TEST_STATE=null;
+  document.getElementById('test-rid').style.display='none';
+  document.getElementById('test-players-section').style.display='none';
+  document.getElementById('test-game-section').style.display='none';
+  document.getElementById('test-msg').textContent='';
+  document.getElementById('test-dice-face').textContent='⚀';
+  document.getElementById('test-dice-num').textContent='—';
+}
+
+// Update tab function for new panel
+
+let AUTO_BOT = false;
+let BOT_INTERVAL = null;
+
+function toggleAutoBot() {
+  AUTO_BOT = !AUTO_BOT;
+  const btn = document.getElementById('btn-autobot');
+  if(btn) {
+    btn.textContent = '🤖 Auto-Bot: ' + (AUTO_BOT ? 'ON' : 'OFF');
+    btn.style.color = AUTO_BOT ? '#00e676' : '#888';
+    btn.style.borderColor = AUTO_BOT ? 'rgba(0,230,118,.3)' : '#252a50';
+  }
+  if(AUTO_BOT) startAutoBot();
+  else stopAutoBot();
+}
+
+function startAutoBot() {
+  stopAutoBot();
+  BOT_INTERVAL = setInterval(async () => {
+    if(!TEST_STATE || !TEST_RID || TEST_STATE.over) { stopAutoBot(); return; }
+    const curPlayer = TEST_STATE.players[TEST_STATE.turn];
+    if(!curPlayer) return;
+    // If it's a bot's turn (not admin = uid -999)
+    if(curPlayer.user_id !== -999) {
+      await adminApi('/api/admin/play/bot_turn','POST',{room_id:TEST_RID,uid:curPlayer.user_id});
+      // Refresh state
+      const d = await adminApi('/api/admin/play/state/'+TEST_RID);
+      if(d.room_id) { TEST_STATE=d; renderTestState(d); }
+    }
+  }, 800);
+}
+
+function stopAutoBot() {
+  if(BOT_INTERVAL) { clearInterval(BOT_INTERVAL); BOT_INTERVAL=null; }
+}
+
+async function skipBotTurn() {
+  if(!TEST_STATE || !TEST_RID) return;
+  const curP = TEST_STATE.players[TEST_STATE.turn];
+  if(!curP || curP.user_id === -999) return;
+  await adminApi('/api/admin/play/bot_turn','POST',{room_id:TEST_RID,uid:curP.user_id});
+  const d = await adminApi('/api/admin/play/state/'+TEST_RID);
+  if(d.room_id) { TEST_STATE=d; renderTestState(d); }
+}
+
+async function loginAsPlayer() {
+  const name = document.getElementById('admin-player-name').value.trim() || 'Admin';
+  const d = await adminApi('/api/admin/login','POST',{name});
+  if(d.ok) {
+    showAlert('✅ Sessão iniciada como "'+name+'"! A abrir o site...', true);
+    setTimeout(() => window.open('/', '_blank'), 800);
+  } else {
+    showAlert('Erro: '+(d.error||'Falhou'));
+  }
+}
+
+// Auto-ligar ao abrir
+window.onload=()=>connect();
+</script>
+<script src="/static/ludo_board.js"></script>
+</body>
+</html>
