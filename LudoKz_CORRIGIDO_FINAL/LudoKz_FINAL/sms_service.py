@@ -84,3 +84,4 @@ def enviar_sms_simulado(numero, codigo, nome="utilizador"):
         return True, msg
     else:
         return _enviar_simulado(numero_e164, codigo, nome, mensagem)
+#ombala 
