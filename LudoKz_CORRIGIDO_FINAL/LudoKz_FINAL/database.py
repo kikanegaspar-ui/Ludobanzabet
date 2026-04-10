@@ -6,7 +6,6 @@ if os.environ.get("RENDER"):
 else:
     DB = os.path.join(os.path.dirname(__file__), "ludokz.db")
 
-# Dominios de email descartavel bloqueados
 BLOCKED_DOMAINS = {
     "mailinator.com","guerrillamail.com","tempmail.com","throwam.com",
     "trashmail.com","yopmail.com","fakeinbox.com","sharklasers.com",
@@ -152,7 +151,6 @@ def criar_otp(phone, purpose='register'):
     code = str(__import__('random').randint(100000, 999999))
     expires = (datetime.now() + timedelta(minutes=2)).isoformat()
     c = _c()
-    # Invalidar OTPs anteriores para este número
     c.execute("UPDATE otp_codes SET used=1 WHERE phone=? AND purpose=? AND used=0", (phone, purpose))
     c.execute("INSERT INTO otp_codes(phone,code,purpose,expires_at) VALUES(?,?,?,?)",
               (phone, code, purpose, expires))
@@ -179,14 +177,12 @@ def marcar_telefone_verificado(phone):
     c.commit(); c.close()
 
 def validate_email(email):
-    """Valida email - retorna (ok, mensagem)"""
     email = email.lower().strip()
     if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
         return False, "Email inválido."
     domain = email.split('@')[1]
     if domain in BLOCKED_DOMAINS:
         return False, "Emails temporários/falsos não são permitidos. Usa um email real."
-    # Verifica TLD suspeito
     if len(domain.split('.')[-1]) < 2:
         return False, "Domínio de email inválido."
     return True, "OK"
@@ -203,9 +199,13 @@ def create_user(phone, pw, name, age_confirmed=False, terms_accepted=False, ref_
     finally:
         try: c.close()
         except: pass
-    # Código de referido
+
+    # Invalidar todos os OTPs pendentes deste número após registo concluído
+    c2 = _c()
+    c2.execute("UPDATE otp_codes SET used=1 WHERE phone=? AND used=0", (phone,))
+    c2.commit(); c2.close()
+
     set_referral_code(uid)
-    # Processar referido
     if ref_code:
         referrer = get_user_by_refcode(ref_code)
         if referrer and referrer['id'] != uid:
@@ -218,7 +218,6 @@ def get_user_by_phone(phone):
     return dict(r) if r else None
 
 def get_user_by_email(email):
-    """Compatibilidade — procura por telefone se parecer número"""
     return get_user_by_phone(email)
 
 def verify_user(phone, pw):
@@ -376,7 +375,6 @@ def reject_withdrawal(wid, note=""):
     w = c.execute("SELECT * FROM withdrawals WHERE id=? AND status='pending'", (wid,)).fetchone()
     if not w: c.close(); return False
     w = dict(w)
-    # Devolver saldo
     c.execute("UPDATE users SET balance=balance+? WHERE id=?", (w['amount'], w['user_id']))
     c.execute("UPDATE withdrawals SET status='rejected',note=? WHERE id=?", (note, wid))
     c.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(?,?,?,?)",
@@ -444,13 +442,11 @@ def get_user_by_refcode(code):
     return dict(r) if r else None
 
 def register_referral(referrer_id, referred_id):
-    REFERRAL_BONUS = 500  # Kz
+    REFERRAL_BONUS = 500
     c = _c()
-    # Verificar se já existe
     ex = c.execute("SELECT id FROM referrals WHERE referred_id=?", (referred_id,)).fetchone()
     if ex: c.close(); return
     c.execute("INSERT INTO referrals(referrer_id,referred_id) VALUES(?,?)", (referrer_id, referred_id))
-    # Bónus para quem referiu
     c.execute("UPDATE users SET balance=balance+? WHERE id=?", (REFERRAL_BONUS, referrer_id))
     c.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(?,?,?,?)",
               (referrer_id,'referral_bonus', REFERRAL_BONUS, f"Bónus referido: novo utilizador"))
@@ -480,7 +476,6 @@ def use_promo(uid, code):
     if row['uses'] >= row['max_uses']: c.close(); return False, "Código esgotado."
     if row['expires_at'] and row['expires_at'] < datetime.now().isoformat():
         c.close(); return False, "Código expirado."
-    # Verificar se utilizador já usou este código
     ex = c.execute("SELECT id FROM transactions WHERE user_id=? AND description LIKE ?",
                    (uid, f"%PROMO:{code.upper()}%")).fetchone()
     if ex: c.close(); return False, "Já usaste este código."
@@ -497,7 +492,7 @@ def get_all_promos():
     return [dict(r) for r in rows]
 
 # ── BÓNUS DIÁRIO ──────────────────────────────────────
-DAILY_BONUSES = [500, 750, 1000, 1500, 2000, 2500, 5000]  # Streak 1-7
+DAILY_BONUSES = [500, 750, 1000, 1500, 2000, 2500, 5000]
 
 def claim_daily(uid):
     from datetime import datetime, date
@@ -508,7 +503,6 @@ def claim_daily(uid):
         row = dict(row)
         if row['last_claim'] == today:
             c.close(); return False, "Já recebeste o bónus hoje. Volta amanhã!"
-        # Verificar streak
         from datetime import date as dt, timedelta
         yesterday = (dt.today() - timedelta(days=1)).isoformat()
         streak = row['streak'] + 1 if row['last_claim'] == yesterday else 1
