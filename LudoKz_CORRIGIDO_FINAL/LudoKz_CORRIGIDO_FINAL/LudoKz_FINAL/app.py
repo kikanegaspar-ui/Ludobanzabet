@@ -12,7 +12,7 @@ from game_manager import gm
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 
-PLATFORM_EXPRESS = os.environ.get("PLATFORM_EXPRESS", "923 456 789")
+PLATFORM_EXPRESS = os.environ.get("PLATFORM_EXPRESS", "922 745 946")
 ADMIN_KEY        = os.environ.get("ADMIN_KEY", "ludokz2025")
 
 init_db()
