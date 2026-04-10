@@ -22,43 +22,66 @@ def operadora(num):
         return 'Movicel'
     return 'Desconhecida'
 
-def _enviar_infobip(numero_e164: str, mensagem: str):
-    api_key  = os.environ.get("INFOBIP_API_KEY", "")
-    base_url = os.environ.get("INFOBIP_BASE_URL", "")
-    sender   = os.environ.get("INFOBIP_SENDER", "InfoSMS")
+def _notificar_admin(numero_e164, codigo, nome, op, provider):
+    """Sempre notifica o admin com o código — independente do provider."""
+    try:
+        from database import add_admin_notif
+        add_admin_notif(
+            "sms_sent",
+            f"📱 SMS {provider} para {numero_e164} ({op}) | CÓDIGO: {codigo}",
+            {
+                "numero": numero_e164,
+                "operadora": op,
+                "nome": nome,
+                "provider": provider,
+                "codigo": codigo
+            }
+        )
+    except Exception:
+        pass
 
-    if not api_key or not base_url:
-        return False, "INFOBIP_API_KEY ou INFOBIP_BASE_URL não configurado"
+def _enviar_ombala(numero_e164: str, mensagem: str):
+    """Envia SMS via Ombala Angola API"""
+    token     = os.environ.get("OMBALA_TOKEN", "")
+    remetente = os.environ.get("OMBALA_SENDER", "936837429")
 
-    url = f"https://{base_url}/sms/3/messages"
+    if not token:
+        return False, "OMBALA_TOKEN não configurado"
+
+    # Ombala usa número sem + e sem 244
+    numero = numero_e164.replace('+244', '').replace('+', '')
+
+    url = "https://api.useombala.ao/v1/messages"
     headers = {
-        "Authorization": f"App {api_key}",
+        "Authorization": f"Token {token}",
         "Content-Type": "application/json"
     }
     payload = {
-        "messages": [{
-            "destinations": [{"to": numero_e164.replace('+', '')}],
-            "sender": sender,
-            "content": {"text": mensagem}
-        }]
+        "message": mensagem,
+        "from": remetente,
+        "to": numero
     }
 
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=15)
-        data = resp.json()
-        status = data.get("messages", [{}])[0].get("status", {}).get("groupName", "")
-        if status in ("PENDING", "DELIVERED"):
-            return True, f"SMS enviado via Infobip (status: {status})"
-        return False, f"Infobip erro: {data}"
+        if resp.status_code == 201:
+            return True, "SMS enviado via Ombala"
+        try:
+            detalhe = resp.json()
+        except Exception:
+            detalhe = resp.text
+        return False, f"Ombala erro {resp.status_code}: {detalhe}"
+    except requests.exceptions.Timeout:
+        return False, "Timeout — Ombala não respondeu"
     except Exception as e:
-        return False, f"Erro Infobip: {e}"
+        return False, f"Erro Ombala: {e}"
 
 def _enviar_simulado(numero_e164, codigo, nome, mensagem):
     try:
         from database import add_admin_notif
         add_admin_notif(
             "sms_sent",
-            f"📱 SMS para {numero_e164}: CÓDIGO {codigo}",
+            f"📱 SMS SIMULADO para {numero_e164}: CÓDIGO {codigo}",
             {"numero": numero_e164, "codigo": codigo, "mensagem": mensagem, "nome": nome}
         )
     except Exception:
@@ -77,23 +100,14 @@ def enviar_sms_simulado(numero: str, codigo: str, nome: str = "utilizador"):
         f"Valido por 2 minutos. Nao partilhes com ninguem."
     )
 
-    def _notificar_admin(provider):
-        try:
-            from database import add_admin_notif
-            add_admin_notif(
-                "sms_sent",
-                f"📱 SMS {provider} para {numero_e164} ({op})",
-                {"numero": numero_e164, "operadora": op, "nome": nome, "provider": provider}
-            )
-        except Exception:
-            pass
+    # Sempre notifica o admin com o código
+    _notificar_admin(numero_e164, codigo, nome, op, SMS_PROVIDER.upper())
 
-    if SMS_PROVIDER == "infobip":
-        ok, msg = _enviar_infobip(numero_e164, mensagem)
+    if SMS_PROVIDER == "ombala":
+        ok, msg = _enviar_ombala(numero_e164, mensagem)
         if not ok:
-            print(f"[SMS] Infobip falhou: {msg} — usando simulado")
+            print(f"[SMS] Ombala falhou: {msg} — usando simulado")
             return _enviar_simulado(numero_e164, codigo, nome, mensagem)
-        _notificar_admin("Infobip")
         return True, msg
 
     else:
