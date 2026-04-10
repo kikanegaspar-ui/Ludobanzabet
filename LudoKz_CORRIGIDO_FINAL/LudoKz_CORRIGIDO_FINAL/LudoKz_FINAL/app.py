@@ -21,25 +21,41 @@ init_db()
 _sse: dict[int, list[queue.Queue]] = {}
 _sse_lk = threading.Lock()
 
+# Rate limiting para envio de OTP — máx 2 pedidos por minuto por número
+_otp_rate: dict = {}
+_otp_rate_lk = threading.Lock()
+
+def _otp_permitido(phone: str, max_por_minuto: int = 2) -> bool:
+    """Retorna True se o número ainda não excedeu o limite de pedidos de OTP."""
+    agora = time.time()
+    with _otp_rate_lk:
+        contagem, reset_em = _otp_rate.get(phone, (0, agora + 60))
+        if agora > reset_em:
+            contagem, reset_em = 0, agora + 60
+        if contagem >= max_por_minuto:
+            return False
+        _otp_rate[phone] = (contagem + 1, reset_em)
+        return True
+
 def push(uid: int, event: str, data: dict):
     msg = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
     with _sse_lk:
         for q in _sse.get(uid, []):
             try:
                 if q.full():
-                    try: q.get_nowait()  # descarta msg antiga
+                    try: q.get_nowait()
                     except: pass
                 q.put_nowait(msg)
             except Exception:
                 pass
 
 def push_admin(event: str, data: dict):
-    push(-1, event, data)  # -1 = admin
+    push(-1, event, data)
 
 def push_room(rid: str, event: str, data: dict):
     r = gm.get_room(rid)
     if r:
-        players_snapshot = list(r.players)  # snapshot to avoid race condition
+        players_snapshot = list(r.players)
         for p in players_snapshot:
             push(p.user_id, event, data)
 
@@ -76,7 +92,6 @@ def admin_page():
 # AUTH
 @app.route("/api/otp/send", methods=["POST"])
 def api_otp_send():
-    """Envia OTP por SMS para o número angolano"""
     d = request.json or {}
     raw_phone = d.get("phone","").strip()
     purpose = d.get("purpose","register")
@@ -84,12 +99,13 @@ def api_otp_send():
     
     phone, err = formatar_numero_angola(raw_phone)
     if err: return jsonify({"error": err}), 400
-    
-    # Se for registo, verificar se já existe
+
+    if not _otp_permitido(phone):
+        return jsonify({"error": "Demasiados pedidos. Aguarda 1 minuto antes de tentar novamente."}), 429
+
     if purpose == "register" and get_user_by_phone(phone):
         return jsonify({"error": "Número já registado. Faz login."}), 400
     
-    # Se for login, verificar se existe
     if purpose == "login" and not get_user_by_phone(phone):
         return jsonify({"error": "Número não encontrado. Regista-te primeiro."}), 404
     
@@ -109,15 +125,16 @@ def api_otp_send():
 
 @app.route("/api/otp/verify", methods=["POST"])
 def api_otp_verify():
-    """Verifica o código OTP"""
     d = request.json or {}
     phone = d.get("phone","").strip()
     code = d.get("code","").strip()
     purpose = d.get("purpose","register")
-    
+
     ok, msg = verificar_otp(phone, code, purpose)
     if not ok: return jsonify({"error": msg}), 400
-    
+
+    # Guardar na sessão do servidor — não pode ser falsificado pelo cliente
+    session[f"otp_ok_{purpose}"] = phone
     return jsonify({"ok": True, "verified": True})
 
 @app.route("/api/register", methods=["POST"])
@@ -139,18 +156,20 @@ def api_register():
         return jsonify({"error":"Deves confirmar que tens 18 ou mais anos."}), 400
     if not terms_ok:
         return jsonify({"error":"Deves aceitar os Termos e Condições."}), 400
-    # OTP já foi verificado no passo anterior (/api/otp/verify)
-    # Apenas confirmar que o número passou pela verificação
-    # (O frontend só chega aqui depois de verificar o OTP)
-    if not otp and not d.get("phone_verified"):
-        return jsonify({"error":"Verifica o número primeiro."}), 400
-    
+
+    # Verificar sessão do servidor — garante que o OTP foi mesmo validado
+    # (não se confia em nenhum campo do body JSON enviado pelo cliente)
+    if session.get("otp_ok_register") != phone:
+        return jsonify({"error": "Verifica o número por SMS antes de te registares."}), 400
+
     try:
         uid = create_user(phone, pw, name, age_ok, terms_ok, ref_code)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     
     marcar_telefone_verificado(phone)
+    # Limpar token de verificação da sessão — não pode ser reutilizado
+    session.pop("otp_ok_register", None)
     session["uid"] = uid
     return jsonify({"ok":True,"user":safe_user(get_user(uid))})
 
@@ -173,15 +192,12 @@ def api_logout():
 def api_me():
     return jsonify({"user": safe_user(get_user(session["uid"]))})
 
-# RECUPERAR SENHA
 @app.route("/api/reset/request", methods=["POST"])
 def api_reset_req():
-    """Reset senha via SMS OTP"""
     phone = (request.json or {}).get("phone","").strip()
     u = get_user_by_phone(phone)
     if not u:
         return jsonify({"ok":True,"msg":"Se o número existir, receberás um SMS."})
-    # Enviar OTP de reset
     code = criar_otp(phone, "reset")
     enviar_sms_simulado(phone, code, u["name"])
     push_admin("password_reset", {"phone": phone, "code": code, "name": u["name"]})
@@ -201,7 +217,6 @@ def api_reset_confirm():
     reset_password(u["id"], new_pw)
     return jsonify({"ok":True})
 
-# PERFIL
 @app.route("/api/set_express", methods=["POST"])
 @login_req
 def api_set_express():
@@ -210,7 +225,6 @@ def api_set_express():
     set_express(session["uid"], num)
     return jsonify({"ok":True})
 
-# DEPÓSITO
 @app.route("/api/deposit/request", methods=["POST"])
 @login_req
 def api_dep_req():
@@ -222,7 +236,6 @@ def api_dep_req():
     if amt < 500: return jsonify({"error":"Mínimo 500 Kz."}), 400
     if not ref:   return jsonify({"error":"Insere a referência Express."}), 400
     did = create_deposit(session["uid"], amt, ref, payer)
-    # Notificar admin via SSE
     deps = get_pending_deposits()
     push_admin("new_deposit", {
         "deposit_id": did, "amount": amt, "ref": ref,
@@ -235,7 +248,6 @@ def api_dep_req():
 def api_dep_list():
     return jsonify({"deposits": get_user_deposits(session["uid"])})
 
-# LEVANTAMENTO
 @app.route("/api/withdraw/request", methods=["POST"])
 @login_req
 def api_wit_req():
@@ -261,7 +273,6 @@ def api_wit_req():
 def api_wit_list():
     return jsonify({"withdrawals": get_user_withdrawals(session["uid"])})
 
-# HISTÓRICO
 @app.route("/api/transactions")
 @login_req
 def api_txs():
@@ -272,7 +283,6 @@ def api_txs():
 def api_ghist():
     return jsonify({"games": get_user_games(session["uid"])})
 
-# LOBBY
 BET_TIERS = {1000:"Bronze",5000:"Prata",10000:"Ouro",50000:"VIP"}
 
 @app.route("/api/lobby")
@@ -311,7 +321,6 @@ def api_join():
         refund_bet(session["uid"], r.bet); return jsonify({"error":msg}), 400
     add_tx(session["uid"],"bet",-r.bet,f"Aposta sala {r.tier}")
     push_room(rid, "player_joined", {"name": u["name"], "players": len(r.players), "max": r.max_p})
-    # Se sala ficou cheia, iniciar jogo
     if len(r.players) >= r.max_p:
         state = gm.start_game(rid)
         if state: push_room(rid, "game_started", state)
@@ -320,7 +329,6 @@ def api_join():
 @app.route("/api/room/start", methods=["POST"])
 @login_req
 def api_start():
-    """Host pode iniciar com menos jogadores (min 2)"""
     rid = (request.json or {}).get("room_id","")
     r = gm.get_room(rid)
     if not r: return jsonify({"error":"Sala não encontrada."}), 404
@@ -338,7 +346,6 @@ def api_state(rid):
     if not s: return jsonify({"error":"Sala não encontrada."}), 404
     return jsonify(s)
 
-# JOGO
 @app.route("/api/game/roll", methods=["POST"])
 @login_req
 def api_roll():
@@ -384,7 +391,6 @@ def api_leave():
         gm.remove_room(rid)
         return jsonify({"ok":True})
     if r.over: gm.remove_room(rid); return jsonify({"ok":True})
-    # Encontrar vencedor (entre os que ficaram)
     remaining = [p for p in r.players if p.user_id != uid]
     if remaining:
         winner_uid = max(remaining, key=lambda p: getattr(p, 'fin', 0)).user_id
@@ -410,7 +416,6 @@ def _finish_game(rid):
         })
     gm.remove_room(rid)
 
-# SSE
 @app.route("/api/events")
 @login_req
 def sse():
@@ -452,7 +457,6 @@ def sse_admin():
                     mimetype="text/event-stream",
                     headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"})
 
-# ADMIN API
 @app.route("/admin/deposits")
 @admin_req
 def adm_deps(): return jsonify({"deposits":get_pending_deposits()})
@@ -547,9 +551,6 @@ def adm_stats():
         "pending_withdrawals": pwits
     }})
 
-
-# ════════════════ REFERIDOS ════════════════
-
 @app.route("/api/referral/code")
 @login_req
 def api_ref_code():
@@ -564,8 +565,6 @@ def api_ref_code():
 @login_req
 def api_ref_list():
     return jsonify({"referrals": get_referrals(session["uid"])})
-
-# ════════════════ PROMO CODES ════════════════
 
 @app.route("/api/promo/use", methods=["POST"])
 @login_req
@@ -584,8 +583,6 @@ def fmt_kz(n):
     except (ValueError, TypeError):
         return "0"
 
-# ════════════════ BÓNUS DIÁRIO ════════════════
-
 @app.route("/api/bonus/daily/status")
 @login_req
 def api_daily_status():
@@ -601,8 +598,6 @@ def api_daily_claim():
     add_tx(session["uid"], "daily_bonus", result["amount"],
            f"Bónus diário dia {result['streak']}")
     return jsonify({"ok":True, **result, "balance": u["balance"]})
-
-# ════════════════ SUPORTE ════════════════
 
 @app.route("/api/support/ticket", methods=["POST"])
 @login_req
@@ -620,8 +615,6 @@ def api_support_send():
 @login_req
 def api_support_list():
     return jsonify({"tickets": get_user_tickets(session["uid"])})
-
-# ════════════════ ADMIN — PROMO / SUPORTE ════════════════
 
 @app.route("/admin/promos", methods=["GET"])
 @admin_req
@@ -666,13 +659,11 @@ def adm_ticket_reply(tid):
 @app.route("/admin/balance/add", methods=["POST"])
 @admin_req
 def adm_add_balance():
-    """Admin pode adicionar saldo manualmente a qualquer utilizador"""
     d = request.json or {}
     uid = int(d.get("user_id",0))
     amount = float(d.get("amount",0))
     reason = d.get("reason","Ajuste manual")
     if not uid or amount == 0: return jsonify({"error":"Dados inválidos"}), 400
-    # Verify user exists before updating
     u_check = get_user(uid)
     if not u_check: return jsonify({"error": f"Utilizador {uid} não encontrado."}), 404
     c = _sq.connect(DB); c.execute("UPDATE users SET balance=balance+? WHERE id=?",(amount,uid))
@@ -682,16 +673,11 @@ def adm_add_balance():
     if u: push(uid,"balance_update",{"balance":u["balance"],"msg":f"O teu saldo foi ajustado: +{amount:,.0f} Kz"})
     return jsonify({"ok":True})
 
-
-# ════════════════ ADMIN — MODO JOGO SEM DINHEIRO ════════════════
-
 @app.route("/api/admin/login", methods=["POST"])
 @admin_req
 def adm_login_as_player():
-    """Admin entra como jogador regular (sem dinheiro)"""
     d = request.json or {}
     name = d.get("name", "Admin").strip()
-    # Criar/usar conta especial de admin (identificada pelo phone interno)
     ADMIN_PHONE = "admin@ludokz.internal"
     c = _sq.connect(DB); c.row_factory = _sq.Row
     u = c.execute("SELECT * FROM users WHERE phone=?", (ADMIN_PHONE,)).fetchone()
@@ -701,7 +687,6 @@ def adm_login_as_player():
         c.commit()
         u = c.execute("SELECT * FROM users WHERE phone=?", (ADMIN_PHONE,)).fetchone()
     uid = u["id"]
-    # Update name if changed
     c.execute("UPDATE users SET name=? WHERE id=?", (name, uid))
     c.commit(); c.close()
     session["uid"] = uid
@@ -714,22 +699,19 @@ def adm_login_as_player():
 @app.route("/api/admin/play/create", methods=["POST"])
 @admin_req
 def adm_play_create():
-    """Admin cria sala de teste sem dinheiro real"""
     d = request.json or {}
     name = d.get("name", "Admin").strip()
     max_p = int(d.get("max_players", 2))
-    # Usar uid=-999 para o admin (não precisa de conta)
     rid = gm.create_room(-999, name, 0, "Admin", max_p)
     return jsonify({"ok": True, "room_id": rid})
 
 @app.route("/api/admin/play/join", methods=["POST"])
 @admin_req
 def adm_play_join():
-    """Admin entra numa sala como qualquer jogador"""
     d = request.json or {}
     rid = d.get("room_id", "")
     name = d.get("name", "Admin").strip()
-    player_idx = int(d.get("player_idx", 1))  # qual bot/jogador simular
+    player_idx = int(d.get("player_idx", 1))
     ok, msg = gm.join_room(rid, -(1000 + player_idx), name)
     if not ok: return jsonify({"error": msg}), 400
     return jsonify({"ok": True})
@@ -754,7 +736,7 @@ def adm_play_roll():
     return jsonify(res)
 
 @app.route("/api/admin/play/move", methods=["POST"])
-@admin_req  
+@admin_req
 def adm_play_move():
     d = request.json or {}
     rid = d.get("room_id", "")
@@ -779,11 +761,9 @@ def adm_play_state(rid):
     if not s: return jsonify({"error": "Sala não encontrada."}), 404
     return jsonify(s)
 
-
 @app.route("/api/admin/play/bot_turn", methods=["POST"])
 @admin_req
 def adm_bot_turn():
-    """Executa turno do bot automaticamente"""
     d = request.json or {}
     rid = d.get("room_id","")
     uid = int(d.get("uid", -1000))
@@ -795,8 +775,6 @@ def adm_bot_turn():
                 _finish_game(rid)
     threading.Thread(target=run, daemon=True).start()
     return jsonify({"ok": True})
-
-# ════════════════ CHAT ════════════════
 
 @app.route("/api/game/chat", methods=["POST"])
 @login_req
@@ -813,8 +791,6 @@ def api_chat():
     push_room(rid, "chat_message", {"name": u["name"], "text": msg, "system": False})
     return jsonify({"ok":True})
 
-# ════════════════ LEADERBOARD ════════════════
-
 @app.route("/api/leaderboard")
 def api_leaderboard():
     c = _sq.connect(DB); c.row_factory = _sq.Row
@@ -827,8 +803,6 @@ def api_leaderboard():
     c.close()
     return jsonify({"leaderboard": [dict(r) for r in rows]})
 
-# ════════════════ STATS PUBLICAS ════════════════
-
 @app.route("/api/stats/public")
 def api_stats_public():
     c = _sq.connect(DB); c.row_factory = _sq.Row
@@ -839,11 +813,9 @@ def api_stats_public():
     c.close()
     return jsonify({"users": users, "games": games, "paid": paid, "online": online})
 
-# ════════════════ JACKPOT PROGRESSIVO ════════════════
 _jackpot_lock = threading.Lock()
 
 def get_jackpot_value():
-    """Lê jackpot da DB para persistir entre reinícios"""
     try:
         c = _sq.connect(DB); c.row_factory = _sq.Row
         row = c.execute("SELECT value FROM jackpot LIMIT 1").fetchone()
