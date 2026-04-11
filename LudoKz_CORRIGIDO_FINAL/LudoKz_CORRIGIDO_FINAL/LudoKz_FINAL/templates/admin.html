@@ -903,17 +903,17 @@ function onTestCanvasClick(e) {
   if(TEST_STATE.phase !== 1) return;
   const curPlayer = TEST_STATE.players[TEST_STATE.turn];
   if(!curPlayer || curPlayer.user_id !== -999) return;
-  
+  if(!curPlayer.tokens) return;
+
   const rect = e.target.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   const cs = e.target.width / 15;
-  
-  curPlayer.pos.forEach((pos, i) => {
+
+  curPlayer.tokens.forEach((token, i) => {
     if(!TEST_SELECTABLE.includes(i)) return;
-    const coord = TEST_BOARD_OBJ.getPieceCoord(curPlayer.color, pos, !!curPlayer.in_base[i], i);
-    const r = cs * 0.35;
-    if(Math.sqrt((x-coord.x)**2+(y-coord.y)**2) <= r+8) testMove(i);
+    const s = TEST_BOARD_OBJ._toScreen(token.x, token.y);
+    if(Math.sqrt((x-s.sx)**2+(y-s.sy)**2) <= cs*0.38+8) testMove(i);
   });
 }
 function buildTPath(){
