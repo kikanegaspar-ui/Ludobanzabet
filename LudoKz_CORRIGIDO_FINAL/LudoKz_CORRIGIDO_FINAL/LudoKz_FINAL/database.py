@@ -339,22 +339,48 @@ def get_user_deposits(uid, limit=15):
 
 # --- LEVANTAMENTOS ---
 def create_withdrawal(uid, amount, express_num, account_name):
-    if amount < 10000: return None, "Mínimo 10.000 Kz"
+    if amount < 1000: return None, "Minimo 1.000 Kz"
     if not account_name or len(account_name.strip()) < 3:
-        return None, "Nome da conta obrigatório para verificação."
-    net = round(amount * 0.95, 2)
+        return None, "Nome da conta obrigatorio para verificacao."
+    taxa_casa = round(amount * 0.05, 2)
+    taxa_afiliado = round(amount * 0.05, 2)
+    net = round(amount - taxa_casa - taxa_afiliado, 2)
     c = _c()
-    row = c.execute("SELECT balance,name FROM users WHERE id=?", (uid,)).fetchone()
+    row = c.execute("SELECT balance, name, referred_by FROM users WHERE id=?", (uid,)).fetchone()
     if not row or row['balance'] < amount: c.close(); return None, "Saldo insuficiente"
+
+    # Verificar se tem bonus — se sim, precisa de 5 convites para sacar
+    bonus_tx = c.execute(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE user_id=? AND type IN ('daily_bonus', 'promo', 'referral_bonus')",
+        (uid,)
+    ).fetchone()
+    total_bonus = bonus_tx['total'] if bonus_tx else 0
+    if total_bonus > 0:
+        total_referidos = c.execute(
+            "SELECT COUNT(*) as n FROM referrals WHERE referrer_id=?", (uid,)
+        ).fetchone()['n']
+        if total_referidos < 5:
+            c.close()
+            return None, f"Para sacar com bonus precisas de convidar 5 pessoas. Tens {total_referidos}/5."
+
     c.execute("UPDATE users SET balance=balance-? WHERE id=?", (amount, uid))
     r = c.execute("INSERT INTO withdrawals(user_id,amount,net_amount,express_number,account_name) VALUES(?,?,?,?,?)",
                   (uid, amount, net, express_num, account_name))
     c.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(?,?,?,?)",
-              (uid, 'withdrawal_pending', -amount, f"Pedido levantamento → {express_num}"))
+              (uid, 'withdrawal_pending', -amount, f"Pedido levantamento -> {express_num}"))
+
+    # Pagar 5% ao afiliado se existir
+    referrer_id = row['referred_by']
+    if referrer_id:
+        c.execute("UPDATE users SET balance=balance+? WHERE id=?", (taxa_afiliado, referrer_id))
+        c.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(?,?,?,?)",
+                  (referrer_id, 'affiliate_bonus', taxa_afiliado,
+                   f"Comissao afiliado 5% do levantamento de uid {uid}"))
+
     c.commit(); wid = r.lastrowid; c.close()
     u = get_user(uid)
     add_admin_notif("withdrawal_request",
-        f"💸 LEVANTAMENTO: {u['name']} quer sacar {amount:,.0f} Kz → {express_num} ({account_name})",
+        f"LEVANTAMENTO: {u['name']} quer sacar {amount:,.0f} Kz -> {express_num} ({account_name})",
         {"uid": uid, "amount": amount, "net": net, "express": express_num,
          "account_name": account_name, "wid": wid})
     return wid, None
