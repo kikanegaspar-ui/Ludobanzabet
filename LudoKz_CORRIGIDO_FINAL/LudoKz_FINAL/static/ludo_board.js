@@ -1,65 +1,66 @@
 /**
- * LudoBoard v4.0 — Design Simples e Limpo
- * Tabuleiro estilo clássico com bordas pretas, cores sólidas
- * Movimentação correcta com todas as regras do Ludo
+ * ludo_board.js — LudoKz v5
+ * Formato do backend: players[].tokens[].{ x, y, is_locked, has_reached_home, colour, id }
+ * Coordenadas: x=linha, y=coluna (grid 15×15)
  */
 
 // ══════════════════════════════════════════════
-//  SONS — ficheiros MP3 reais
+//  SONS
 // ══════════════════════════════════════════════
 const SFX = (() => {
   const cache = {};
-  function play(name, volume = 1.0) {
+  function play(name, vol) {
+    vol = vol === undefined ? 1.0 : vol;
     try {
-      if (!cache[name]) {
-        cache[name] = new Audio('/static/' + name + '.mp3');
-      }
-      const snd = cache[name].cloneNode();
-      snd.volume = Math.min(1, Math.max(0, volume));
-      snd.play().catch(() => {});
+      if (!cache[name]) cache[name] = new Audio('/static/' + name + '.mp3');
+      const s = cache[name].cloneNode();
+      s.volume = Math.min(1, Math.max(0, vol));
+      s.play().catch(function(){});
     } catch(e) {}
   }
   return {
-    dice()        { play('sfx_dice_roll', 0.8); },
-    diceResult(v) { play('sfx_click', 0.6); },
-    move()        { play('sfx_token_move', 0.9); },
-    capture()     { play('sfx_token_killed', 1.0); },
-    exitBase()    { play('sfx_click', 0.8); },
-    finish()      { play('sfx_in_home', 1.0); },
-    win()         { play('sfx_win', 1.0); },
-    safe()        { play('sfx_token_move', 0.5); },
-    myTurn()      { play('sfx_my_turn', 0.7); },
-    oppTurn()     { play('sfx_opp_turn', 0.5); },
-    clock()       { play('sfx_clock', 0.4); },
-    tick()        { play('sfx_click', 0.3); },
+    dice:    function() { play('sfx_dice_roll', 0.8); },
+    move:    function() { play('sfx_token_move', 0.9); },
+    capture: function() { play('sfx_token_killed', 1.0); },
+    exit:    function() { play('sfx_click', 0.8); },
+    finish:  function() { play('sfx_in_home', 1.0); },
+    win:     function() { play('sfx_win', 1.0); },
+    tick:    function() { play('sfx_click', 0.3); },
+    myTurn:  function() { play('sfx_my_turn', 0.7); },
+    oppTurn: function() { play('sfx_opp_turn', 0.5); },
+    blocked: function() { play('sfx_click', 0.4); },
   };
 })();
 
 // ══════════════════════════════════════════════
-//  CORES SIMPLES E SÓLIDAS
+//  CORES
 // ══════════════════════════════════════════════
 const PALETTE = {
-  red:    { main:'#e53935', light:'#ffcdd2', dark:'#b71c1c', text:'#ffffff' },
-  green:  { main:'#43a047', light:'#c8e6c9', dark:'#1b5e20', text:'#ffffff' },
-  blue:   { main:'#1e88e5', light:'#bbdefb', dark:'#0d47a1', text:'#ffffff' },
-  yellow: { main:'#fdd835', light:'#fff9c4', dark:'#f57f17', text:'#333300' },
+  red:    { main: '#e53935', light: '#ffcdd2', text: '#ffffff' },
+  green:  { main: '#43a047', light: '#c8e6c9', text: '#ffffff' },
+  blue:   { main: '#1e88e5', light: '#bbdefb', text: '#ffffff' },
+  yellow: { main: '#fdd835', light: '#fff9c4', text: '#333300' },
 };
 
 // ══════════════════════════════════════════════
-//  CASAS SEGURAS
+//  CASAS SEGURAS (linha, coluna)
 // ══════════════════════════════════════════════
-const SAFE_COORDS = new Set([
+const SAFE_SET = new Set([
   '6,13','1,6','8,1','13,8',
   '8,12','2,8','6,2','12,6',
 ]);
 
+function isSafe(row, col) {
+  return SAFE_SET.has(Math.round(row) + ',' + Math.round(col));
+}
+
 // ══════════════════════════════════════════════
-//  POSIÇÕES BASE de cada cor (linha, coluna)
+//  POSIÇÕES LOCKED de cada cor (do backend)
 // ══════════════════════════════════════════════
-const BASE_POSITIONS = {
-  red:    [[1.5,1.2],[3.5,1.2],[1.5,3.2],[3.5,3.2]],
-  green:  [[1.5,10.2],[3.5,10.2],[1.5,12.2],[3.5,12.2]],
-  blue:   [[10.5,1.2],[12.5,1.2],[10.5,3.2],[12.5,3.2]],
+const LOCKED_COORDS = {
+  blue:   [[1.5,10.2],[3.5,10.2],[1.5,12.2],[3.5,12.2]],
+  red:    [[1.5,1.2], [3.5,1.2], [1.5,3.2], [3.5,3.2]],
+  green:  [[10.5,1.2],[12.5,1.2],[10.5,3.2],[12.5,3.2]],
   yellow: [[10.5,10.2],[12.5,10.2],[10.5,12.2],[12.5,12.2]],
 };
 
@@ -68,95 +69,104 @@ const BASE_POSITIONS = {
 // ══════════════════════════════════════════════
 class LudoBoard {
   constructor(canvas, size) {
-    this.canvas = canvas;
-    this.ctx    = canvas.getContext('2d');
-    this.size   = size;
-    this.cs     = size / 15;
-
-    this.pieces           = {};
-    this._pulse           = 0;
-    this._rafId           = null;
-    this._particles       = [];
-    this._boardCache      = null;
-    this._boardCacheDirty = true;
-
+    this.canvas      = canvas;
+    this.ctx         = canvas.getContext('2d');
+    this.size        = size;
+    this.cs          = size / 15;
+    this.pieces      = {};
+    this._particles  = [];
+    this._boardCache = null;
+    this._pulse      = 0;
+    this._rafId      = null;
     this._startLoop();
   }
 
-  _gameToScreen(gameX, gameY) {
+  // Converte (linha, coluna) → píxeis canvas
+  _toScreen(row, col) {
     return {
-      sx: gameY * this.cs + this.cs * 0.5,
-      sy: gameX * this.cs + this.cs * 0.5,
+      sx: col * this.cs + this.cs * 0.5,
+      sy: row * this.cs + this.cs * 0.5,
     };
   }
 
+  // Alias usado pelo game_patch.js
+  _gameToScreen(row, col) {
+    return this._toScreen(row, col);
+  }
+
   _startLoop() {
-    const loop = (ts) => {
-      this._pulse = ts * 0.001;
-      this._updateParticles();
-      this._rafId = requestAnimationFrame(loop);
+    var self = this;
+    var tick = function(ts) {
+      self._pulse = ts * 0.001;
+      self._drawParticles();
+      self._rafId = requestAnimationFrame(tick);
     };
-    this._rafId = requestAnimationFrame(loop);
+    self._rafId = requestAnimationFrame(tick);
   }
 
   // ══════════════════════════════════════════
   //  TABULEIRO
   // ══════════════════════════════════════════
   drawBoard() {
-    if (!this._boardCache || this._boardCacheDirty) this._renderBoardToCache();
+    if (!this._boardCache) this._buildBoardCache();
     this.ctx.drawImage(this._boardCache, 0, 0);
   }
 
-  _renderBoardToCache() {
-    const off = document.createElement('canvas');
+  _buildBoardCache() {
+    var off = document.createElement('canvas');
     off.width = off.height = this.size;
-    const oc = off.getContext('2d');
-    const { cs, size } = this;
+    var g   = off.getContext('2d');
+    var cs  = this.cs;
+    var size = this.size;
 
     // Fundo branco
-    oc.fillStyle = '#ffffff';
-    oc.fillRect(0, 0, size, size);
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, size, size);
 
     // Células
-    for (let r = 0; r < 15; r++)
-      for (let c = 0; c < 15; c++)
-        this._drawCellTo(oc, r, c);
+    for (var r = 0; r < 15; r++)
+      for (var c = 0; c < 15; c++)
+        this._drawCell(g, r, c);
 
-    // Bases (quadrantes coloridos)
-    this._drawBaseTo(oc, 0, 0,  5, 5,  'red');
-    this._drawBaseTo(oc, 0, 9,  5, 14, 'green');
-    this._drawBaseTo(oc, 9, 0,  14, 5, 'blue');
-    this._drawBaseTo(oc, 9, 9,  14, 14,'yellow');
+    // Bases coloridas
+    this._drawBase(g, 0,  0,  5,  5,  'red');
+    this._drawBase(g, 0,  9,  5,  14, 'green');
+    this._drawBase(g, 9,  0,  14, 5,  'blue');
+    this._drawBase(g, 9,  9,  14, 14, 'yellow');
 
-    this._drawHomePathsTo(oc);
-    this._drawSafeStarsTo(oc);
-    this._drawCenterTo(oc);
+    // Retas finais
+    this._drawHomeLanes(g);
+
+    // Estrelas seguras
+    this._drawSafeStars(g);
+
+    // Centro
+    this._drawCenter(g);
 
     // Borda externa
-    oc.strokeStyle = '#000000';
-    oc.lineWidth   = 3;
-    oc.strokeRect(1, 1, size - 2, size - 2);
+    g.strokeStyle = '#000000';
+    g.lineWidth   = 3;
+    g.strokeRect(1.5, 1.5, size - 3, size - 3);
 
-    this._boardCache      = off;
-    this._boardCacheDirty = false;
+    this._boardCache = off;
   }
 
-  _drawCellTo(oc, r, c) {
-    const { cs } = this;
-    const x = c * cs, y = r * cs;
-    oc.fillStyle = this._cellBgColor(r, c);
-    oc.fillRect(x, y, cs, cs);
-    oc.strokeStyle = '#cccccc';
-    oc.lineWidth   = 0.5;
-    oc.strokeRect(x, y, cs, cs);
+  _drawCell(g, r, c) {
+    var cs = this.cs;
+    var x  = c * cs, y = r * cs;
+    g.fillStyle = this._cellColor(r, c);
+    g.fillRect(x, y, cs, cs);
+    g.strokeStyle = '#cccccc';
+    g.lineWidth   = 0.5;
+    g.strokeRect(x, y, cs, cs);
   }
 
-  _cellBgColor(r, c) {
-    if (r >= 0 && r <= 5  && c >= 0  && c <= 5)  return PALETTE.red.light;
-    if (r >= 0 && r <= 5  && c >= 9  && c <= 14) return PALETTE.green.light;
-    if (r >= 9 && r <= 14 && c >= 0  && c <= 5)  return PALETTE.blue.light;
-    if (r >= 9 && r <= 14 && c >= 9  && c <= 14) return PALETTE.yellow.light;
-    if (r >= 6 && r <= 8  && c >= 6  && c <= 8)  return '#ffffff';
+  _cellColor(r, c) {
+    if (r <= 5 && c <= 5)  return PALETTE.red.light;
+    if (r <= 5 && c >= 9)  return PALETTE.green.light;
+    if (r >= 9 && c <= 5)  return PALETTE.blue.light;
+    if (r >= 9 && c >= 9)  return PALETTE.yellow.light;
+    if (r >= 6 && r <= 8 && c >= 6 && c <= 8) return '#ffffff';
     if (r === 7 && c >= 1 && c <= 5)  return PALETTE.red.light;
     if (c === 7 && r >= 1 && r <= 5)  return PALETTE.green.light;
     if (r === 7 && c >= 9 && c <= 13) return PALETTE.yellow.light;
@@ -164,165 +174,153 @@ class LudoBoard {
     return '#ffffff';
   }
 
-  _drawBaseTo(oc, r1, c1, r2, c2, color) {
-    const { cs } = this;
-    const p = PALETTE[color];
+  _drawBase(g, r1, c1, r2, c2, color) {
+    var cs  = this.cs;
+    var p   = PALETTE[color];
+    var x   = c1 * cs, y = r1 * cs;
+    var w   = (c2 - c1 + 1) * cs;
+    var h   = (r2 - r1 + 1) * cs;
 
-    // Fundo colorido da base
-    oc.fillStyle = p.main;
-    oc.fillRect(c1 * cs, r1 * cs, (c2 - c1 + 1) * cs, (r2 - r1 + 1) * cs);
+    g.fillStyle   = p.main;
+    g.fillRect(x, y, w, h);
+    g.strokeStyle = '#000000';
+    g.lineWidth   = 2;
+    g.strokeRect(x, y, w, h);
 
-    // Borda da base
-    oc.strokeStyle = '#000000';
-    oc.lineWidth   = 2;
-    oc.strokeRect(c1 * cs, r1 * cs, (c2 - c1 + 1) * cs, (r2 - r1 + 1) * cs);
+    var pad = cs * 0.55;
+    g.fillStyle   = '#ffffff';
+    g.fillRect(x + pad, y + pad, w - pad * 2, h - pad * 2);
+    g.strokeStyle = '#000000';
+    g.lineWidth   = 1.5;
+    g.strokeRect(x + pad, y + pad, w - pad * 2, h - pad * 2);
 
-    // Painel branco interno
-    const pad = cs * 0.55;
-    const iw  = (c2 - c1 + 1) * cs - pad * 2;
-    const ih  = (r2 - r1 + 1) * cs - pad * 2;
-    oc.fillStyle   = '#ffffff';
-    oc.strokeStyle = '#000000';
-    oc.lineWidth   = 2;
-    oc.fillRect(c1 * cs + pad, r1 * cs + pad, iw, ih);
-    oc.strokeRect(c1 * cs + pad, r1 * cs + pad, iw, ih);
+    var coords = LOCKED_COORDS[color];
+    for (var i = 0; i < coords.length; i++) {
+      var row = coords[i][0], col = coords[i][1];
+      var cx  = col * cs + cs * 0.5;
+      var cy  = row * cs + cs * 0.5;
+      var rad = cs * 0.28;
 
-    // 4 círculos de peças
-    BASE_POSITIONS[color].forEach(([bx, by]) => {
-      const cx = by * cs + cs * 0.5;
-      const cy = bx * cs + cs * 0.5;
-      const r  = cs * 0.28;
+      g.fillStyle   = p.main;
+      g.strokeStyle = '#000000';
+      g.lineWidth   = 2;
+      g.beginPath();
+      g.arc(cx, cy, rad, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
 
-      oc.fillStyle   = p.main;
-      oc.strokeStyle = '#000000';
-      oc.lineWidth   = 2;
-      oc.beginPath();
-      oc.arc(cx, cy, r, 0, Math.PI * 2);
-      oc.fill();
-      oc.stroke();
-
-      // Brilho simples
-      oc.fillStyle = 'rgba(255,255,255,0.35)';
-      oc.beginPath();
-      oc.arc(cx - r * 0.25, cy - r * 0.25, r * 0.38, 0, Math.PI * 2);
-      oc.fill();
-    });
+      g.fillStyle = 'rgba(255,255,255,0.35)';
+      g.beginPath();
+      g.arc(cx - rad * 0.25, cy - rad * 0.28, rad * 0.38, 0, Math.PI * 2);
+      g.fill();
+    }
   }
 
-  _drawHomePathsTo(oc) {
-    const { cs } = this;
-    const lanes = [
-      { cells: [[7,1],[7,2],[7,3],[7,4],[7,5]], color: PALETTE.red,    arrow:'→' },
-      { cells: [[1,7],[2,7],[3,7],[4,7],[5,7]], color: PALETTE.green,  arrow:'↓' },
-      { cells: [[7,9],[7,10],[7,11],[7,12],[7,13]], color: PALETTE.yellow, arrow:'←' },
-      { cells: [[9,7],[10,7],[11,7],[12,7],[13,7]], color: PALETTE.blue,   arrow:'↑' },
+  _drawHomeLanes(g) {
+    var cs = this.cs;
+    var lanes = [
+      { cells: [[7,1],[7,2],[7,3],[7,4],[7,5]],     color: 'red',    arrow: '→' },
+      { cells: [[1,7],[2,7],[3,7],[4,7],[5,7]],     color: 'green',  arrow: '↓' },
+      { cells: [[7,9],[7,10],[7,11],[7,12],[7,13]], color: 'yellow', arrow: '←' },
+      { cells: [[9,7],[10,7],[11,7],[12,7],[13,7]], color: 'blue',   arrow: '↑' },
     ];
-
-    lanes.forEach(({ cells, color, arrow }) => {
-      cells.forEach(([row, col], i) => {
-        const x = col * cs, y = row * cs;
-
-        // Fundo colorido da reta final
-        oc.fillStyle = color.main;
-        oc.fillRect(x, y, cs, cs);
-
-        // Borda
-        oc.strokeStyle = '#000000';
-        oc.lineWidth   = 0.5;
-        oc.strokeRect(x, y, cs, cs);
-
-        // Seta na primeira célula
-        if (i === 0) {
-          oc.fillStyle    = '#ffffff';
-          oc.font         = `bold ${cs * 0.55}px sans-serif`;
-          oc.textAlign    = 'center';
-          oc.textBaseline = 'middle';
-          oc.fillText(arrow, x + cs * 0.5, y + cs * 0.5);
+    for (var li = 0; li < lanes.length; li++) {
+      var lane = lanes[li];
+      var p    = PALETTE[lane.color];
+      for (var ci = 0; ci < lane.cells.length; ci++) {
+        var row = lane.cells[ci][0], col = lane.cells[ci][1];
+        var x   = col * cs, y = row * cs;
+        g.fillStyle   = p.main;
+        g.fillRect(x, y, cs, cs);
+        g.strokeStyle = '#bbbbbb';
+        g.lineWidth   = 0.5;
+        g.strokeRect(x, y, cs, cs);
+        if (ci === 0) {
+          g.fillStyle     = '#ffffff';
+          g.font          = 'bold ' + Math.round(cs * 0.55) + 'px sans-serif';
+          g.textAlign     = 'center';
+          g.textBaseline  = 'middle';
+          g.fillText(lane.arrow, x + cs * 0.5, y + cs * 0.5);
         }
-      });
-    });
+      }
+    }
   }
 
-  _drawSafeStarsTo(oc) {
-    const { cs } = this;
-    const safeList = [
-      [6,13],[1,6],[8,1],[13,8],
-      [8,12],[2,8],[6,2],[12,6],
-    ];
-    safeList.forEach(([row, col]) => {
-      const x = col * cs, y = row * cs;
-      oc.fillStyle    = '#fdd835';
-      oc.font         = `${cs * 0.55}px serif`;
-      oc.textAlign    = 'center';
-      oc.textBaseline = 'middle';
-      oc.fillText('★', x + cs * 0.5, y + cs * 0.5 + 1);
-    });
+  _drawSafeStars(g) {
+    var cs     = this.cs;
+    var safes  = [[6,13],[1,6],[8,1],[13,8],[8,12],[2,8],[6,2],[12,6]];
+    g.font         = Math.round(cs * 0.55) + 'px serif';
+    g.textAlign    = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle    = '#fdd835';
+    for (var i = 0; i < safes.length; i++) {
+      var row = safes[i][0], col = safes[i][1];
+      g.fillText('★', col * cs + cs * 0.5, row * cs + cs * 0.5 + 1);
+    }
   }
 
-  _drawCenterTo(oc) {
-    const { cs } = this;
-    const cx = 7.5 * cs, cy = 7.5 * cs;
-
-    // 4 triângulos coloridos simples
-    const tris = [
-      { c: PALETTE.green.main,  pts: [[6,6],[9,6],[7.5,7.5]] },
-      { c: PALETTE.yellow.main, pts: [[9,6],[9,9],[7.5,7.5]] },
-      { c: PALETTE.blue.main,   pts: [[6,9],[9,9],[7.5,7.5]] },
-      { c: PALETTE.red.main,    pts: [[6,6],[6,9],[7.5,7.5]] },
+  _drawCenter(g) {
+    var cs = this.cs;
+    var tris = [
+      { color: PALETTE.green.main,  pts: [[6,6],[9,6],[7.5,7.5]] },
+      { color: PALETTE.yellow.main, pts: [[9,6],[9,9],[7.5,7.5]] },
+      { color: PALETTE.blue.main,   pts: [[6,9],[9,9],[7.5,7.5]] },
+      { color: PALETTE.red.main,    pts: [[6,6],[6,9],[7.5,7.5]] },
     ];
-
-    tris.forEach(({ c, pts }) => {
-      oc.fillStyle = c;
-      oc.beginPath();
-      oc.moveTo(pts[0][0] * cs, pts[0][1] * cs);
-      oc.lineTo(pts[1][0] * cs, pts[1][1] * cs);
-      oc.lineTo(pts[2][0] * cs, pts[2][1] * cs);
-      oc.closePath();
-      oc.fill();
-      oc.strokeStyle = '#000000';
-      oc.lineWidth   = 0.5;
-      oc.stroke();
-    });
-
-    // Círculo central branco com estrela
-    oc.fillStyle   = '#ffffff';
-    oc.strokeStyle = '#cccccc';
-    oc.lineWidth   = 1;
-    oc.beginPath();
-    oc.arc(cx, cy, cs * 1.05, 0, Math.PI * 2);
-    oc.fill();
-    oc.stroke();
-
-    oc.fillStyle    = 'rgba(0,0,0,0.15)';
-    oc.font         = `${cs * 1.3}px serif`;
-    oc.textAlign    = 'center';
-    oc.textBaseline = 'middle';
-    oc.fillText('★', cx, cy + cs * 0.06);
+    for (var i = 0; i < tris.length; i++) {
+      var t = tris[i];
+      g.fillStyle = t.color;
+      g.beginPath();
+      g.moveTo(t.pts[0][0] * cs, t.pts[0][1] * cs);
+      g.lineTo(t.pts[1][0] * cs, t.pts[1][1] * cs);
+      g.lineTo(t.pts[2][0] * cs, t.pts[2][1] * cs);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = '#000000';
+      g.lineWidth   = 0.5;
+      g.stroke();
+    }
+    var cx = 7.5 * cs, cy = 7.5 * cs;
+    g.fillStyle   = '#ffffff';
+    g.strokeStyle = '#cccccc';
+    g.lineWidth   = 1;
+    g.beginPath();
+    g.arc(cx, cy, cs * 1.05, 0, Math.PI * 2);
+    g.fill();
+    g.stroke();
+    g.fillStyle     = 'rgba(0,0,0,0.12)';
+    g.font          = Math.round(cs * 1.3) + 'px serif';
+    g.textAlign     = 'center';
+    g.textBaseline  = 'middle';
+    g.fillText('★', cx, cy + cs * 0.06);
   }
 
   // ══════════════════════════════════════════
-  //  DESENHAR PEÇA — simples e limpa
+  //  DESENHAR PEÇA
   // ══════════════════════════════════════════
-  drawPiece(sx, sy, color, num, selectable, pulseT, scale = 1, opacity = 1) {
-    const { ctx, cs } = this;
-    const p = PALETTE[color];
+  drawPiece(sx, sy, color, num, selectable, pulseT, scale, opacity) {
+    scale   = scale   === undefined ? 1 : scale;
+    opacity = opacity === undefined ? 1 : opacity;
+    var ctx = this.ctx;
+    var cs  = this.cs;
+    var p   = PALETTE[color];
     if (!p) return;
 
     ctx.save();
     ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
 
-    const t       = pulseT || 0;
-    const bounce  = selectable ? Math.abs(Math.sin(t * 3.5)) * cs * 0.10 : 0;
-    const drawY   = sy - bounce;
-    const r       = cs * 0.30 * scale;
+    var t      = pulseT || 0;
+    var bounce = selectable ? Math.abs(Math.sin(t * 3.5)) * cs * 0.10 : 0;
+    var drawY  = sy - bounce;
+    var r      = cs * 0.30 * scale;
 
-    // Sombra simples
-    ctx.fillStyle = 'rgba(0,0,0,0.20)';
+    // Sombra
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
     ctx.beginPath();
-    ctx.ellipse(sx, sy + r * 0.3, r * 0.65, r * 0.18, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx, sy + r * 0.28, r * 0.65, r * 0.18, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Corpo da peça — círculo sólido
+    // Corpo
     ctx.fillStyle   = p.main;
     ctx.strokeStyle = '#000000';
     ctx.lineWidth   = Math.max(1.5, scale * 1.8);
@@ -331,26 +329,26 @@ class LudoBoard {
     ctx.fill();
     ctx.stroke();
 
-    // Anel interno branco (estilo clássico)
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.lineWidth   = Math.max(1, scale * 1.2);
+    // Anel interno
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth   = Math.max(1, scale * 1.1);
     ctx.beginPath();
-    ctx.arc(sx, drawY, r * 0.62, 0, Math.PI * 2);
+    ctx.arc(sx, drawY, r * 0.60, 0, Math.PI * 2);
     ctx.stroke();
 
     // Número
-    const fs = Math.max(8, cs * 0.20 * scale);
-    ctx.font          = `bold ${fs}px Arial, sans-serif`;
+    var fs = Math.max(8, cs * 0.20 * scale);
+    ctx.font          = 'bold ' + fs + 'px Arial, sans-serif';
     ctx.textAlign     = 'center';
     ctx.textBaseline  = 'middle';
     ctx.fillStyle     = p.text;
     ctx.fillText(String(num), sx, drawY + fs * 0.05);
 
-    // Glow quando seleccionável
+    // Glow seleccionável
     if (selectable) {
+      ctx.globalAlpha = 0.4 + 0.3 * Math.abs(Math.sin(t * 3));
       ctx.strokeStyle = p.main;
       ctx.lineWidth   = 3;
-      ctx.globalAlpha = 0.4 + 0.3 * Math.abs(Math.sin(t * 3));
       ctx.beginPath();
       ctx.arc(sx, drawY, r + 5, 0, Math.PI * 2);
       ctx.stroke();
@@ -360,180 +358,137 @@ class LudoBoard {
   }
 
   // ══════════════════════════════════════════
-  //  ANIMAÇÃO DE PEÇAS
+  //  ANIMAÇÃO
   // ══════════════════════════════════════════
-  animatePieceTo(colour, tokenId, fromGameX, fromGameY, toGameX, toGameY, wasLocked, onComplete) {
-    const key   = colour + '_' + tokenId;
-    const fromS = this._gameToScreen(fromGameX, fromGameY);
-    const toS   = this._gameToScreen(toGameX, toGameY);
+
+  // Chamado pelo game_patch.js com (colour, tokenId, prevRow, prevCol, nextRow, nextCol, wasLocked, cb)
+  animateMove(colour, tokenId, fromRow, fromCol, toRow, toCol, wasLocked, onComplete) {
+    var key  = colour + '_' + tokenId;
+    var from = this._toScreen(fromRow, fromCol);
+    var to   = this._toScreen(toRow,   toCol);
 
     if (!this.pieces[key])
-      this.pieces[key] = { sx: fromS.sx, sy: fromS.sy, scale: 1, opacity: 1, animating: false };
+      this.pieces[key] = { sx: from.sx, sy: from.sy, scale: 1, opacity: 1, animating: false };
 
-    const piece = this.pieces[key];
+    var piece = this.pieces[key];
     piece.animating = true;
-    piece.sx = fromS.sx;
-    piece.sy = fromS.sy;
+    piece.sx = from.sx;
+    piece.sy = from.sy;
 
-    if (wasLocked) {
-      SFX.exitBase();
-      this._animSegment(piece, fromS, toS, 300, () => {
-        piece.animating = false;
-        if (onComplete) onComplete();
-      });
-    } else if (toGameX === 7 && toGameY === 7) {
-      SFX.finish();
-      this._animSegment(piece, fromS, toS, 350, () => {
-        this._spawnConfetti(toS.sx, toS.sy, colour);
-        piece.animating = false;
-        if (onComplete) onComplete();
-      });
-    } else {
-      const key2 = `${Math.round(toGameX)},${Math.round(toGameY)}`;
-      SAFE_COORDS.has(key2) ? SFX.safe() : SFX.move();
-      this._animSegment(piece, fromS, toS, 280, () => {
-        piece.animating = false;
-        if (onComplete) onComplete();
-      });
-    }
+    var isHome = (Math.round(toRow) === 7 && Math.round(toCol) === 7);
+
+    if (wasLocked)     SFX.exit();
+    else if (isHome)   SFX.finish();
+    else if (isSafe(toRow, toCol)) SFX.tick();
+    else               SFX.move();
+
+    this._animTo(piece, from, to, 280, function() {
+      piece.animating = false;
+      if (isHome) this._spawnConfetti(to.sx, to.sy, colour);
+      if (onComplete) onComplete();
+    }.bind(this));
   }
 
   animateCaptureAt(colour, tokenId) {
-    const key = colour + '_' + tokenId;
+    var key = colour + '_' + tokenId;
     if (!this.pieces[key]) return;
     SFX.capture();
-    const piece = this.pieces[key];
-    this._spawnCaptureBurst(piece.sx, piece.sy, colour);
-    piece.animating = false;
+    var p = this.pieces[key];
+    this._spawnBurst(p.sx, p.sy, colour);
   }
 
   animateDice(finalVal, onDone) {
     SFX.dice();
-    const faces  = ['⚀','⚁','⚂','⚃','⚄','⚅'];
-    const total  = 600;
-    const start  = performance.now();
-    let lastSwap = 0, interval = 50;
-
-    const step = (now) => {
-      const el = now - start, prog = el / total;
-      interval = 50 + prog * 80;
-      if (el - lastSwap > interval) {
-        const dfc = document.getElementById('dfc');
+    var faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+    var dur   = 600;
+    var start = performance.now();
+    var last  = 0;
+    var step  = function(now) {
+      var el   = now - start;
+      var prog = el / dur;
+      if (el - last > 50 + prog * 80) {
+        var dfc = document.getElementById('dfc');
         if (dfc) dfc.textContent = faces[Math.floor(Math.random() * 6)];
-        lastSwap = el;
+        last = el;
       }
-      if (el < total) {
+      if (el < dur) {
         requestAnimationFrame(step);
       } else {
-        const dfc   = document.getElementById('dfc');
-        const numEl = document.getElementById('dnm');
-        if (dfc) { dfc.textContent = faces[finalVal - 1]; }
-        if (numEl) { numEl.textContent = finalVal; }
-        SFX.diceResult(finalVal);
+        var dfc2 = document.getElementById('dfc');
+        var dnm  = document.getElementById('dnm');
+        if (dfc2) dfc2.textContent = faces[finalVal - 1];
+        if (dnm)  dnm.textContent  = finalVal;
         if (onDone) onDone();
       }
     };
     requestAnimationFrame(step);
   }
 
-  // ── Animações internas ───────────────────
-  _animSegment(piece, from, to, dur, onDone) {
-    const start = performance.now();
-    const dx = to.sx - from.sx, dy = to.sy - from.sy;
-    const step = (now) => {
-      const raw = Math.min((now - start) / dur, 1);
-      const e   = 1 - Math.pow(1 - raw, 3);
-      piece.sx  = from.sx + dx * e;
-      piece.sy  = from.sy + dy * e;
-      raw < 1 ? requestAnimationFrame(step) : (piece.sx = to.sx, piece.sy = to.sy, onDone && onDone());
+  _animTo(piece, from, to, dur, onDone) {
+    var start = performance.now();
+    var dx = to.sx - from.sx, dy = to.sy - from.sy;
+    var step = function(now) {
+      var t = Math.min((now - start) / dur, 1);
+      var e = 1 - Math.pow(1 - t, 3);
+      piece.sx = from.sx + dx * e;
+      piece.sy = from.sy + dy * e;
+      if (t < 1) requestAnimationFrame(step);
+      else { piece.sx = to.sx; piece.sy = to.sy; if (onDone) onDone(); }
     };
     requestAnimationFrame(step);
   }
 
-  _animScale(piece, from, to, dur, onDone) {
-    const start = performance.now();
-    const step  = (now) => {
-      const raw    = Math.min((now - start) / dur, 1);
-      piece.scale  = from + (to - from) * raw;
-      raw < 1 ? requestAnimationFrame(step) : (piece.scale = to, onDone && onDone());
-    };
-    requestAnimationFrame(step);
-  }
-
-  // ── Partículas ───────────────────────────
   _spawnConfetti(x, y, color) {
-    const p = PALETTE[color] || PALETTE.red;
-    for (let i = 0; i < 18; i++) {
-      const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.3;
-      const speed = 2 + Math.random() * 3;
+    var p = PALETTE[color] || PALETTE.red;
+    for (var i = 0; i < 18; i++) {
+      var a = (i / 18) * Math.PI * 2;
+      var s = 2 + Math.random() * 3;
       this._particles.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 3,
+        x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 3,
         life: 1, decay: 0.020 + Math.random() * 0.008,
-        color: [p.main, p.light, '#ffffff', '#fdd835'][Math.floor(Math.random() * 4)],
-        size: 3 + Math.random() * 4,
-        rot: Math.random() * Math.PI * 2,
-        rv:  (Math.random() - 0.5) * 0.3,
-        type: 'confetti',
+        color: [p.main, p.light, '#fff', '#fdd835'][Math.floor(Math.random() * 4)],
+        size: 3 + Math.random() * 4, rot: Math.random() * Math.PI * 2,
+        rv: (Math.random() - 0.5) * 0.3, type: 'confetti',
       });
     }
   }
 
-  _spawnCaptureBurst(x, y, color) {
-    const p = PALETTE[color] || PALETTE.red;
-    for (let i = 0; i < 10; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 1.5 + Math.random() * 2.5;
+  _spawnBurst(x, y, color) {
+    var p = PALETTE[color] || PALETTE.red;
+    for (var i = 0; i < 10; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var s = 1.5 + Math.random() * 2.5;
       this._particles.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 1.5,
+        x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1.5,
         life: 1, decay: 0.04 + Math.random() * 0.015,
-        color: p.main,
-        size: 2 + Math.random() * 3,
+        color: p.main, size: 2 + Math.random() * 3,
         rot: 0, rv: 0, type: 'spark',
       });
     }
   }
 
-  _updateParticles() {
-    const { ctx } = this;
-    this._particles = this._particles.filter(p => p.life > 0.01);
-    this._particles.forEach(p => {
+  _drawParticles() {
+    var ctx = this.ctx;
+    this._particles = this._particles.filter(function(p) { return p.life > 0.01; });
+    for (var i = 0; i < this._particles.length; i++) {
+      var p = this._particles[i];
       p.x += p.vx; p.y += p.vy;
       p.vy += 0.22; p.vx *= 0.98;
-      p.life -= p.decay;
-      p.rot  += p.rv;
+      p.life -= p.decay; p.rot += p.rv;
       ctx.save();
       ctx.globalAlpha = Math.max(0, p.life);
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
       if (p.type === 'confetti') {
-        ctx.fillStyle = p.color;
         ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
       } else {
-        ctx.fillStyle = p.color;
         ctx.beginPath();
         ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
-    });
-  }
-
-  _rrectTo(oc, x, y, w, h, r) {
-    oc.beginPath();
-    oc.moveTo(x + r, y);
-    oc.lineTo(x + w - r, y);
-    oc.arcTo(x + w, y, x + w, y + r, r);
-    oc.lineTo(x + w, y + h - r);
-    oc.arcTo(x + w, y + h, x + w - r, y + h, r);
-    oc.lineTo(x + r, y + h);
-    oc.arcTo(x, y + h, x, y + h - r, r);
-    oc.lineTo(x, y + r);
-    oc.arcTo(x, y, x + r, y, r);
-    oc.closePath();
+    }
   }
 
   destroy() {
@@ -543,97 +498,4 @@ class LudoBoard {
   }
 }
 
-// ══════════════════════════════════════════════
-//  ADAPTADOR
-// ══════════════════════════════════════════════
-function adaptNewState(state) {
-  if (!state || !state.players) return state;
-  return {
-    ...state,
-    players: state.players.map(p => ({
-      ...p,
-      color:   p.colour,
-      fin:     p.fin || (p.tokens ? p.tokens.filter(t => t.has_reached_home).length : 0),
-      pos:     p.tokens ? p.tokens.map(t => t.is_locked ? 0 : (t.has_reached_home ? 58 : 1)) : p.pos,
-      in_base: p.tokens ? p.tokens.map(t => t.is_locked) : p.in_base,
-    }))
-  };
-}
-
-window.drawGameStateNew = function(state) {
-  if (!window.BOARD || !state || !state.players) return;
-  window.BOARD.drawBoard();
-
-  state.players.forEach(pl => {
-    const color = pl.colour || pl.color;
-    if (!color) return;
-
-    pl.tokens.forEach((token, i) => {
-      const key   = color + '_' + (token.id !== undefined ? token.id : i);
-      const piece = window.BOARD.pieces[key];
-
-      let sx, sy;
-      if (piece && piece.animating) {
-        sx = piece.sx; sy = piece.sy;
-      } else {
-        const s = window.BOARD._gameToScreen(token.x, token.y);
-        sx = s.sx; sy = s.sy;
-        if (piece) { piece.sx = sx; piece.sy = sy; }
-        else { window.BOARD.pieces[key] = { sx, sy, scale: 1, opacity: 1, animating: false }; }
-      }
-
-      const isSelectable = (window.SELECTABLE_PIECES || []).includes(i)
-        && pl.user_id === window.U?.id
-        && _isMeTurnNew(state);
-
-      const pScale   = piece ? (piece.scale   ?? 1) : 1;
-      const pOpacity = piece ? (piece.opacity ?? 1) : 1;
-
-      window.BOARD.drawPiece(
-        sx, sy, color,
-        (token.id !== undefined ? token.id + 1 : i + 1),
-        isSelectable, window.PULSE_T, pScale, pOpacity
-      );
-    });
-  });
-};
-
-function _isMeTurnNew(state) {
-  if (!state || !state.players || !window.U) return false;
-  const p = state.players[state.turn];
-  return p && p.user_id === window.U.id && state.phase === 0;
-}
-
-window._triggerMoveAnimationsNew = function(prev, next) {
-  if (!prev || !next || !window.BOARD) return;
-  next.players.forEach(pl => {
-    const prevPl = (prev.players || []).find(p => p.user_id === pl.user_id);
-    if (!prevPl) return;
-    pl.tokens.forEach((token, i) => {
-      const prevToken = prevPl.tokens[i];
-      if (!prevToken) return;
-      const colour = pl.colour || pl.color;
-      const tid    = token.id !== undefined ? token.id : i;
-
-      if (token.x === prevToken.x && token.y === prevToken.y &&
-          token.is_locked === prevToken.is_locked &&
-          token.has_reached_home === prevToken.has_reached_home) return;
-
-      if (token.is_locked && !prevToken.is_locked) {
-        window.BOARD.animateCaptureAt(colour, tid);
-        return;
-      }
-
-      window.BOARD.animatePieceTo(
-        colour, tid,
-        prevToken.x, prevToken.y,
-        token.x,     token.y,
-        prevToken.is_locked && !token.is_locked,
-        null
-      );
-    });
-  });
-};
-
-window.drawGameState          = window.drawGameStateNew;
-window._triggerMoveAnimations = window._triggerMoveAnimationsNew;
+console.log('[LudoKz] ludo_board.js v5 carregado ✓');
