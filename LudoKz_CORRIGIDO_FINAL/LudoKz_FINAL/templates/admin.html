@@ -883,14 +883,17 @@ function drawTestState(state) {
   if(!canvas) return;
   TEST_BOARD_OBJ.drawBoard();
   state.players.forEach(pl => {
-    pl.pos.forEach((pos, i) => {
-      const coord = TEST_BOARD_OBJ.getPieceCoord(pl.color, pos, !!pl.in_base[i], i);
-      const key = pl.color+'_'+i;
-      if(!TEST_BOARD_OBJ.pieces[key]) TEST_BOARD_OBJ.pieces[key]={x:coord.x,y:coord.y,animating:false};
+    const colour = pl.colour || pl.color || 'blue';
+    if(!pl.tokens) return;
+    pl.tokens.forEach((token, i) => {
+      const tid = token.id !== undefined ? token.id : i;
+      const key = colour+'_'+tid;
+      const s = TEST_BOARD_OBJ._toScreen(token.x, token.y);
+      if(!TEST_BOARD_OBJ.pieces[key]) TEST_BOARD_OBJ.pieces[key]={sx:s.sx,sy:s.sy,animating:false};
       const piece = TEST_BOARD_OBJ.pieces[key];
-      if(!piece.animating) { piece.x=coord.x; piece.y=coord.y; }
+      if(!piece.animating) { piece.sx=s.sx; piece.sy=s.sy; }
       const isSel = TEST_SELECTABLE.includes(i) && pl.idx===state.turn;
-      TEST_BOARD_OBJ.drawPiece(piece.x, piece.y, pl.color, i+1, isSel, TEST_PULSE_T);
+      TEST_BOARD_OBJ.drawPiece(piece.sx, piece.sy, colour, tid+1, isSel, TEST_PULSE_T);
     });
   });
 }
