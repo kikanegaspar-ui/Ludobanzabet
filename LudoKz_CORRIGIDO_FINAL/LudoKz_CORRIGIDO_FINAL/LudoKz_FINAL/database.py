@@ -5,7 +5,7 @@ from psycopg2.extras import RealDictCursor
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://postgres:vnfnjdjdkkdksf555d4f4fjksjdmfkASDFG@db.lyytipmsqawiljvsjcds.supabase.co:5432/postgres"
+    "postgresql://postgres.lyytipmsqawiljvsjcds:vnfnjdjdkkdksf555d4f4fjksjdmfkASDFG@aws-0-eu-west-1.pooler.supabase.com:6543/postgres"
 )
 
 BLOCKED_DOMAINS = {
