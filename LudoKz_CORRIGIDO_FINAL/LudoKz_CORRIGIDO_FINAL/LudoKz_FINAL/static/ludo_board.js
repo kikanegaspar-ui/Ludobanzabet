@@ -5,49 +5,33 @@
  */
 
 // ══════════════════════════════════════════════
-//  SONS
+//  SONS — ficheiros MP3 reais
 // ══════════════════════════════════════════════
 const SFX = (() => {
-  let ctx = null;
-  function getCtx() {
-    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
-    return ctx;
-  }
-  function tone(freq, type, dur, vol = 0.25, delay = 0) {
+  const cache = {};
+  function play(name, volume = 1.0) {
     try {
-      const ac = getCtx(), osc = ac.createOscillator(), gain = ac.createGain();
-      osc.connect(gain); gain.connect(ac.destination);
-      osc.type = type; osc.frequency.value = freq;
-      const t = ac.currentTime + delay;
-      gain.gain.setValueAtTime(0.001, t);
-      gain.gain.linearRampToValueAtTime(vol, t + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      osc.start(t); osc.stop(t + dur + 0.05);
-    } catch(e) {}
-  }
-  function noise(dur, vol = 0.15, freq = 2000) {
-    try {
-      const ac = getCtx(), buf = ac.createBuffer(1, ac.sampleRate * dur, ac.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      const src = ac.createBufferSource(), filter = ac.createBiquadFilter(), gain = ac.createGain();
-      filter.type = 'bandpass'; filter.frequency.value = freq;
-      src.buffer = buf; src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
-      gain.gain.setValueAtTime(vol, ac.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
-      src.start(); src.stop(ac.currentTime + dur + 0.05);
+      if (!cache[name]) {
+        cache[name] = new Audio('/static/' + name + '.mp3');
+      }
+      const snd = cache[name].cloneNode();
+      snd.volume = Math.min(1, Math.max(0, volume));
+      snd.play().catch(() => {});
     } catch(e) {}
   }
   return {
-    dice()        { noise(0.08,0.18,3000); tone(180,'square',0.04,0.06,0.05); },
-    diceResult(v) { const c={1:[261],2:[261,329],3:[261,329,392],4:[349,440],5:[392,494,587],6:[523,659,784]}; (c[v]||[261]).forEach((f,i)=>tone(f,'sine',0.35,0.22,i*0.04)); },
-    move()        { tone(440,'sine',0.09,0.18); tone(554,'triangle',0.08,0.14,0.07); },
-    capture()     { tone(330,'sawtooth',0.06,0.28); tone(220,'sawtooth',0.10,0.30,0.05); noise(0.18,0.20,800); },
-    exitBase()    { tone(392,'sine',0.08,0.20); tone(494,'sine',0.08,0.20,0.07); tone(587,'sine',0.10,0.22,0.14); },
-    finish()      { [523,659,784,1047].forEach((f,i)=>tone(f,'sine',0.22,0.28,i*0.09)); },
-    win()         { [523,659,784,1047,1319].forEach((f,i)=>tone(f,'sine',0.3,0.28,i*0.08)); },
-    safe()        { tone(659,'sine',0.12,0.15); tone(784,'sine',0.10,0.12,0.08); },
+    dice()        { play('sfx_dice_roll', 0.8); },
+    diceResult(v) { play('sfx_click', 0.6); },
+    move()        { play('sfx_token_move', 0.9); },
+    capture()     { play('sfx_token_killed', 1.0); },
+    exitBase()    { play('sfx_click', 0.8); },
+    finish()      { play('sfx_in_home', 1.0); },
+    win()         { play('sfx_win', 1.0); },
+    safe()        { play('sfx_token_move', 0.5); },
+    myTurn()      { play('sfx_my_turn', 0.7); },
+    oppTurn()     { play('sfx_opp_turn', 0.5); },
+    clock()       { play('sfx_clock', 0.4); },
+    tick()        { play('sfx_click', 0.3); },
   };
 })();
 
