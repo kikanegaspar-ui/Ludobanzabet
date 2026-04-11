@@ -1,9 +1,10 @@
 """app.py — LudoKz Backend completo"""
 import json, queue, threading, os, secrets, time, uuid
-import sqlite3 as _sq
 from functools import wraps
 from flask import (Flask, render_template, request, jsonify,
                    session, Response, stream_with_context)
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from database import *
 from sms_service import formatar_numero_angola, enviar_sms_simulado, operadora
 from game_manager import GameManager
@@ -15,6 +16,10 @@ PLATFORM_EXPRESS = os.environ.get("PLATFORM_EXPRESS", "922 745 946")
 ADMIN_KEY        = os.environ.get("ADMIN_KEY", "ludokz2025")
 
 init_db()
+
+# ── Helper de conexão PostgreSQL ───────────────────────────────
+def get_pg():
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 # ── Salas activas ──────────────────────────────────────────────
 _rooms: dict = {}           # room_id → GameManager
@@ -566,8 +571,9 @@ def adm_approve(did):
     note = (request.json or {}).get("note", "")
     ok   = approve_deposit(did, note)
     if ok:
-        c   = _sq.connect(DB); c.row_factory = _sq.Row
-        dep = c.execute("SELECT * FROM deposits WHERE id=?", (did,)).fetchone(); c.close()
+        conn = get_pg(); cur = conn.cursor()
+        cur.execute("SELECT * FROM deposits WHERE id=%s", (did,))
+        dep = cur.fetchone(); cur.close(); conn.close()
         if dep:
             u = get_user(dep["user_id"])
             push(dep["user_id"], "deposit_approved", {
@@ -592,8 +598,9 @@ def adm_complete(wid):
     note = (request.json or {}).get("note", "")
     ok   = complete_withdrawal(wid, note)
     if ok:
-        c = _sq.connect(DB); c.row_factory = _sq.Row
-        w = c.execute("SELECT * FROM withdrawals WHERE id=?", (wid,)).fetchone(); c.close()
+        conn = get_pg(); cur = conn.cursor()
+        cur.execute("SELECT * FROM withdrawals WHERE id=%s", (wid,))
+        w = cur.fetchone(); cur.close(); conn.close()
         if w:
             push(w["user_id"], "withdrawal_done", {
                 "amount":  w["amount"],
@@ -607,8 +614,9 @@ def adm_complete(wid):
 def adm_wit_reject(wid):
     ok = reject_withdrawal(wid, (request.json or {}).get("note", ""))
     if ok:
-        c = _sq.connect(DB); c.row_factory = _sq.Row
-        w = c.execute("SELECT * FROM withdrawals WHERE id=?", (wid,)).fetchone(); c.close()
+        conn = get_pg(); cur = conn.cursor()
+        cur.execute("SELECT * FROM withdrawals WHERE id=%s", (wid,))
+        w = cur.fetchone(); cur.close(); conn.close()
         if w:
             push(w["user_id"], "withdrawal_rejected", {
                 "amount": w["amount"],
@@ -637,15 +645,15 @@ def adm_users(): return jsonify({"users": get_all_users()})
 @app.route("/admin/stats")
 @admin_req
 def adm_stats():
-    c     = _sq.connect(DB); c.row_factory = _sq.Row
-    users = c.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
-    bal   = c.execute("SELECT SUM(balance) s FROM users").fetchone()["s"] or 0
-    deps  = c.execute("SELECT COUNT(*) n, SUM(amount) s FROM deposits WHERE status='approved'").fetchone()
-    wits  = c.execute("SELECT COUNT(*) n, SUM(amount) s FROM withdrawals WHERE status='completed'").fetchone()
-    games = c.execute("SELECT COUNT(*) n FROM game_history").fetchone()["n"]
-    pdeps = c.execute("SELECT COUNT(*) n FROM deposits WHERE status='pending'").fetchone()["n"]
-    pwits = c.execute("SELECT COUNT(*) n FROM withdrawals WHERE status='pending'").fetchone()["n"]
-    c.close()
+    conn = get_pg(); cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) AS n FROM users");              users = cur.fetchone()["n"]
+    cur.execute("SELECT SUM(balance) AS s FROM users");          bal   = cur.fetchone()["s"] or 0
+    cur.execute("SELECT COUNT(*) AS n, SUM(amount) AS s FROM deposits WHERE status='approved'");    deps  = cur.fetchone()
+    cur.execute("SELECT COUNT(*) AS n, SUM(amount) AS s FROM withdrawals WHERE status='completed'"); wits  = cur.fetchone()
+    cur.execute("SELECT COUNT(*) AS n FROM game_history");       games = cur.fetchone()["n"]
+    cur.execute("SELECT COUNT(*) AS n FROM deposits WHERE status='pending'");    pdeps = cur.fetchone()["n"]
+    cur.execute("SELECT COUNT(*) AS n FROM withdrawals WHERE status='pending'"); pwits = cur.fetchone()["n"]
+    cur.close(); conn.close()
     return jsonify({"stats": {
         "users": users, "total_balance": bal,
         "deposits":    {"count": deps["n"], "total": deps["s"] or 0},
@@ -665,9 +673,9 @@ def adm_add_balance():
     if not uid or amount == 0: return jsonify({"error": "Dados inválidos"}), 400
     u_check = get_user(uid)
     if not u_check: return jsonify({"error": f"Utilizador {uid} não encontrado."}), 404
-    c = _sq.connect(DB)
-    c.execute("UPDATE users SET balance=balance+? WHERE id=?", (amount, uid))
-    c.commit(); c.close()
+    conn = get_pg(); cur = conn.cursor()
+    cur.execute("UPDATE users SET balance=balance+%s WHERE id=%s", (amount, uid))
+    conn.commit(); cur.close(); conn.close()
     add_tx(uid, "admin_credit", amount, f"Admin: {reason}")
     u = get_user(uid)
     if u: push(uid, "balance_update", {"balance": u["balance"],
@@ -684,16 +692,18 @@ def adm_login_as_player():
     d     = request.json or {}
     name  = d.get("name", "Admin").strip()
     ADMIN_PHONE = "admin@ludokz.internal"
-    c = _sq.connect(DB); c.row_factory = _sq.Row
-    u = c.execute("SELECT * FROM users WHERE phone=?", (ADMIN_PHONE,)).fetchone()
+    conn = get_pg(); cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE phone=%s", (ADMIN_PHONE,))
+    u = cur.fetchone()
     if not u:
-        c.execute("INSERT INTO users(phone,password,name,balance) VALUES(?,?,?,?)",
-                  (ADMIN_PHONE, "admin_no_login", name, 999999999))
-        c.commit()
-        u = c.execute("SELECT * FROM users WHERE phone=?", (ADMIN_PHONE,)).fetchone()
+        cur.execute("INSERT INTO users(phone,password,name,balance) VALUES(%s,%s,%s,%s)",
+                    (ADMIN_PHONE, "admin_no_login", name, 999999999))
+        conn.commit()
+        cur.execute("SELECT * FROM users WHERE phone=%s", (ADMIN_PHONE,))
+        u = cur.fetchone()
     uid = u["id"]
-    c.execute("UPDATE users SET name=? WHERE id=?", (name, uid))
-    c.commit(); c.close()
+    cur.execute("UPDATE users SET name=%s WHERE id=%s", (name, uid))
+    conn.commit(); cur.close(); conn.close()
     session["uid"]      = uid
     session["is_admin"] = True
     return jsonify({"ok": True, "user": {"id": uid, "name": name, "balance": 999999999,
@@ -823,9 +833,9 @@ def adm_promo_create():
 @app.route("/admin/promos/<code>/deactivate", methods=["POST"])
 @admin_req
 def adm_promo_deactivate(code):
-    c = _sq.connect(DB)
-    c.execute("UPDATE promo_codes SET active=0 WHERE code=?", (code,))
-    c.commit(); c.close()
+    conn = get_pg(); cur = conn.cursor()
+    cur.execute("UPDATE promo_codes SET active=0 WHERE code=%s", (code,))
+    conn.commit(); cur.close(); conn.close()
     return jsonify({"ok": True})
 
 @app.route("/admin/tickets")
@@ -918,24 +928,24 @@ def api_support_list():
 
 @app.route("/api/leaderboard")
 def api_leaderboard():
-    c = _sq.connect(DB); c.row_factory = _sq.Row
-    rows = c.execute("""
+    conn = get_pg(); cur = conn.cursor()
+    cur.execute("""
         SELECT name, wins, games_played, total_earned,
                CASE WHEN games_played>0 THEN ROUND(wins*100.0/games_played,1) ELSE 0 END AS win_rate
         FROM users WHERE games_played > 0
         ORDER BY wins DESC, total_earned DESC LIMIT 10
-    """).fetchall()
-    c.close()
+    """)
+    rows = cur.fetchall(); cur.close(); conn.close()
     return jsonify({"leaderboard": [dict(r) for r in rows]})
 
 @app.route("/api/stats/public")
 def api_stats_public():
-    c      = _sq.connect(DB); c.row_factory = _sq.Row
-    users  = c.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]
-    games  = c.execute("SELECT COUNT(*) n FROM game_history").fetchone()["n"]
-    paid   = c.execute("SELECT SUM(prize) s FROM game_history").fetchone()["s"] or 0
+    conn = get_pg(); cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) AS n FROM users");          users = cur.fetchone()["n"]
+    cur.execute("SELECT COUNT(*) AS n FROM game_history");   games = cur.fetchone()["n"]
+    cur.execute("SELECT SUM(prize) AS s FROM game_history"); paid  = cur.fetchone()["s"] or 0
+    cur.close(); conn.close()
     online = len([uid for uid, qs in _sse.items() if uid > 0 and qs])
-    c.close()
     return jsonify({"users": users, "games": games, "paid": paid, "online": online})
 
 # ══════════════════════════════════════════════════════════════
@@ -946,8 +956,9 @@ _jackpot_lock = threading.Lock()
 
 def get_jackpot_value():
     try:
-        c   = _sq.connect(DB); c.row_factory = _sq.Row
-        row = c.execute("SELECT value FROM jackpot LIMIT 1").fetchone(); c.close()
+        conn = get_pg(); cur = conn.cursor()
+        cur.execute("SELECT value FROM jackpot LIMIT 1")
+        row = cur.fetchone(); cur.close(); conn.close()
         return float(row["value"]) if row else 245000.0
     except Exception:
         return 245000.0
@@ -957,10 +968,13 @@ def grow_jackpot(bet):
         try:
             current = get_jackpot_value()
             new_val = round(current + float(bet) * 0.01, 2)
-            c = _sq.connect(DB)
-            c.execute("CREATE TABLE IF NOT EXISTS jackpot(id INTEGER PRIMARY KEY, value REAL)")
-            c.execute("INSERT OR REPLACE INTO jackpot(id,value) VALUES(1,?)", (new_val,))
-            c.commit(); c.close()
+            conn = get_pg(); cur = conn.cursor()
+            cur.execute("CREATE TABLE IF NOT EXISTS jackpot(id SERIAL PRIMARY KEY, value REAL)")
+            cur.execute(
+                "INSERT INTO jackpot(id,value) VALUES(1,%s) ON CONFLICT(id) DO UPDATE SET value=EXCLUDED.value",
+                (new_val,)
+            )
+            conn.commit(); cur.close(); conn.close()
         except Exception:
             pass
 
