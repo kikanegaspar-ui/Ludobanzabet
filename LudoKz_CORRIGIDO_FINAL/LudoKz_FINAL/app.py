@@ -1,6 +1,10 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request, redirect, session
 
 app = Flask(__name__)
+app.secret_key = "ludobanzabet_secret_123"
+
+ADMIN_USER = "admin"
+ADMIN_PASS = "ludo2024"
 
 SCENARIOS = [
     {
@@ -50,6 +54,27 @@ def stats():
         "max_monthly": "45.000.000 Kz",
         "roi_months": "12–18",
     })
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    if request.method == "POST":
+        user = request.form.get("username")
+        pwd = request.form.get("password")
+        if user == ADMIN_USER and pwd == ADMIN_PASS:
+            session["admin"] = True
+            return redirect("/admin")
+        else:
+            return render_template("admin_login.html", error="Credenciais incorrectas")
+    
+    if not session.get("admin"):
+        return render_template("admin_login.html", error=None)
+    
+    return render_template("admin.html", scenarios=SCENARIOS)
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.clear()
+    return redirect("/admin")
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
