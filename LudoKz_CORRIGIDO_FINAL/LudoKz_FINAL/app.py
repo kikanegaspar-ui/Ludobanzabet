@@ -17,12 +17,19 @@ ADMIN_KEY        = os.environ.get("ADMIN_KEY", "ludokz2025")
 
 init_db()
 
+# ── Headers obrigatórios para o Godot HTML5 funcionar ─────────
+@app.after_request
+def add_godot_headers(response):
+    response.headers["Cross-Origin-Opener-Policy"]   = "same-origin"
+    response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+    return response
+
 # ── Helper de conexão PostgreSQL ───────────────────────────────
 def get_pg():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 # ── Salas activas ──────────────────────────────────────────────
-_rooms: dict = {}           # room_id → GameManager
+_rooms: dict = {}
 _rooms_lk = threading.Lock()
 
 BET_TIERS = {1000: "Bronze", 5000: "Prata", 10000: "Ouro", 50000: "VIP"}
@@ -52,7 +59,6 @@ def _otp_permitido(phone: str, max_por_minuto: int = 2) -> bool:
         _otp_rate[phone] = (contagem + 1, reset_em)
         return True
 
-# ── Helpers SSE ────────────────────────────────────────────────
 def push(uid: int, event: str, data: dict):
     msg = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
     with _sse_lk:
@@ -74,7 +80,6 @@ def push_room(rid: str, event: str, data: dict):
         for p in r.players:
             push(p["user_id"], event, data)
 
-# ── Decoradores ────────────────────────────────────────────────
 def login_req(f):
     @wraps(f)
     def d(*a, **kw):
@@ -98,7 +103,6 @@ def safe_user(u):
              "games_played", "wins", "losses", "total_earned",
              "phone_verified", "age_confirmed", "terms_accepted", "created_at")}
 
-# ── Páginas ────────────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template("index.html", platform_express=PLATFORM_EXPRESS)
@@ -106,10 +110,6 @@ def index():
 @app.route("/admin")
 def admin_page():
     return render_template("admin.html")
-
-# ══════════════════════════════════════════════════════════════
-#  AUTH
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/api/otp/send", methods=["POST"])
 def api_otp_send():
@@ -224,10 +224,6 @@ def api_set_express():
     set_express(session["uid"], num)
     return jsonify({"ok": True})
 
-# ══════════════════════════════════════════════════════════════
-#  CARTEIRA
-# ══════════════════════════════════════════════════════════════
-
 @app.route("/api/deposit/request", methods=["POST"])
 @login_req
 def api_dep_req():
@@ -285,10 +281,6 @@ def api_txs():
 def api_ghist():
     return jsonify({"games": get_user_games(session["uid"])})
 
-# ══════════════════════════════════════════════════════════════
-#  LOBBY
-# ══════════════════════════════════════════════════════════════
-
 @app.route("/api/lobby")
 @login_req
 def api_lobby():
@@ -298,10 +290,6 @@ def api_lobby():
             if not r.started and r.player_count() < r.max_players
         ]
     return jsonify({"rooms": lobby})
-
-# ══════════════════════════════════════════════════════════════
-#  CRIAR SALA
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/api/room/create", methods=["POST"])
 @login_req
@@ -323,10 +311,6 @@ def api_create():
     with _rooms_lk:
         _rooms[rid] = room
     return jsonify({"ok": True, "room_id": rid})
-
-# ══════════════════════════════════════════════════════════════
-#  ENTRAR NA SALA
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/api/room/join", methods=["POST"])
 @login_req
@@ -350,17 +334,12 @@ def api_join():
         "players": r.player_count(),
         "max":     r.max_players,
     })
-    # Sala cheia → iniciar automaticamente
     if r.player_count() >= r.max_players:
         ok2, _ = r.start()
         if ok2:
             push_room(rid, "game_started", r.state_dict())
     return jsonify({"ok": True, "room_id": rid,
                     "state": r.state_dict(session["uid"])})
-
-# ══════════════════════════════════════════════════════════════
-#  INICIAR (host com menos jogadores)
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/api/room/start", methods=["POST"])
 @login_req
@@ -376,20 +355,12 @@ def api_start():
     push_room(rid, "game_started", state)
     return jsonify({"ok": True, "state": r.state_dict(session["uid"])})
 
-# ══════════════════════════════════════════════════════════════
-#  ESTADO DA SALA
-# ══════════════════════════════════════════════════════════════
-
 @app.route("/api/room/<rid>/state")
 @login_req
 def api_state(rid):
     r = _get_room(rid)
     if not r: return jsonify({"error": "Sala não encontrada."}), 404
     return jsonify(r.state_dict(session["uid"]))
-
-# ══════════════════════════════════════════════════════════════
-#  ROLAR DADO
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/api/game/roll", methods=["POST"])
 @login_req
@@ -405,10 +376,6 @@ def api_roll():
     if r.over:
         _finish_game(rid)
     return jsonify({**state, "dice": dice})
-
-# ══════════════════════════════════════════════════════════════
-#  MOVER PEÇA
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/api/game/move", methods=["POST"])
 @login_req
@@ -426,10 +393,6 @@ def api_move():
         _finish_game(rid)
     return jsonify(state)
 
-# ══════════════════════════════════════════════════════════════
-#  PEÇAS MOVÍVEIS
-# ══════════════════════════════════════════════════════════════
-
 @app.route("/api/game/movable", methods=["POST"])
 @login_req
 def api_movable():
@@ -439,10 +402,6 @@ def api_movable():
     if not r: return jsonify({"movable": []})
     return jsonify({"movable": r.get_movable(session["uid"]),
                     "dice": r.dice})
-
-# ══════════════════════════════════════════════════════════════
-#  ABANDONAR
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/api/game/leave", methods=["POST"])
 @login_req
@@ -458,7 +417,6 @@ def api_leave():
     if r.over:
         with _rooms_lk: _rooms.pop(rid, None)
         return jsonify({"ok": True})
-    # Forçar vitória para quem ficou
     remaining = [p for p in r.players if p["user_id"] != uid]
     if remaining:
         r.over   = True
@@ -466,17 +424,13 @@ def api_leave():
         _finish_game(rid)
     return jsonify({"ok": True})
 
-# ══════════════════════════════════════════════════════════════
-#  FIM DE JOGO
-# ══════════════════════════════════════════════════════════════
-
 def _finish_game(rid: str):
     r = _get_room(rid)
     if not r or not r.over or not r.winner:
         return
     winner_id = r.winner
     loser_ids = [p["user_id"] for p in r.players if p["user_id"] != winner_id]
-    prize     = round(r.bet * len(r.players) * 0.95, 2)   # 95% para o vencedor
+    prize     = round(r.bet * len(r.players) * 0.95, 2)
     credit_prize(winner_id, loser_ids, r.bet, prize, r.round, rid)
     add_tx(winner_id, "prize", prize, "Prémio vitória Ludo")
     wu = get_user(winner_id)
@@ -493,10 +447,6 @@ def _finish_game(rid: str):
     with _rooms_lk:
         _rooms.pop(rid, None)
 
-# ══════════════════════════════════════════════════════════════
-#  CHAT
-# ══════════════════════════════════════════════════════════════
-
 @app.route("/api/game/chat", methods=["POST"])
 @login_req
 def api_chat():
@@ -511,10 +461,6 @@ def api_chat():
     u = get_user(session["uid"])
     push_room(rid, "chat_message", {"name": u["name"], "text": msg, "system": False})
     return jsonify({"ok": True})
-
-# ══════════════════════════════════════════════════════════════
-#  SSE — EVENTOS
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/api/events")
 @login_req
@@ -556,10 +502,6 @@ def sse_admin():
     return Response(stream_with_context(gen()),
                     mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-# ══════════════════════════════════════════════════════════════
-#  ADMIN — DEPÓSITOS / LEVANTAMENTOS
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/admin/deposits")
 @admin_req
@@ -624,10 +566,6 @@ def adm_wit_reject(wid):
             })
     return jsonify({"ok": ok})
 
-# ══════════════════════════════════════════════════════════════
-#  ADMIN — UTILIZADORES / STATS
-# ══════════════════════════════════════════════════════════════
-
 @app.route("/admin/notifications")
 @admin_req
 def adm_notifs():
@@ -681,10 +619,6 @@ def adm_add_balance():
     if u: push(uid, "balance_update", {"balance": u["balance"],
                                         "msg": f"O teu saldo foi ajustado: +{amount:,.0f} Kz"})
     return jsonify({"ok": True})
-
-# ══════════════════════════════════════════════════════════════
-#  ADMIN — JOGO DE TESTE (BOT)
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/api/admin/login", methods=["POST"])
 @admin_req
@@ -810,10 +744,6 @@ def adm_bot_turn():
     threading.Thread(target=run, daemon=True).start()
     return jsonify({"ok": True})
 
-# ══════════════════════════════════════════════════════════════
-#  ADMIN — PROMOS / TICKETS / SUPORTE
-# ══════════════════════════════════════════════════════════════
-
 @app.route("/admin/promos", methods=["GET"])
 @admin_req
 def adm_promos(): return jsonify({"promos": get_all_promos()})
@@ -854,10 +784,6 @@ def adm_ticket_reply(tid):
             "msg": f"O suporte respondeu ao teu pedido: {reply[:80]}"
         })
     return jsonify({"ok": True})
-
-# ══════════════════════════════════════════════════════════════
-#  REFERIDOS / PROMOS / BÓNUS / SUPORTE
-# ══════════════════════════════════════════════════════════════
 
 @app.route("/api/referral/code")
 @login_req
@@ -922,10 +848,6 @@ def api_support_send():
 def api_support_list():
     return jsonify({"tickets": get_user_tickets(session["uid"])})
 
-# ══════════════════════════════════════════════════════════════
-#  LEADERBOARD / STATS PÚBLICAS
-# ══════════════════════════════════════════════════════════════
-
 @app.route("/api/leaderboard")
 def api_leaderboard():
     conn = get_pg(); cur = conn.cursor()
@@ -947,10 +869,6 @@ def api_stats_public():
     cur.close(); conn.close()
     online = len([uid for uid, qs in _sse.items() if uid > 0 and qs])
     return jsonify({"users": users, "games": games, "paid": paid, "online": online})
-
-# ══════════════════════════════════════════════════════════════
-#  JACKPOT
-# ══════════════════════════════════════════════════════════════
 
 _jackpot_lock = threading.Lock()
 
@@ -981,10 +899,6 @@ def grow_jackpot(bet):
 @app.route("/api/jackpot")
 def api_jackpot():
     return jsonify({"value": get_jackpot_value()})
-
-# ══════════════════════════════════════════════════════════════
-#  ARRANQUE
-# ══════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
