@@ -496,8 +496,10 @@ def sse():
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 @app.route("/api/admin/events")
-@admin_req
 def sse_admin():
+    k = request.args.get("key", "") or request.headers.get("X-Admin-Key", "")
+    if k != ADMIN_KEY:
+        return jsonify({"error": "Acesso negado"}), 403
     q = queue.Queue(maxsize=200)
     with _sse_lk:
         _sse.setdefault(-1, []).append(q)
