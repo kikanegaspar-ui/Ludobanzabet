@@ -420,7 +420,7 @@ function tab(name){
 
 function connect(){
   if(SSE)SSE.close();
-  SSE=new EventSource('/api/admin/events',{withCredentials:false});
+  SSE = new EventSource('/api/admin/events?key=' + key());
   // Passar key via header nao funciona com SSE, usamos param
   SSE.addEventListener('connected',()=>{
     document.getElementById('live-dot').style.display='inline-block';
