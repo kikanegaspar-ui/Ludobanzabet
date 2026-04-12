@@ -24,7 +24,6 @@ def add_godot_headers(response):
     response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
     return response
 
-# ← AQUI, mesmo a seguir
 @app.after_request
 def add_cors(response):
     response.headers["Access-Control-Allow-Origin"]      = "*"
@@ -36,9 +35,6 @@ def add_cors(response):
 @app.route("/api/<path:path>", methods=["OPTIONS"])
 def options_handler(path):
     return "", 204
-
-# ── Helper de conexão PostgreSQL ───────────────────────────────
-def get_pg():
 
 # ── Helper de conexão PostgreSQL ───────────────────────────────
 def get_pg():
