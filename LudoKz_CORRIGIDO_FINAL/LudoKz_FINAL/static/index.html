@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<title>LudoKz — Angola Gaming</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#020208;--bg1:#05040f;--bg2:#080618;--bg3:#0c0920;
+  --c1:#0f0d28;--c2:#141030;--c3:#1a1538;
+  --rim:#1e1a40;--rim2:#2d285a;--rim3:#4038a0;
+  --g1:#f5c518;--g2:#ffdb4d;--g3:#e6a800;--g4:#fff8e1;
+  --jade:#00e676;--jade2:#00c853;
+  --red:#ff2d55;--blue:#0a84ff;--purple:#bf5af2;--orange:#ff9f0a;
+  --t1:#f0eeff;--t2:#9890c0;--t3:#4a4470;
+  --R:#ff453a;--G:#30d158;--B:#0a84ff;--Y:#ffd60a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:"Plus Jakarta Sans",sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;overflow-x:hidden;cursor:default}
+
+/* ─── NOISE TEXTURE ─── */
+body::before{content:"";position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
+
+/* ─── AURORA BG ─── */
+.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.aurora-blob{position:absolute;border-radius:50%;filter:blur(80px);animation:drift linear infinite}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-20px) scale(1.05)}66%{transform:translate(-20px,15px) scale(.97)}100%{transform:translate(0,0) scale(1)}}
+
+/* ─── CANVAS ─── */
+#cvs{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+.z{position:relative;z-index:2}
+.hidden{display:none!important}
+.screen{display:none;min-height:100vh;flex-direction:column;position:relative;z-index:2}
+.screen.on{display:flex}
+
+/* ═══ BUTTONS ═══ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:12px;font-family:"Plus Jakarta Sans",sans-serif;font-weight:800;cursor:pointer;transition:all .18s cubic-bezier(.34,1.56,.64,1);letter-spacing:.3px;position:relative;overflow:hidden}
+.btn::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);opacity:0;transition:opacity .2s}
+.btn:hover::after{opacity:1}
+.bg{background:linear-gradient(135deg,var(--g2),var(--g1),var(--g3));color:#0a0800;padding:13px 30px;font-size:14px;box-shadow:0 8px 24px rgba(245,197,24,.4),0 2px 4px rgba(0,0,0,.3);text-transform:uppercase;letter-spacing:.8px}
+.bg:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 14px 36px rgba(245,197,24,.55)}
+.bg:active{transform:translateY(0) scale(.98)}
+.bj{background:linear-gradient(135deg,#00e676,#00c853);color:#001808;padding:13px 30px;font-size:14px;box-shadow:0 8px 22px rgba(0,230,118,.35);text-transform:uppercase;letter-spacing:.8px}
+.bj:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(0,230,118,.5)}
+.bpu{background:linear-gradient(135deg,#bf5af2,#9b44d4);color:#fff;padding:13px 30px;font-size:14px;box-shadow:0 8px 22px rgba(191,90,242,.35);text-transform:uppercase;letter-spacing:.8px}
+.bpu:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(191,90,242,.5)}
+.bgh{background:rgba(255,255,255,.05);border:1.5px solid var(--rim2);color:var(--t2);padding:12px 24px;font-size:13px;text-transform:uppercase;letter-spacing:.5px}
+.bgh:hover{border-color:var(--rim3);color:var(--t1);background:rgba(255,255,255,.08)}
+.brd{background:linear-gradient(135deg,var(--red),#c41230);color:#fff;padding:10px 20px;font-size:13px;text-transform:uppercase;letter-spacing:.5px}
+.brd:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(255,45,85,.4)}
+.bxl{padding:18px 50px;font-size:17px;border-radius:16px}
+.blg{padding:14px 32px;font-size:14px}
+.bsm{padding:8px 16px;font-size:12px;border-radius:9px}
+.bfw{width:100%}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn:disabled::after{display:none}
+
+/* ═══ INPUTS ═══ */
+.fl{margin-bottom:15px}
+.fl label{display:block;font-size:11px;font-weight:800;color:var(--t3);margin-bottom:6px;letter-spacing:2px;text-transform:uppercase}
+.fl input,.fl select,.fl textarea{width:100%;padding:13px 16px;background:rgba(255,255,255,.04);border:1.5px solid var(--rim);border-radius:11px;color:var(--t1);font-family:"Plus Jakarta Sans",sans-serif;font-size:15px;font-weight:600;outline:none;transition:all .22s}
+.fl input:focus,.fl select:focus,.fl textarea:focus{border-color:var(--g1);background:rgba(255,255,255,.07);box-shadow:0 0 0 4px rgba(245,197,24,.08)}
+.fl input::placeholder{color:var(--t3);font-weight:500}
+.fl select option{background:#141030}
+.errt{color:var(--red);font-size:12px;font-weight:700;min-height:18px;margin-top:4px;display:flex;align-items:center;gap:5px}
+.okt{color:var(--jade);font-size:12px;font-weight:700;min-height:18px;margin-top:4px}
+
+/* ═══ NAV ═══ */
+nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(180%);border-bottom:1px solid rgba(245,197,24,.08);display:flex;align-items:center;padding:0 24px;gap:16px;position:sticky;top:0;z-index:200}
+.logo{display:flex;flex-direction:column;cursor:pointer}
+.logo-main{font-family:"Bebas Neue",sans-serif;font-size:28px;letter-spacing:3px;background:linear-gradient(135deg,var(--g4),var(--g2),var(--g1));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1;filter:drop-shadow(0 0 12px rgba(245,197,24,.5))}
+.logo-sub{font-size:9px;font-weight:800;letter-spacing:3px;color:var(--jade);text-transform:uppercase;margin-top:-2px}
+.ndv{width:1px;height:28px;background:var(--rim);flex-shrink:0}
+.nmenu{display:flex;gap:2px;flex:1}
+.nb{background:none;border:none;color:var(--t3);font-family:"Plus Jakarta Sans",sans-serif;font-size:12px;font-weight:800;padding:9px 14px;border-radius:9px;cursor:pointer;transition:all .18s;text-transform:uppercase;letter-spacing:.6px}
+.nb:hover,.nb.on{color:var(--g1);background:rgba(245,197,24,.07)}
+.nright{display:flex;align-items:center;gap:10px;margin-left:auto}
+.chip{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);border-radius:10px;padding:7px 16px;font-size:14px;font-weight:800;color:var(--g1);font-family:"Bebas Neue",sans-serif;letter-spacing:1px;white-space:nowrap}
+.avt{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--blue));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;cursor:pointer;border:2px solid var(--rim2);transition:all .2s;font-family:"Bebas Neue",sans-serif}
+.avt:hover{border-color:var(--g1);transform:scale(1.05)}
+@media(max-width:580px){.nmenu{display:none}}
+
+/* ═══ AUTH PAGE ═══ */
+#s-auth{align-items:center;justify-content:center;padding:28px 16px;min-height:100vh}
+.auth-wrap{width:100%;max-width:420px}
+.auth-brand{text-align:center;margin-bottom:28px}
+.dice-anim{font-size:60px;display:inline-block;animation:dice3d 3s ease-in-out infinite;filter:drop-shadow(0 0 24px rgba(245,197,24,.7))}
+@keyframes dice3d{0%,100%{transform:rotateY(0deg) scale(1)}25%{transform:rotateY(90deg) scale(1.1)}50%{transform:rotateY(180deg) scale(1)}75%{transform:rotateY(270deg) scale(1.1)}}
+.auth-title{font-family:"Bebas Neue",sans-serif;font-size:52px;letter-spacing:4px;background:linear-gradient(135deg,var(--g4),var(--g2),var(--g1),var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent;display:block;line-height:1;filter:drop-shadow(0 0 20px rgba(245,197,24,.5))}
+.auth-stars{color:var(--g1);font-size:18px;letter-spacing:5px;margin:8px 0}
+.auth-trust{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;margin-top:8px}
+.trust-i{font-size:11px;color:var(--t3);font-weight:700;display:flex;align-items:center;gap:4px}
+.trust-i span{color:var(--jade)}
+.auth-card{background:linear-gradient(160deg,rgba(20,16,48,.98),rgba(26,21,56,.98));border:1px solid rgba(245,197,24,.1);border-radius:22px;padding:30px;box-shadow:0 40px 80px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.03),inset 0 1px 0 rgba(255,255,255,.06)}
+.tabs{display:flex;background:rgba(0,0,0,.4);border-radius:12px;padding:4px;gap:4px;margin-bottom:24px}
+.tab{flex:1;padding:11px;text-align:center;border-radius:9px;cursor:pointer;font-weight:800;font-size:13px;letter-spacing:.6px;transition:all .2s;color:var(--t3);text-transform:uppercase}
+.tab.on{background:linear-gradient(135deg,rgba(245,197,24,.18),rgba(245,197,24,.08));color:var(--g1);border:1px solid rgba(245,197,24,.22);box-shadow:0 4px 12px rgba(245,197,24,.1)}
+.auth-note{text-align:center;margin-top:13px;font-size:12px;color:var(--t3);font-weight:600}
+.reset-link{color:var(--g1);cursor:pointer;font-weight:800;font-size:12px;text-decoration:none}
+.reset-link:hover{text-decoration:underline}
+
+/* ═══ HOME ═══ */
+.jk-banner{background:linear-gradient(135deg,rgba(245,197,24,.12),rgba(255,159,10,.08));border-bottom:1px solid rgba(245,197,24,.12);padding:12px 24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}
+.jk-label{font-size:11px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase}
+.jk-val{font-family:"Bebas Neue",sans-serif;font-size:28px;color:var(--g1);letter-spacing:2px;filter:drop-shadow(0 0 8px rgba(245,197,24,.5));animation:jkpulse 2s ease-in-out infinite}
+@keyframes jkpulse{0%,100%{filter:drop-shadow(0 0 8px rgba(245,197,24,.5))}50%{filter:drop-shadow(0 0 18px rgba(245,197,24,.8))}}
+.jk-dot{width:8px;height:8px;border-radius:50%;background:var(--jade);box-shadow:0 0 8px var(--jade);animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.hero{padding:56px 24px 48px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:800px;height:500px;background:radial-gradient(ellipse,rgba(93,68,209,.12),transparent 70%);pointer-events:none}
+.hero h1{font-family:"Bebas Neue",sans-serif;font-size:clamp(42px,8vw,88px);letter-spacing:2px;line-height:.95;margin-bottom:16px}
+.hero h1 .line1{display:block;color:var(--t1)}
+.hero h1 .line2{display:block;background:linear-gradient(135deg,var(--g4),var(--g2),var(--orange));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 20px rgba(245,197,24,.4))}
+.hero p{font-size:17px;color:var(--t2);max-width:520px;margin:0 auto 28px;line-height:1.65;font-weight:500}
+.hcta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.stats-strip{display:flex;justify-content:center;border-top:1px solid rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.04)}
+.stat-s{flex:1;min-width:100px;padding:18px;text-align:center;border-right:1px solid rgba(255,255,255,.04)}
+.stat-s:last-child{border-right:none}
+.stat-sv{font-family:"Bebas Neue",sans-serif;font-size:24px;color:var(--g1);letter-spacing:1px}
+.stat-sl{font-size:10px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-top:2px}
+.hbody{padding:30px 22px 70px;max-width:1100px;margin:0 auto;width:100%}
+.sh{font-family:"Bebas Neue",sans-serif;font-size:22px;letter-spacing:2px;color:var(--g1);display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.sh::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(245,197,24,.3),transparent)}
+.lb{background:linear-gradient(135deg,var(--c1),var(--c2));border:1px solid var(--rim);border-radius:18px;overflow:hidden;margin-bottom:28px}
+.lb-head{display:flex;padding:12px 18px;border-bottom:1px solid var(--rim);font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase}
+.lbr{display:flex;align-items:center;gap:13px;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s}
+.lbr:last-child{border-bottom:none}
+.lbr:hover{background:rgba(255,255,255,.02)}
+.lb-rank{font-family:"Bebas Neue",sans-serif;font-size:20px;width:32px;text-align:center}
+.r1{color:#ffd700;filter:drop-shadow(0 0 6px #ffd700)}.r2{color:#c0c0c0}.r3{color:#cd7f32}
+.lb-av{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,var(--purple),var(--blue));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}
+.lb-nm{flex:1;font-weight:700;font-size:14px}
+.lb-w{color:var(--jade);font-size:13px;font-weight:700}
+.lb-e{font-family:"Bebas Neue",sans-serif;font-size:16px;color:var(--g1);letter-spacing:.5px}
+.rooms-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:28px}
+.room{background:linear-gradient(160deg,var(--c1),var(--c2));border:1px solid var(--rim);border-radius:18px;overflow:hidden;cursor:pointer;transition:all .24s cubic-bezier(.34,1.56,.64,1);position:relative}
+.room::before{content:"";position:absolute;top:0;left:0;right:0;height:3px}
+.tbr::before{background:linear-gradient(90deg,#cd7f32,#f5c518,#cd7f32)}
+.tsi::before{background:linear-gradient(90deg,#9e9e9e,#fff,#9e9e9e)}
+.tgo::before{background:linear-gradient(90deg,#f5c518,#ff9f0a,#f5c518)}
+.tvip::before{background:linear-gradient(90deg,#bf5af2,#ff375f,#bf5af2)}
+.room:hover{border-color:rgba(245,197,24,.3);transform:translateY(-5px) scale(1.01);box-shadow:0 20px 50px rgba(0,0,0,.55),0 0 0 1px rgba(245,197,24,.08)}
+.rb{padding:20px}
+.rt{font-size:10px;font-weight:800;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-bottom:10px}
+.rv{font-family:"Bebas Neue",sans-serif;font-size:30px;color:var(--g1);letter-spacing:1px;line-height:1}
+.rv small{font-size:14px;color:var(--t3);font-family:"Plus Jakarta Sans",sans-serif;font-weight:600;letter-spacing:0}
+.rp{font-size:13px;color:var(--jade);margin-top:6px;font-weight:700}
+.rf{display:flex;justify-content:space-between;align-items:center;padding:11px 20px;background:rgba(0,0,0,.2);border-top:1px solid rgba(255,255,255,.04)}
+.rh{font-size:12px;color:var(--t2);font-weight:700}
+.rpill{font-size:10px;padding:3px 10px;border-radius:20px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.pw{background:rgba(255,214,0,.1);color:var(--Y);border:1px solid rgba(255,214,0,.22)}
+.pf{background:rgba(255,45,85,.1);color:var(--red);border:1px solid rgba(255,45,85,.2)}
+.bps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.bp{background:rgba(255,255,255,.03);border:1.5px solid var(--rim);border-radius:12px;padding:13px 6px;text-align:center;cursor:pointer;transition:all .18s}
+.bp:hover,.bp.on{border-color:var(--g1);background:rgba(245,197,24,.07);box-shadow:0 0 0 1px rgba(245,197,24,.15),0 4px 12px rgba(245,197,24,.1)}
+.bpa{font-family:"Bebas Neue",sans-serif;font-size:18px;color:var(--t1);letter-spacing:1px}
+.bp.on .bpa{color:var(--g1)}
+.bpl{font-size:10px;color:var(--t3);margin-top:2px;font-weight:700}
+.nps{display:flex;gap:8px;margin-bottom:14px}
+.np{background:rgba(255,255,255,.03);border:1.5px solid var(--rim);border-radius:11px;padding:11px;flex:1;text-align:center;cursor:pointer;transition:all .18s}
+.np:hover,.np.on{border-color:var(--g1);background:rgba(245,197,24,.07)}
+.npa{font-family:"Bebas Neue",sans-serif;font-size:22px;color:var(--t1)}
+.np.on .npa{color:var(--g1)}
+.npl{font-size:10px;color:var(--t3);font-weight:700}
+.wait-box{background:linear-gradient(160deg,var(--c2),var(--c3));border:1px solid rgba(245,197,24,.2);border-radius:22px;padding:40px;text-align:center;max-width:460px;width:100%;box-shadow:0 0 60px rgba(245,197,24,.07)}
+.spn{display:inline-block;width:52px;height:52px;border:3px solid rgba(245,197,24,.12);border-top-color:var(--g1);border-radius:50%;animation:sp .75s linear infinite;margin-bottom:18px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.wait-id{font-family:"Bebas Neue",sans-serif;font-size:44px;color:var(--g1);letter-spacing:6px;margin:14px 0 6px;filter:drop-shadow(0 0 12px rgba(245,197,24,.5))}
+.wait-slots{display:flex;justify-content:center;gap:10px;margin:14px 0;flex-wrap:wrap}
+.ws{width:48px;height:48px;border-radius:12px;border:2px dashed var(--rim2);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--t3);transition:all .3s}
+.ws.on{border-style:solid;border-color:var(--jade);background:rgba(0,230,118,.08);color:var(--jade);font-weight:800}
+.wb{padding:26px 22px 80px;max-width:740px;margin:0 auto;width:100%}
+.bal-card{background:linear-gradient(160deg,var(--c2),var(--c3));border:1px solid rgba(245,197,24,.18);border-radius:22px;padding:32px;text-align:center;margin-bottom:24px;position:relative;overflow:hidden}
+.bal-card::before{content:"";position:absolute;top:-80px;right:-80px;width:250px;height:250px;background:radial-gradient(circle,rgba(245,197,24,.1),transparent 70%)}
+.bll{font-size:11px;font-weight:800;color:var(--t3);letter-spacing:3px;text-transform:uppercase}
+.bln{font-family:"Bebas Neue",sans-serif;font-size:clamp(40px,7vw,60px);color:var(--g1);filter:drop-shadow(0 0 18px rgba(245,197,24,.4));margin:6px 0 2px;letter-spacing:2px}
+.blc{font-size:15px;color:var(--t2);font-weight:600}
+.wg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px}
+@media(max-width:540px){.wg{grid-template-columns:1fr}}
+.wc{background:var(--c1);border:1px solid var(--rim);border-radius:18px;padding:22px}
+.wc h3{font-family:"Bebas Neue",sans-serif;font-size:20px;letter-spacing:1px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.exb{background:linear-gradient(135deg,rgba(245,197,24,.08),rgba(245,197,24,.04));border:1.5px solid rgba(245,197,24,.2);border-radius:16px;padding:20px;margin-bottom:18px}
+.exb h4{font-family:"Bebas Neue",sans-serif;font-size:18px;letter-spacing:1px;color:var(--g1);margin-bottom:12px}
+.exn{font-family:"Bebas Neue",sans-serif;font-size:34px;color:var(--g1);letter-spacing:5px;text-align:center;padding:14px;background:rgba(0,0,0,.3);border-radius:11px;margin:8px 0;filter:drop-shadow(0 0 10px rgba(245,197,24,.3))}
+.exl{list-style:none;font-size:13px;color:var(--t2);font-weight:600;line-height:2.1}
+.exl li::before{content:"→ ";color:var(--g1)}
+.mths{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.mth{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;cursor:pointer;border:1.5px solid var(--rim);color:var(--t3);transition:all .15s;text-transform:uppercase;letter-spacing:.5px}
+.mth.on{border-color:var(--g1);color:var(--g1);background:rgba(245,197,24,.08)}
+.pnote{font-size:11px;color:var(--t3);font-weight:600;margin-top:8px;line-height:1.6}
+.alrt{background:rgba(245,197,24,.06);border:1px solid rgba(245,197,24,.18);border-radius:11px;padding:14px;font-size:13px;font-weight:600;color:var(--t2);line-height:1.65;margin-bottom:14px}
+.alrt strong{color:var(--g1)}
+.txp{background:var(--c1);border:1px solid var(--rim);border-radius:16px;overflow:hidden}
+.txh{display:flex;justify-content:space-between;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.04);font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase}
+.txi{display:flex;align-items:center;gap:11px;padding:13px 18px;border-bottom:1px solid rgba(255,255,255,.03);transition:background .12s}
+.txi:last-child{border-bottom:none}
+.txi:hover{background:rgba(255,255,255,.013)}
+.tic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.id{background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.15)}
+.iw{background:rgba(255,45,85,.08);border:1px solid rgba(255,45,85,.15)}
+.ig{background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.15)}
+.il{background:rgba(80,70,120,.12);border:1px solid var(--rim)}
+.tin2{flex:1}.tds{font-size:13px;font-weight:700}.tdt{font-size:11px;color:var(--t3);font-weight:600;margin-top:1px}
+.tam{font-family:"Bebas Neue",sans-serif;font-size:16px;letter-spacing:.5px}
+.pos{color:var(--jade)}.neg{color:var(--red)}
+.empty{padding:36px;text-align:center;color:var(--t3);font-size:14px;font-weight:600}
+.dst{font-size:10px;padding:3px 10px;border-radius:20px;font-weight:800;text-transform:uppercase;display:inline-block}
+.dsp{background:rgba(255,159,10,.1);color:var(--orange);border:1px solid rgba(255,159,10,.2)}
+.dsa{background:rgba(0,230,118,.1);color:var(--jade);border:1px solid rgba(0,230,118,.2)}
+.dsr{background:rgba(255,45,85,.1);color:var(--red);border:1px solid rgba(255,45,85,.2)}
+.daily-card{background:linear-gradient(135deg,rgba(245,197,24,.1),rgba(255,159,10,.06));border:1.5px solid rgba(245,197,24,.22);border-radius:18px;padding:22px;margin-bottom:16px}
+.daily-card h3{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--g1);margin-bottom:12px;letter-spacing:1px}
+.streak-days{display:flex;gap:6px;margin:12px 0;flex-wrap:wrap}
+.sd{flex:1;min-width:38px;text-align:center;padding:7px 4px;border-radius:10px;border:1px solid var(--rim);background:transparent;transition:all .3s}
+.sd.done{border-color:var(--g1);background:rgba(245,197,24,.1)}
+.sd-day{font-size:9px;color:var(--t3);font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+.sd-val{font-family:"Bebas Neue",sans-serif;font-size:13px;color:var(--t2);margin-top:2px}
+.sd.done .sd-val{color:var(--g1)}
+.ref-card{background:linear-gradient(135deg,rgba(0,230,118,.08),rgba(0,200,83,.04));border:1.5px solid rgba(0,230,118,.18);border-radius:18px;padding:22px;margin-bottom:16px}
+.ref-card h3{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--jade);margin-bottom:12px;letter-spacing:1px}
+.ref-link{background:rgba(0,0,0,.3);border:1px solid rgba(0,230,118,.2);border-radius:11px;padding:12px 15px;font-family:monospace;font-size:12px;color:var(--jade);word-break:break-all;cursor:pointer;margin-bottom:12px;transition:background .2s}
+.ref-link:hover{background:rgba(0,230,118,.05)}
+.sup-card{background:var(--c1);border:1px solid rgba(10,132,255,.2);border-radius:18px;padding:22px;margin-bottom:22px}
+.sup-card h3{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--blue);margin-bottom:12px;letter-spacing:1px}
+.tkt{background:rgba(0,0,0,.2);border:1px solid var(--rim);border-radius:11px;padding:12px;margin-bottom:8px;font-size:13px}
+.pb{padding:26px 22px 80px;max-width:730px;margin:0 auto;width:100%}
+.phd{background:linear-gradient(160deg,var(--c2),var(--c3));border:1px solid var(--rim);border-radius:20px;padding:28px;display:flex;align-items:center;gap:20px;margin-bottom:20px;flex-wrap:wrap;position:relative;overflow:hidden}
+.phd::after{content:"";position:absolute;right:-40px;top:-40px;width:200px;height:200px;background:radial-gradient(circle,rgba(191,90,242,.06),transparent 70%)}
+.pav{width:76px;height:76px;border-radius:16px;background:linear-gradient(135deg,var(--purple),var(--blue));display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;border:3px solid var(--rim2);flex-shrink:0;font-family:"Bebas Neue",sans-serif;box-shadow:0 8px 24px rgba(191,90,242,.3)}
+.pnm{font-family:"Bebas Neue",sans-serif;font-size:24px;letter-spacing:1px}
+.pem{font-size:13px;color:var(--t3);font-weight:600;margin-top:3px}
+.prk{font-size:12px;padding:4px 12px;border-radius:20px;background:rgba(245,197,24,.1);color:var(--g1);border:1px solid rgba(245,197,24,.2);font-weight:800;display:inline-block;margin-top:7px}
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:11px;margin-bottom:20px}
+.sc{background:var(--c1);border:1px solid var(--rim);border-radius:14px;padding:18px;text-align:center;transition:transform .2s}
+.sc:hover{transform:translateY(-2px)}
+.scv{font-family:"Bebas Neue",sans-serif;font-size:26px;letter-spacing:.5px}
+.scl{font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:4px;font-weight:700}
+#s-game{background:linear-gradient(160deg,var(--bg),var(--bg1),var(--bg2));padding:14px;min-height:100vh}
+.gw{max-width:1000px;margin:0 auto;width:100%}
+.gtp{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.pc{display:flex;align-items:center;gap:10px;background:var(--c1);border:1.5px solid var(--rim);border-radius:14px;padding:11px 16px;min-width:185px;transition:all .25s}
+.pc.mt{border-color:var(--g1);box-shadow:0 0 24px rgba(245,197,24,.18),inset 0 1px 0 rgba(245,197,24,.1)}
+.pdot{width:13px;height:13px;border-radius:50%;flex-shrink:0}
+.pnm2{font-weight:800;font-size:14px;font-family:"Bebas Neue",sans-serif;letter-spacing:.5px}
+.pft{font-size:11px;color:var(--t3);margin-top:1px;font-weight:600}
+.gmid{text-align:center}
+.ttx{font-size:12px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:.5px}
+.rtx{font-size:11px;color:var(--t3);margin-top:2px;font-family:"Bebas Neue",sans-serif;letter-spacing:1px}
+.gly{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.bouter{background:linear-gradient(135deg,#e8e4f0,#ddd8f2);border-radius:14px;padding:6px;box-shadow:0 0 70px rgba(0,0,0,.75),0 0 35px rgba(93,68,209,.2),inset 0 2px 0 rgba(255,255,255,.4);flex-shrink:0;position:relative}
+.bouter::before{content:"";position:absolute;inset:-3px;border-radius:17px;background:linear-gradient(135deg,rgba(245,197,24,.5),rgba(191,90,242,.3),rgba(245,197,24,.5));z-index:-1}
+.ludo{display:grid;grid-template-columns:repeat(15,1fr);width:min(460px,calc(100vw - 30px));height:min(460px,calc(100vw - 30px));border-radius:9px;overflow:hidden}
+.c{display:flex;align-items:center;justify-content:center;position:relative;border:.25px solid rgba(0,0,0,.1)}
+.cr{background:#e53935}.cg{background:#43a047}.cb{background:#1565c0}.cy{background:#f9a825}
+.ci{background:#fafafa}.cw{background:#fff}
+.hpr{background:#ef9a9a}.hpg{background:#a5d6a7}.hpb{background:#90caf9}.hpy{background:#fff59d}
+.tr{background:#e53935}.tg{background:#43a047}.tb{background:#1565c0}.ty{background:#f9a825}
+.ch{background:#fff}.ch::after{content:"★";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.65);color:rgba(0,0,0,.1);pointer-events:none;line-height:1}
+.sf{background:#fff}.sf::after{content:"☆";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.52);color:rgba(0,0,0,.18);pointer-events:none;line-height:1}
+.ar::after{content:"→";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.5);color:#e53935;font-weight:900;pointer-events:none}
+.ag::after{content:"↓";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.5);color:#43a047;font-weight:900;pointer-events:none}
+.ab::after{content:"←";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.5);color:#1565c0;font-weight:900;pointer-events:none}
+.ay::after{content:"↑";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.5);color:#f9a825;font-weight:900;pointer-events:none}
+.piece{position:absolute;width:66%;height:66%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:calc(min(460px,100vw - 30px)/15*.28);font-weight:700;cursor:pointer;z-index:5;transition:all .22s;border:2px solid rgba(255,255,255,.9);font-family:"Bebas Neue",sans-serif;letter-spacing:0}
+.p-r{background:radial-gradient(circle at 38% 32%,#ff8a80,#b71c1c);box-shadow:0 2px 10px rgba(183,28,28,.6)}
+.p-g{background:radial-gradient(circle at 38% 32%,#c8e6c9,#1b5e20);box-shadow:0 2px 10px rgba(27,94,32,.5)}
+.p-b{background:radial-gradient(circle at 38% 32%,#bbdefb,#0d47a1);box-shadow:0 2px 10px rgba(13,71,161,.5)}
+.p-y{background:radial-gradient(circle at 38% 32%,#fff9c4,#e65100);box-shadow:0 2px 10px rgba(230,81,0,.5)}
+.piece.sel{animation:pglow .45s ease-in-out infinite alternate}
+@keyframes piece-move{0%{transform:scale(1) translateY(0)}30%{transform:scale(1.4) translateY(-8px)}60%{transform:scale(1.1) translateY(-3px)}100%{transform:scale(1) translateY(0)}}
+.piece-moving{animation:piece-move .45s cubic-bezier(.34,1.56,.64,1) forwards!important}
+@keyframes piece-captured{0%{transform:scale(1);opacity:1}40%{transform:scale(1.8);opacity:.8}100%{transform:scale(0);opacity:0}}
+.piece-captured{animation:piece-captured .4s ease-in forwards!important}
+@keyframes piece-finish{0%{transform:scale(1) rotate(0deg)}25%{transform:scale(1.5) rotate(90deg)}50%{transform:scale(1.8) rotate(180deg)}75%{transform:scale(1.3) rotate(270deg)}100%{transform:scale(1) rotate(360deg)}}
+.piece-finish{animation:piece-finish .7s cubic-bezier(.34,1.56,.64,1) forwards!important}
+@keyframes dice-roll{0%{transform:rotateX(0) rotateY(0) scale(1)}25%{transform:rotateX(180deg) rotateY(90deg) scale(1.2)}50%{transform:rotateX(360deg) rotateY(180deg) scale(.9)}75%{transform:rotateX(270deg) rotateY(270deg) scale(1.1)}100%{transform:rotateX(360deg) rotateY(360deg) scale(1)}}
+.dice-rolling-3d{animation:dice-roll .6s cubic-bezier(.34,1.56,.64,1) forwards!important}
+@keyframes turn-pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,197,24,.5)}50%{box-shadow:0 0 0 10px rgba(245,197,24,0)}}
+.my-turn-glow{animation:turn-pulse 1.2s ease-in-out infinite}
+@keyframes safe-glow{0%,100%{background:#fff}50%{background:rgba(255,214,0,.25)}}
+@keyframes selectable-bounce{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.15) translateY(-4px)}}
+.piece.sel{animation:selectable-bounce .6s ease-in-out infinite!important}
+@keyframes base-blink{0%,100%{opacity:1;filter:brightness(1)}50%{opacity:.7;filter:brightness(1.5)}}
+@keyframes trail-fade{0%{opacity:.7;transform:scale(.6)}100%{opacity:0;transform:scale(1.4)}}
+.trail-dot{position:absolute;width:50%;height:50%;border-radius:50%;pointer-events:none;z-index:4;animation:trail-fade .5s ease-out forwards}
+@keyframes star-burst{0%{transform:translate(-50%,-50%) scale(0) rotate(0);opacity:1}100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1) rotate(var(--rot));opacity:0}}
+.star-particle{position:fixed;font-size:22px;z-index:998;pointer-events:none;animation:star-burst .9s ease-out forwards}
+.dice-face{transition:transform .1s;perspective:200px}
+.cell-exact{animation:safe-glow 1s ease-in-out infinite}
+@keyframes pglow{from{box-shadow:0 0 4px rgba(255,255,255,.4);transform:scale(1)}to{box-shadow:0 0 20px #fff,0 0 10px var(--g1);transform:scale(1.18)}}
+.gsd{display:flex;flex-direction:column;gap:13px;min-width:205px;max-width:260px;flex:1}
+.gcd{background:var(--c1);border:1px solid var(--rim);border-radius:16px;padding:18px}
+.btd{background:linear-gradient(135deg,rgba(245,197,24,.12),rgba(245,197,24,.06));border:1px solid rgba(245,197,24,.2);border-radius:11px;padding:10px 16px;text-align:center;margin-bottom:14px}
+.bdl{font-size:10px;font-weight:800;color:var(--g1);letter-spacing:2px;text-transform:uppercase}
+.bdv{font-family:"Bebas Neue",sans-serif;font-size:22px;color:var(--g1);letter-spacing:1px}
+.dice-face{font-size:60px;text-align:center;line-height:1;margin:8px 0;display:block;filter:drop-shadow(0 0 10px rgba(245,197,24,.5));transition:all .15s}
+.dice-face.rolling{animation:dr .08s steps(1) infinite}
+@keyframes dr{0%{opacity:.3}50%{opacity:1}}
+.dice-num{font-family:"Bebas Neue",sans-serif;font-size:36px;color:var(--g1);text-align:center;margin-bottom:11px;letter-spacing:2px;filter:drop-shadow(0 0 12px rgba(245,197,24,.5))}
+.chat-wrap{background:var(--c1);border:1px solid var(--rim);border-radius:16px;overflow:hidden}
+.chat-head{padding:11px 15px;border-bottom:1px solid var(--rim);font-size:11px;font-weight:800;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;display:flex;justify-content:space-between}
+.chat-msgs{height:150px;overflow-y:auto;padding:10px 13px;font-size:12px;display:flex;flex-direction:column;gap:6px}
+.chat-msgs::-webkit-scrollbar{width:3px}
+.chat-msgs::-webkit-scrollbar-thumb{background:var(--rim2);border-radius:3px}
+.chat-msg{line-height:1.5}
+.cm-name{font-weight:800;margin-right:4px}
+.cm-txt{color:var(--t2)}
+.chat-msg.sys .cm-txt{color:var(--jade);font-style:italic}
+.chat-row{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--rim)}
+.chat-inp{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--rim);border-radius:8px;color:var(--t1);font-family:"Plus Jakarta Sans",sans-serif;font-size:13px;font-weight:600;padding:7px 11px;outline:none;transition:border-color .2s}
+.chat-inp:focus{border-color:var(--g1)}
+.chat-send{background:var(--g1);color:#0a0800;border:none;border-radius:8px;padding:7px 14px;font-weight:800;cursor:pointer;font-size:13px;font-family:"Plus Jakarta Sans",sans-serif;transition:all .15s}
+.chat-send:hover{background:var(--g2)}
+.glog-wrap{max-height:150px;overflow-y:auto;font-size:12px}
+.glog-wrap::-webkit-scrollbar{width:3px}
+.glog-wrap::-webkit-scrollbar-thumb{background:var(--rim2);border-radius:3px}
+.gli{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);color:var(--t2);line-height:1.45;font-weight:600}
+.gli:last-child{border:none}
+.gli-w{color:var(--jade)!important}.gli-d{color:var(--red)!important}
+.goov{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(14px)}
+.gocd{background:linear-gradient(160deg,var(--c2),var(--c3));border-radius:26px;padding:46px 36px;text-align:center;max-width:420px;width:100%;border:2px solid var(--g1);box-shadow:0 0 70px rgba(245,197,24,.25),0 40px 80px rgba(0,0,0,.8)}
+.gocd.lose{border-color:var(--red);box-shadow:0 0 50px rgba(255,45,85,.2),0 40px 80px rgba(0,0,0,.8)}
+.goic{font-size:80px;margin-bottom:14px;display:block;animation:gob .6s ease-in-out infinite alternate}
+@keyframes gob{from{transform:scale(1)}to{transform:scale(1.1)}}
+.gott{font-family:"Bebas Neue",sans-serif;font-size:44px;letter-spacing:2px;margin-bottom:6px}
+.gosb{font-size:15px;color:var(--t2);margin-bottom:18px;font-weight:600}
+.gopl{font-size:10px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;font-weight:800}
+.gopr{font-family:"Bebas Neue",sans-serif;font-size:48px;letter-spacing:2px;margin:6px 0 28px}
+.goa{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.86);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(10px)}
+.md{background:linear-gradient(160deg,var(--c2),var(--c3));border:1px solid rgba(245,197,24,.18);border-radius:22px;padding:30px;width:100%;max-width:450px;box-shadow:0 36px 80px rgba(0,0,0,.7)}
+.md h3{font-family:"Bebas Neue",sans-serif;font-size:26px;letter-spacing:1px;color:var(--g1);margin-bottom:6px}
+.md p{font-size:13px;color:var(--t2);margin-bottom:18px;font-weight:600;line-height:1.65}
+.mft{display:flex;gap:9px}
+.tst{position:fixed;bottom:24px;right:24px;z-index:600;background:var(--c2);border:1px solid var(--rim2);border-radius:14px;padding:14px 20px;font-size:13px;font-weight:700;max-width:290px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.tst.show{transform:translateY(0);opacity:1}
+.tok{border-color:var(--jade);color:var(--jade)}.ter{border-color:var(--red);color:var(--red)}.tin{border-color:var(--g1);color:var(--g1)}
+@media(max-width:580px){.mob-nav{display:flex!important}body{padding-bottom:68px}}
+.mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:62px;background:rgba(2,2,8,.97);border-top:1px solid rgba(245,197,24,.08);z-index:200;justify-content:space-around;align-items:center;backdrop-filter:blur(20px)}
+.mnb{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;color:var(--t3);font-family:"Plus Jakarta Sans",sans-serif;font-size:9px;font-weight:800;letter-spacing:.5px;cursor:pointer;padding:6px 12px;border-radius:10px;text-transform:uppercase;transition:all .15s}
+.mnb:hover,.mnb.on{color:var(--g1)}
+.mnb-ic{font-size:21px}
+@keyframes coinfall{0%{transform:translateY(-20px) rotate(0deg);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateY(80px) rotate(360deg);opacity:0}}
+.coin-drop{position:fixed;pointer-events:none;font-size:20px;animation:coinfall 1s ease-in forwards;z-index:999}
+@keyframes flash-win{0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}40%{opacity:1;transform:translate(-50%,-50%) scale(1.3)}70%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5)}}
+.flash-el{position:fixed;top:45%;left:50%;z-index:999;font-size:72px;animation:flash-win .9s ease-out forwards;pointer-events:none}
+.promo-row{display:flex;gap:8px;margin-top:12px}
+.promo-inp{flex:1;padding:11px 14px;background:rgba(255,255,255,.04);border:1.5px solid var(--rim);border-radius:11px;color:var(--t1);font-family:"Plus Jakarta Sans",sans-serif;font-size:15px;font-weight:700;outline:none;transition:all .2s;text-transform:uppercase;letter-spacing:1px}
+.promo-inp:focus{border-color:var(--g1);background:rgba(255,255,255,.07)}
+.promo-inp::placeholder{text-transform:none;letter-spacing:0;font-weight:500}
+</style>
+</head>
+<body>
+
+<!-- AURORA -->
+<div class="aurora">
+  <div class="aurora-blob" style="width:600px;height:600px;background:rgba(93,68,209,.08);top:-200px;left:-100px;animation-duration:25s"></div>
+  <div class="aurora-blob" style="width:500px;height:500px;background:rgba(245,197,24,.05);top:30%;right:-150px;animation-duration:20s;animation-delay:-8s"></div>
+  <div class="aurora-blob" style="width:400px;height:400px;background:rgba(0,230,118,.04);bottom:-100px;left:30%;animation-duration:22s;animation-delay:-5s"></div>
+</div>
+<canvas id="cvs"></canvas>
+
+<!-- ══════ AUTH ══════ -->
+<div id="s-auth" class="screen on z">
+  <div class="auth-wrap">
+    <div class="auth-brand">
+      <div class="dice-anim">🎲</div>
+      <span class="auth-title">LudoKz</span>
+      <div class="auth-stars">★★★★★</div>
+      <div style="font-size:13px;color:var(--t3);font-weight:700;letter-spacing:1px">ANGOLA'S #1 LUDO PLATFORM</div>
+      <div class="auth-trust">
+        <div class="trust-i"><span>✓</span> Express Card</div>
+        <div class="trust-i"><span>✓</span> Jogo Justo</div>
+        <div class="trust-i"><span>✓</span> Pagamentos Rápidos</div>
+      </div>
+    </div>
+    <div class="auth-card">
+      <div class="tabs">
+        <div class="tab on" onclick="atab('in')">Entrar</div>
+        <div class="tab" onclick="atab('up')">Criar Conta</div>
+      </div>
+
+      <!-- ═══ LOGIN ═══ -->
+      <div id="fin">
+        <div class="fl">
+          <label>Número de Telefone Angola</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="background:rgba(255,255,255,.06);border:1.5px solid var(--rim);border-radius:9px;padding:12px 12px;font-size:15px;font-weight:700;color:var(--t2);white-space:nowrap">🇦🇴 +244</span>
+            <input id="lp-phone" type="tel" placeholder="9XX XXX XXX" style="flex:1" onkeydown="if(event.key==='Enter')document.getElementById('lp-pw').focus()">
+          </div>
+        </div>
+        <div class="fl"><label>Senha</label><input id="lp-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div class="errt" id="lerr"></div>
+        <button class="btn bg bfw" id="btn-login" onclick="doLogin()" style="margin-top:6px;font-size:15px">Entrar</button>
+        <div style="text-align:center;margin-top:13px">
+          <span style="font-size:12px;color:var(--t3)">Esqueceste a senha? </span>
+          <a class="reset-link" onclick="showReset()">Recuperar</a>
+        </div>
+      </div>
+
+      <!-- ═══ REGISTER — Multi-step ═══ -->
+      <div id="fup" class="hidden">
+        <div id="reg-s1">
+          <div class="fl"><label>Nome Completo</label><input id="rn" placeholder="O teu nome completo"></div>
+          <div class="fl">
+            <label>Número de Telefone Angola</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="background:rgba(255,255,255,.06);border:1.5px solid var(--rim);border-radius:9px;padding:12px 12px;font-size:15px;font-weight:700;color:var(--t2);white-space:nowrap">🇦🇴 +244</span>
+              <input id="rphone" type="tel" placeholder="9XX XXX XXX" style="flex:1">
+            </div>
+            <div id="op-badge" style="font-size:11px;color:var(--jade);margin-top:4px;font-weight:700"></div>
+          </div>
+          <div class="fl"><label>Senha</label><input id="rp" type="password" placeholder="Mínimo 6 caracteres"></div>
+          <div class="fl"><label>Código de Referido <span style="color:var(--jade);font-size:10px">+500 Kz bónus</span></label><input id="rref" placeholder="Opcional"></div>
+          <div class="errt" id="rerr"></div>
+          <button class="btn bg bfw" id="btn-send-otp" onclick="enviarOTP()" style="font-size:14px">📱 Enviar Código SMS</button>
+        </div>
+
+        <div id="reg-s2" class="hidden">
+          <div style="text-align:center;margin-bottom:16px">
+            <div style="font-size:32px;margin-bottom:8px">📱</div>
+            <div style="font-size:14px;color:var(--t2);font-weight:600" id="otp-msg">Código enviado!</div>
+          </div>
+          <div class="fl">
+            <label>Código SMS (6 dígitos)</label>
+            <input id="rotp" type="number" placeholder="123456" style="font-size:22px;text-align:center;letter-spacing:6px;font-family:monospace" maxlength="6">
+          </div>
+          <div style="text-align:center;margin-bottom:14px">
+            <span style="font-size:13px;color:var(--t3)">Expira em: </span>
+            <span id="otp-timer" style="font-family:Bebas Neue,sans-serif;font-size:18px;color:var(--g1)">2:00</span>
+            <span style="font-size:12px;color:var(--t3);margin-left:8px" id="resend-btn" style="cursor:pointer;display:none">
+              · <a onclick="enviarOTP()" style="color:var(--g1);cursor:pointer;font-weight:700">Reenviar</a>
+            </span>
+          </div>
+          <div class="errt" id="otp-err"></div>
+          <button class="btn bg bfw" onclick="verificarOTP()" style="font-size:14px">✓ Verificar Código</button>
+          <button class="btn bgh bsm" onclick="voltarStep1()" style="width:100%;margin-top:8px;font-size:13px">← Voltar</button>
+        </div>
+
+        <div id="reg-s3" class="hidden">
+          <div style="text-align:center;margin-bottom:18px">
+            <div style="font-size:36px;margin-bottom:8px">✅</div>
+            <div style="font-size:14px;color:var(--jade);font-weight:700">Número verificado!</div>
+          </div>
+          <div style="background:rgba(255,45,85,.08);border:1.5px solid rgba(255,45,85,.3);border-radius:14px;padding:18px;margin-bottom:16px;text-align:center">
+            <div style="font-size:28px;margin-bottom:8px">🔞</div>
+            <div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:6px">Tens 18 ou mais anos?</div>
+            <div style="font-size:12px;color:var(--t3);margin-bottom:14px;line-height:1.6">O LudoKz é uma plataforma de apostas proibida a menores de 18 anos conforme a lei angolana.</div>
+            <div style="display:flex;gap:10px;justify-content:center">
+              <button id="btn-age-yes" onclick="confirmarIdade(true)" class="btn bj" style="font-size:14px;padding:10px 28px">✓ Sim, tenho 18+</button>
+              <button onclick="confirmarIdade(false)" class="btn brd bsm" style="font-size:13px">✗ Não</button>
+            </div>
+          </div>
+          <div id="terms-section" class="hidden">
+            <div style="background:rgba(255,255,255,.03);border:1px solid var(--rim);border-radius:11px;padding:14px;max-height:160px;overflow-y:auto;font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:14px" id="terms-text">
+              <strong style="color:var(--g1);font-size:13px">TERMOS E CONDIÇÕES — LUDOKZ</strong><br><br>
+              <strong>1. Elegibilidade</strong><br>
+              Só podem jogar pessoas com 18 ou mais anos. Ao registares-te declaras ter essa idade.<br><br>
+              <strong>2. Apostas e Pagamentos</strong><br>
+              Todas as apostas são em Kwanzas Angolanos (Kz). Os pagamentos são processados via Express Card ou Unitel Money. O LudoKz retém 10% de comissão sobre ganhos.<br><br>
+              <strong>3. Jogo Responsável</strong><br>
+              O LudoKz promove o jogo responsável. Se sentires que tens problemas com o jogo, contacta o nosso suporte.<br><br>
+              <strong>4. Política de Privacidade</strong><br>
+              Os teus dados pessoais (nome, número de telefone) são usados exclusivamente para gerir a tua conta e processar pagamentos. Não partilhamos com terceiros.<br><br>
+              <strong>5. Segurança</strong><br>
+              Não partilhes a tua senha ou código SMS com ninguém. O LudoKz nunca te pedirá estes dados por telefone.<br><br>
+              <strong>6. Proibições</strong><br>
+              É proibido criar múltiplas contas, usar bots ou manipular jogos. Infractores serão banidos permanentemente.<br><br>
+              <strong>7. Contacto</strong><br>
+              Suporte disponível dentro da plataforma através do chat de suporte.
+            </div>
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:14px">
+              <input type="checkbox" id="terms-check" style="width:18px;height:18px;margin-top:2px;accent-color:var(--g1)">
+              <span style="font-size:13px;color:var(--t2);line-height:1.5">Li e aceito os <span style="color:var(--g1);font-weight:700">Termos e Condições</span> e a <span style="color:var(--g1);font-weight:700">Política de Privacidade</span></span>
+            </label>
+            <div class="errt" id="terms-err"></div>
+            <button class="btn bg bfw" onclick="doReg()" style="font-size:15px">🎮 Criar Conta</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ RESET SENHA ═══ -->
+      <div id="frst" class="hidden">
+        <div id="rst1">
+          <div style="text-align:center;margin-bottom:14px;font-size:13px;color:var(--t2)">Vamos enviar um código SMS para repor a tua senha.</div>
+          <div class="fl">
+            <label>Número de Telefone</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="background:rgba(255,255,255,.06);border:1.5px solid var(--rim);border-radius:9px;padding:12px;font-size:15px;font-weight:700;color:var(--t2)">🇦🇴 +244</span>
+              <input id="rst-phone" type="tel" placeholder="9XX XXX XXX" style="flex:1">
+            </div>
+          </div>
+          <div class="errt" id="rst-err"></div>
+          <div class="okt" id="rst-ok"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn bg" style="flex:1;font-size:13px" onclick="doResetReq()">Enviar SMS</button>
+            <button class="btn bgh bsm" onclick="hideReset()">Voltar</button>
+          </div>
+        </div>
+        <div id="rst2" class="hidden" style="margin-top:14px">
+          <div class="fl"><label>Código SMS</label><input id="rst-code" type="number" placeholder="123456" style="font-size:20px;text-align:center;letter-spacing:4px"></div>
+          <div class="fl"><label>Nova Senha</label><input id="rst-pw" type="password" placeholder="Mínimo 6 caracteres"></div>
+          <div class="errt" id="rst2-err"></div>
+          <div class="okt" id="rst2-ok"></div>
+          <button class="btn bg bfw" onclick="doResetConf()" style="font-size:13px">Confirmar Nova Senha</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ APP ══════ -->
+<div id="s-app" class="screen z" style="flex-direction:column">
+  <nav>
+    <div class="logo" onclick="pg('home')">
+      <div class="logo-main">LudoKz</div>
+      <div class="logo-sub">Angola Gaming</div>
+    </div>
+    <div class="ndv"></div>
+    <div class="nmenu">
+      <button class="nb on" id="nb-home" onclick="pg('home')">🏠 Início</button>
+      <button class="nb" id="nb-wallet" onclick="pg('wallet')">💳 Carteira</button>
+      <button class="nb" id="nb-profile" onclick="pg('profile')">👤 Perfil</button>
+    </div>
+    <div class="nright">
+      <div class="chip" id="nbcl">0 KZ</div>
+      <div class="avt" id="navt" onclick="pg('profile')">?</div>
+      <button class="btn bgh bsm" onclick="doLogout()">Sair</button>
+    </div>
+  </nav>
+
+  <!-- HOME -->
+  <div id="p-home" class="screen on z" style="flex-direction:column">
+    <div class="jk-banner">
+      <span class="jk-label">Jackpot do Dia</span>
+      <div class="jk-dot"></div>
+      <span class="jk-val" id="jk-val">245.000 KZ</span>
+      <span class="jk-label">ao vivo</span>
+    </div>
+    <div class="hero">
+      <h1><span class="line1">Joga Ludo.</span><span class="line2">Ganha Kwanzas.</span></h1>
+      <p>A plataforma de apostas Ludo #1 em Angola. Partidas reais, dinheiro real, pagamentos Express Card.</p>
+      <div class="hcta">
+        <button class="btn bg bxl" onclick="openMd()">🎮 Jogar Agora</button>
+        <button class="btn bgh blg" onclick="pg('wallet')">💳 Depositar</button>
+      </div>
+    </div>
+    <div class="stats-strip">
+      <div class="stat-s"><div class="stat-sv" id="hs-u">0</div><div class="stat-sl">Online</div></div>
+      <div class="stat-s"><div class="stat-sv" id="hs-g">0</div><div class="stat-sl">Partidas</div></div>
+      <div class="stat-s"><div class="stat-sv" id="hs-k">0</div><div class="stat-sl">Vitórias</div></div>
+      <div class="stat-s"><div class="stat-sv" id="hs-p">0 KZ</div><div class="stat-sl">Pago</div></div>
+    </div>
+    <div class="hbody">
+      <h2 class="sh">🏆 Top Jogadores</h2>
+      <div class="lb" id="lb"><div class="empty">A carregar...</div></div>
+      <h2 class="sh">🎯 Salas Disponíveis</h2>
+      <div class="rooms-grid" id="rms"></div>
+      <div id="no-rms" class="empty hidden">Sem salas. Cria a primeira!</div>
+      <h2 class="sh">⚡ Criar Sala</h2>
+      <div class="wc" style="max-width:400px">
+        <!-- FIX 1: 95% → 90% -->
+        <p style="font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600;line-height:1.65">Vencedor recebe <strong style="color:var(--jade)">90%</strong> do total apostado.</p>
+        <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Aposta por Jogador</div>
+        <div class="bps" id="bps-h">
+          <div class="bp" onclick="hpb(this,1000)"><div class="bpa">1K</div><div class="bpl">Kz</div></div>
+          <div class="bp" onclick="hpb(this,5000)"><div class="bpa">5K</div><div class="bpl">Kz</div></div>
+          <div class="bp" onclick="hpb(this,10000)"><div class="bpa">10K</div><div class="bpl">Kz</div></div>
+          <div class="bp" onclick="hpb(this,50000)"><div class="bpa">50K</div><div class="bpl">VIP</div></div>
+        </div>
+        <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Nº de Jogadores</div>
+        <div class="nps" id="npl-h">
+          <div class="np on" onclick="hnp(this,2)"><div class="npa">2</div><div class="npl">jogadores</div></div>
+          <div class="np" onclick="hnp(this,3)"><div class="npa">3</div><div class="npl">jogadores</div></div>
+          <div class="np" onclick="hnp(this,4)"><div class="npa">4</div><div class="npl">jogadores</div></div>
+        </div>
+        <div class="errt" id="herr"></div>
+        <button class="btn bg bfw" onclick="createRm()">Criar Sala</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WAITING -->
+  <div id="p-wait" class="screen z" style="flex-direction:column;align-items:center;justify-content:center;padding:30px">
+    <div class="wait-box">
+      <div class="spn"></div>
+      <div style="font-size:12px;color:var(--jade);font-weight:800;text-transform:uppercase;letter-spacing:2px">● À Procura de Adversários</div>
+      <div class="wait-id" id="wrid">----</div>
+      <div style="font-size:13px;color:var(--t3);font-weight:600;margin-bottom:8px">Código da sala — partilha por WhatsApp</div>
+      <div style="font-size:14px;color:var(--t2);font-weight:700;margin-bottom:14px">
+        Aposta: <span id="wbet" style="color:var(--g1);font-family:Bebas Neue,sans-serif;font-size:18px;letter-spacing:1px">—</span>
+        &nbsp;·&nbsp; <span id="wmaxp" style="color:var(--g1)">2</span> jogadores
+      </div>
+      <div class="wait-slots" id="wslots"></div>
+      <p style="font-size:12px;color:var(--t3);font-weight:600;margin-bottom:18px">Mínimo 2 jogadores para iniciar</p>
+      <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap">
+        <button class="btn bj bsm" id="btn-start-early" onclick="startEarly()" style="display:none">▶ Iniciar Já</button>
+        <button class="btn brd bsm" onclick="cancelWait()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WALLET -->
+  <div id="p-wallet" class="screen z" style="flex-direction:column">
+    <div class="wb">
+      <h2 class="sh">💳 Carteira</h2>
+      <div class="bal-card">
+        <div class="bll">Saldo Disponível</div>
+        <div class="bln" id="wbn">0</div>
+        <div class="blc">Kwanzas (Kz)</div>
+      </div>
+
+      <div class="daily-card">
+        <h3>🎁 Bónus Diário</h3>
+        <div id="daily-status" style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.8;margin-bottom:10px">A carregar...</div>
+        <div class="streak-days" id="streak-days"></div>
+        <button class="btn bg bfw" id="btn-daily" onclick="claimDaily()" style="font-size:13px;margin-top:6px">🎁 Receber Bónus</button>
+        <p class="pnote">Entra todos os dias e sobe o streak! Dia 7 = 5.000 Kz</p>
+      </div>
+
+      <div class="wc" style="margin-bottom:16px">
+        <h3>🎟️ Código Promo</h3>
+        <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6">Tens um código promocional? Usa aqui!</p>
+        <div class="promo-row">
+          <input class="promo-inp" id="promo-inp" placeholder="Ex: ANGOLA2025" onkeydown="if(event.key==='Enter')usePromo()">
+          <button class="btn bg bsm" onclick="usePromo()">Usar</button>
+        </div>
+        <div class="errt" id="promo-err"></div>
+        <div class="okt" id="promo-ok"></div>
+      </div>
+
+      <div class="exb">
+        <h4>📲 Depositar — Express Card</h4>
+        <ul class="exl">
+          <li>Transfere para o número da plataforma:</li>
+        </ul>
+        <div class="exn" id="plat-exp">{{ platform_express }}</div>
+        <ul class="exl">
+          <li>Escreve o teu nome na descrição</li>
+          <li>Copia a referência e submete abaixo</li>
+        </ul>
+      </div>
+      <div class="wg">
+        <div class="wc">
+          <h3>⬆️ Depositar</h3>
+          <div class="mths" id="dmths">
+            <div class="mth on" onclick="sm(this)">Express Card</div>
+            <div class="mth" onclick="sm(this)">Unitel Money</div>
+          </div>
+          <div class="fl"><label>Valor (Kz)</label><input type="number" id="dv" placeholder="5000" min="500"></div>
+          <div class="fl"><label>Referência</label><input id="dref" placeholder="TXN20250312345"></div>
+          <div class="fl"><label>Teu Nome</label><input id="dpayer" placeholder="João Silva"></div>
+          <div class="errt" id="de"></div><div class="okt" id="dok"></div>
+          <button class="btn bj bfw" onclick="doDeposit()" style="font-size:13px">Enviar Pedido</button>
+          <p class="pnote">Mínimo 500 Kz · Confirmação manual</p>
+        </div>
+        <div class="wc">
+          <h3>⬇️ Levantar</h3>
+          <!-- FIX 3: Taxa 5% → Taxa 10% e Mínimo 10.000 Kz → 1.000 Kz -->
+          <div class="alrt"><strong>Taxa 10%</strong> · Mínimo 1.000 Kz<br>Verificação de nome obrigatória</div>
+          <div class="fl"><label>Nº Express Card</label><input id="wnum" placeholder="9XX XXX XXX"></div>
+          <div class="fl"><label>Nome da Conta</label><input id="wacname" placeholder="Nome exacto da conta"></div>
+          <div class="fl"><label>Valor (Kz)</label><input type="number" id="wv" placeholder="1000" min="1000" oninput="wprev()"></div>
+          <div class="okt" id="wpr"></div>
+          <div class="errt" id="we"></div><div class="okt" id="wok"></div>
+          <button class="btn bpu bfw" onclick="doWithdraw()" style="font-size:13px">Solicitar Levantamento</button>
+        </div>
+      </div>
+
+      <div class="ref-card">
+        <h3>👥 Referidos</h3>
+        <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6;margin-bottom:12px">Convida amigos — ganha <strong style="color:var(--jade)">500 Kz</strong> por cada um!</p>
+        <div class="ref-link" id="ref-link" onclick="copyRef()">A carregar link...</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn bj bsm" onclick="copyRef()">📋 Copiar</button>
+          <button class="btn bgh bsm" onclick="shareRef()">📲 WhatsApp</button>
+        </div>
+        <div id="ref-count" style="font-size:12px;color:var(--t3);margin-top:10px;font-weight:600"></div>
+      </div>
+
+      <div class="sup-card">
+        <h3>💬 Suporte</h3>
+        <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6;margin-bottom:12px">Tens um problema? Envia-nos uma mensagem.</p>
+        <div class="fl" style="margin-bottom:9px"><label>Mensagem</label><textarea id="sup-msg" rows="3" placeholder="Descreve o teu problema..."></textarea></div>
+        <button class="btn bpu bfw" onclick="sendSupport()" style="font-size:13px">Enviar</button>
+        <div class="okt" id="sup-ok" style="margin-top:7px"></div>
+        <div id="tkts-list" style="margin-top:14px"></div>
+      </div>
+
+      <h2 class="sh" style="margin-top:4px">📋 Depósitos</h2>
+      <div class="txp"><div class="txh"><span>Referência</span><span>Estado</span></div><div id="dep-lst"></div></div>
+      <br>
+      <h2 class="sh">📊 Histórico</h2>
+      <div class="txp"><div class="txh"><span>Descrição</span><span>Valor</span></div><div id="txb"></div></div>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div id="p-profile" class="screen z" style="flex-direction:column">
+    <div class="pb">
+      <h2 class="sh">👤 Perfil</h2>
+      <div class="phd">
+        <div class="pav" id="pav">?</div>
+        <div>
+          <div class="pnm" id="pnm">---</div>
+          <div class="pem" id="pem">---</div>
+          <div class="prk" id="prk">🏅 Novato</div>
+        </div>
+      </div>
+      <div class="wc" style="margin-bottom:18px">
+        <h3 style="font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:1px;color:var(--g1);margin-bottom:12px">📲 Número Express</h3>
+        <div class="fl" style="margin-bottom:9px"><label>Número</label><input id="exp-num" placeholder="9XX XXX XXX"></div>
+        <button class="btn bj bsm" onclick="saveExp()">Guardar</button>
+        <p class="pnote">Usado automaticamente nos levantamentos</p>
+      </div>
+      <div class="sg">
+        <div class="sc"><div class="scv" id="sg2" style="color:#00e5ff">0</div><div class="scl">Partidas</div></div>
+        <div class="sc"><div class="scv" id="sw" style="color:var(--jade)">0</div><div class="scl">Vitórias</div></div>
+        <div class="sc"><div class="scv" id="sl" style="color:var(--red)">0</div><div class="scl">Derrotas</div></div>
+        <div class="sc"><div class="scv" id="sr" style="color:var(--g1)">0%</div><div class="scl">Taxa Vitória</div></div>
+        <div class="sc"><div class="scv" id="se" style="color:var(--jade)">0</div><div class="scl">Ganhos Kz</div></div>
+        <div class="sc"><div class="scv" id="sbl" style="color:var(--purple)">0</div><div class="scl">Saldo Kz</div></div>
+      </div>
+      <h2 class="sh">🎮 Histórico de Partidas</h2>
+      <div class="txp"><div class="txh"><span>Partida</span><span>Resultado</span></div><div id="ghb"></div></div>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="s-game" class="screen z" style="flex-direction:column;padding:10px">
+    <div style="max-width:900px;margin:0 auto;width:100%">
+      <div id="player-cards" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;justify-content:center"></div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;align-items:flex-start">
+        <div style="position:relative;flex-shrink:0">
+          <canvas id="ludo-canvas" style="border-radius:12px;box-shadow:0 0 60px rgba(0,0,0,.8),0 0 30px rgba(93,68,209,.2);display:block;max-width:min(460px,calc(100vw - 30px));max-height:min(460px,calc(100vw - 30px))"></canvas>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:11px;min-width:190px;max-width:240px;flex:1">
+          <div class="gcd">
+            <div class="btd"><div class="bdl">Aposta</div><div class="bdv" id="gbv">0 KZ</div></div>
+            <div id="dice-container" style="display:flex;justify-content:center;align-items:center;margin:8px 0;perspective:200px">
+              <div id="dice-3d" style="width:64px;height:64px;position:relative;transform-style:preserve-3d;transition:transform .1s;cursor:pointer" onclick="doRoll()">
+                <div style="position:absolute;inset:0;background:linear-gradient(135deg,#fff8e1,#fff);border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:40px" id="dfc">⚀</div>
+              </div>
+            </div>
+            <div id="dnm" style="font-family:Bebas Neue,sans-serif;font-size:34px;color:var(--g1);text-align:center;margin-bottom:8px;letter-spacing:2px;filter:drop-shadow(0 0 8px rgba(245,197,24,.5))">—</div>
+            <button class="btn bg bfw" id="rb" onclick="doRoll()" style="font-size:13px" disabled>🎲 Lançar Dado</button>
+          </div>
+          <div class="chat-wrap">
+            <div class="chat-head"><span>💬 Chat</span><span id="chat-online" style="color:var(--jade)">0</span></div>
+            <div class="chat-msgs" id="chat-msgs"></div>
+            <div class="chat-row">
+              <input class="chat-inp" id="chat-inp" placeholder="Mensagem..." maxlength="80" onkeydown="if(event.key==='Enter')sendChat()">
+              <button class="chat-send" onclick="sendChat()">→</button>
+            </div>
+          </div>
+          <div class="gcd">
+            <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;margin-bottom:7px;text-transform:uppercase">📋 Registo</div>
+            <div class="glog-wrap" id="glog"></div>
+          </div>
+          <button class="btn brd bsm" onclick="leaveGame()">🚪 Abandonar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div class="goov hidden" id="goo">
+  <div class="gocd" id="gocd">
+    <span class="goic" id="goic">🏆</span>
+    <div class="gott" id="gott">Vitória!</div>
+    <div class="gosb" id="gosb">Parabéns!</div>
+    <div class="gopl">Prémio</div>
+    <div class="gopr" id="gopr">0 KZ</div>
+    <div class="goa">
+      <button class="btn bg blg" onclick="closeGO()">🏠 Início</button>
+      <button class="btn bgh blg" onclick="closeGO();openMd()">🔁 Jogar Novamente</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="mbg hidden" id="cmod">
+  <div class="md">
+    <h3>🎮 Nova Sala</h3>
+    <!-- FIX 2: 95% → 90% -->
+    <p>Escolhe a aposta e número de jogadores. Vencedor leva 90% do pote.</p>
+    <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Aposta</div>
+    <div class="bps" id="bps-m">
+      <div class="bp" onclick="mpb(this,1000)"><div class="bpa">1K</div><div class="bpl">Kz</div></div>
+      <div class="bp" onclick="mpb(this,5000)"><div class="bpa">5K</div><div class="bpl">Kz</div></div>
+      <div class="bp" onclick="mpb(this,10000)"><div class="bpa">10K</div><div class="bpl">Kz</div></div>
+      <div class="bp" onclick="mpb(this,50000)"><div class="bpa">50K</div><div class="bpl">VIP</div></div>
+    </div>
+    <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Jogadores</div>
+    <div class="nps" id="npl-m">
+      <div class="np on" onclick="mnp(this,2)"><div class="npa">2</div><div class="npl">jogadores</div></div>
+      <div class="np" onclick="mnp(this,3)"><div class="npa">3</div><div class="npl">jogadores</div></div>
+      <div class="np" onclick="mnp(this,4)"><div class="npa">4</div><div class="npl">jogadores</div></div>
+    </div>
+    <div class="errt" id="merr"></div>
+    <div class="mft">
+      <button class="btn bg" style="flex:1;font-size:13px" onclick="doCreate()">Criar Sala</button>
+      <button class="btn bgh bsm" onclick="closeMd()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE NAV -->
+<div class="mob-nav z">
+  <button class="mnb" onclick="pg('home')"><span class="mnb-ic">🏠</span>Início</button>
+  <button class="mnb" onclick="pg('wallet')"><span class="mnb-ic">💳</span>Carteira</button>
+  <button class="mnb" onclick="openMd()" style="color:var(--g1)"><span class="mnb-ic">🎮</span>Jogar</button>
+  <button class="mnb" onclick="pg('profile')"><span class="mnb-ic">👤</span>Perfil</button>
+</div>
+
+<div class="tst" id="tst"></div>
+
+<script>
+/* ══════════════════════════════════════════
+   PARTICLES
+══════════════════════════════════════════ */
+(function(){
+  const c=document.getElementById("cvs"),x=c.getContext("2d");
+  let pts=[];
+  const resize=()=>{c.width=innerWidth;c.height=innerHeight;};
+  resize();addEventListener("resize",resize);
+  for(let i=0;i<80;i++) pts.push({
+    x:Math.random()*innerWidth, y:Math.random()*innerHeight,
+    vx:(Math.random()-.5)*.3, vy:(Math.random()-.5)*.3,
+    r:Math.random()*1.8+.3,
+    col:Math.random()<.5
+      ? `rgba(245,197,24,${(Math.random()*.15+.03).toFixed(2)})`
+      : `rgba(93,68,209,${(Math.random()*.12+.02).toFixed(2)})`
+  });
+  (function loop(){
+    x.clearRect(0,0,c.width,c.height);
+    pts.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0)p.x=c.width; if(p.x>c.width)p.x=0;
+      if(p.y<0)p.y=c.height; if(p.y>c.height)p.y=0;
+      x.beginPath(); x.arc(p.x,p.y,p.r,0,Math.PI*2);
+      x.fillStyle=p.col; x.fill();
+    });
+    requestAnimationFrame(loop);
+  })();
+})();
+
+/* ══════════════════════════════════════════
+   STATE
+══════════════════════════════════════════ */
+let U=null, RID=null, SSE=null, SBh=0, SBm=0, NPh=2, NPm=2, LT=null, CUR_STATE=null, CUR_MV=[];
+const fmt=n=>Number(n).toLocaleString("pt-AO");
+const fmtD=s=>new Date(s).toLocaleDateString("pt-AO",{day:"2-digit",month:"2-digit",year:"2-digit"});
+const CCSS=c=>c==="r"?"var(--R)":c==="g"?"var(--G)":c==="b"?"var(--B)":"var(--Y)";
+const CNAME={"r":"Vermelho","g":"Verde","b":"Azul","y":"Amarelo"};
+
+async function api(url,method="GET",body=null){
+  const o={method,headers:{"Content-Type":"application/json"},credentials:"same-origin"};
+  if(body) o.body=JSON.stringify(body);
+  try{
+    const r=await fetch(url,o);
+    const data=await r.json();
+    return data;
+  }catch(e){
+    return {error:"Erro de ligação. Verifica a tua internet."};
+  }
+}
+
+/* ══ JACKPOT ══ */
+(function(){
+  async function upd(){
+    try{
+      const d=await api("/api/jackpot");
+      const el=document.getElementById("jk-val");
+      if(el&&d.value) el.textContent=Math.floor(d.value).toLocaleString("pt-AO")+" KZ";
+    }catch(e){}
+  }
+  upd(); setInterval(upd,5000);
+})();
+
+/* ══ SSE ══ */
+function connectSSE(){
+  if(SSE) SSE.close();
+  SSE=new EventSource("/api/events",{withCredentials:true});
+  SSE.addEventListener("game_started",e=>onGameStarted(JSON.parse(e.data)));
+  SSE.addEventListener("game_update",e=>onGameUpdate(JSON.parse(e.data)));
+  SSE.addEventListener("game_over",e=>onGameOver(JSON.parse(e.data)));
+  SSE.addEventListener("player_joined",e=>{
+    const d=JSON.parse(e.data);
+    toast("👥 "+d.name+" entrou! ("+d.players+"/"+d.max+")","tin");
+    updateWaitSlots(d.players,d.max);
+    if(d.players>=2){const b=document.getElementById("btn-start-early");if(b)b.style.display="inline-flex";}
+  });
+  SSE.addEventListener("chat_message",e=>{
+    const d=JSON.parse(e.data);
+    addChat(d.name,d.text,d.system||false);
+  });
+  SSE.addEventListener("deposit_approved",e=>{
+    const d=JSON.parse(e.data);
+    toast("✅ Depósito de "+fmt(d.amount)+" Kz confirmado!","tok");
+    if(U){U.balance=d.balance;updN();}
+  });
+  SSE.addEventListener("withdrawal_done",e=>{
+    const d=JSON.parse(e.data);
+    toast("💸 "+fmt(d.net)+" Kz enviados!","tin");
+  });
+  SSE.addEventListener("withdrawal_rejected",e=>{
+    const d=JSON.parse(e.data);
+    toast(d.msg||"Levantamento rejeitado. Saldo devolvido.","ter");
+    api("/api/me").then(r=>{if(r.user){U=r.user;updN();}});
+  });
+  SSE.addEventListener("balance_update",e=>{
+    const d=JSON.parse(e.data);
+    if(U){U.balance=d.balance;updN();}
+    if(d.msg) toast(d.msg,"tok");
+  });
+  SSE.addEventListener("support_reply",e=>{
+    const d=JSON.parse(e.data);
+    toast("💬 Suporte respondeu: "+d.reply.substring(0,60),"tin");
+  });
+  SSE.onerror=()=>setTimeout(connectSSE,4000);
+}
+
+/* ══ AUTH — PHONE + OTP ══ */
+let REG_PHONE="";
+let OTP_TIMER=null;
+let AGE_CONFIRMED=false;
+let PHONE_VERIFIED=false;
+
+function atab(t){
+  document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("on",i===(t==="in"?0:1)));
+  document.getElementById("fin").classList.toggle("hidden",t!=="in");
+  document.getElementById("fup").classList.toggle("hidden",t!=="up");
+  document.getElementById("frst").classList.add("hidden");
+}
+
+function getPhone(inputId){
+  const raw=document.getElementById(inputId)?.value.trim().replace(/\s/g,"")||"";
+  return "+244"+raw;
+}
+
+async function doLogin(){
+  const phone=getPhone("lp-phone");
+  const pw=document.getElementById("lp-pw").value;
+  const err=document.getElementById("lerr"); err.textContent="";
+  if(phone==="+244"||!pw){ err.textContent="❌ Preencha todos os campos."; return; }
+  const btn=document.getElementById("btn-login");
+  btn.disabled=true; btn.textContent="A entrar...";
+  const d=await api("/api/login","POST",{phone,password:pw});
+  btn.disabled=false; btn.textContent="Entrar";
+  if(d.error){ err.textContent="❌ "+d.error; return; }
+  U=d.user; connectSSE(); showApp();
+}
+
+async function enviarOTP(){
+  const name=document.getElementById("rn").value.trim();
+  const rawPhone=document.getElementById("rphone").value.trim().replace(/\s/g,"");
+  const pw=document.getElementById("rp").value;
+  const err=document.getElementById("rerr"); err.textContent="";
+  if(!name){ err.textContent="❌ Insere o teu nome."; return; }
+  if(!rawPhone){ err.textContent="❌ Insere o número de telefone."; return; }
+  if(!pw||pw.length<6){ err.textContent="❌ Senha mínima 6 caracteres."; return; }
+  const phone="+244"+rawPhone;
+  REG_PHONE=phone;
+  const btn=document.getElementById("btn-send-otp");
+  btn.disabled=true; btn.textContent="A enviar SMS...";
+  const d=await api("/api/otp/send","POST",{phone,name,purpose:"register"});
+  btn.disabled=false; btn.textContent="📱 Enviar Código SMS";
+  if(d.error){ err.textContent="❌ "+d.error; return; }
+  const ob=document.getElementById("op-badge");
+  if(ob) ob.textContent="📶 "+d.operadora;
+  document.getElementById("reg-s1").classList.add("hidden");
+  document.getElementById("reg-s2").classList.remove("hidden");
+  document.getElementById("otp-msg").textContent=d.msg||"Código enviado para "+phone;
+  iniciarTimerOTP();
+}
+
+function iniciarTimerOTP(){
+  clearInterval(OTP_TIMER);
+  let secs=120;
+  document.getElementById("resend-btn").style.display="none";
+  OTP_TIMER=setInterval(()=>{
+    secs--;
+    const m=Math.floor(secs/60), s=secs%60;
+    const el=document.getElementById("otp-timer");
+    if(el) el.textContent=m+":"+(s<10?"0":"")+s;
+    if(secs<=0){
+      clearInterval(OTP_TIMER);
+      if(el){ el.textContent="Expirado"; el.style.color="var(--red)"; }
+      document.getElementById("resend-btn").style.display="inline";
+    }
+  },1000);
+}
+
+async function verificarOTP(){
+  const code=document.getElementById("rotp").value.trim();
+  const err=document.getElementById("otp-err"); err.textContent="";
+  if(!code||code.length!==6){ err.textContent="❌ Código de 6 dígitos."; return; }
+  const d=await api("/api/otp/verify","POST",{phone:REG_PHONE,code,purpose:"register"});
+  if(d.error){ err.textContent="❌ "+d.error; return; }
+  clearInterval(OTP_TIMER);
+  PHONE_VERIFIED=true;
+  document.getElementById("reg-s2").classList.add("hidden");
+  document.getElementById("reg-s3").classList.remove("hidden");
+}
+
+function voltarStep1(){
+  clearInterval(OTP_TIMER);
+  document.getElementById("reg-s2").classList.add("hidden");
+  document.getElementById("reg-s1").classList.remove("hidden");
+}
+
+function confirmarIdade(sim){
+  if(!sim){ toast("❌ Tens de ter 18+ anos para jogar.","ter"); atab("in"); return; }
+  AGE_CONFIRMED=true;
+  document.getElementById("terms-section").classList.remove("hidden");
+  document.getElementById("terms-text").scrollTop=0;
+}
+
+async function doReg(){
+  const terms=document.getElementById("terms-check").checked;
+  const err=document.getElementById("terms-err"); err.textContent="";
+  if(!AGE_CONFIRMED){ err.textContent="❌ Confirma que tens 18+ anos."; return; }
+  if(!terms){ err.textContent="❌ Aceita os Termos e Condições."; return; }
+  if(!PHONE_VERIFIED){ err.textContent="❌ Verifica o número primeiro."; return; }
+  const name=document.getElementById("rn").value.trim();
+  const pw=document.getElementById("rp").value;
+  const ref=document.getElementById("rref")?.value.trim()||"";
+  const otp=document.getElementById("rotp").value.trim();
+  const d=await api("/api/register","POST",{
+    name, phone:REG_PHONE, password:pw,
+    otp, ref_code:ref,
+    age_confirmed:true, terms_accepted:true
+  });
+  if(d.error){ err.textContent="❌ "+d.error; return; }
+  U=d.user; connectSSE(); showApp();
+  toast("🎉 Conta criada! Deposita para começar.","tok");
+  coinRain();
+}
+
+async function doLogout(){
+  await api("/api/logout","POST");
+  if(SSE) SSE.close();
+  location.reload();
+}
+
+/* ══ RESET SENHA POR SMS ══ */
+let RESET_PHONE="";
+function showReset(){
+  document.getElementById("fin").classList.add("hidden");
+  document.getElementById("fup").classList.add("hidden");
+  document.getElementById("frst").classList.remove("hidden");
+}
+function hideReset(){
+  document.getElementById("frst").classList.add("hidden");
+  document.getElementById("fin").classList.remove("hidden");
+}
+async function doResetReq(){
+  const rawPhone=document.getElementById("rst-phone").value.trim().replace(/\s/g,"");
+  const phone="+244"+rawPhone;
+  RESET_PHONE=phone;
+  const err=document.getElementById("rst-err"),ok=document.getElementById("rst-ok");
+  err.textContent=""; ok.textContent="";
+  if(!rawPhone){ err.textContent="❌ Insere o número."; return; }
+  await api("/api/reset/request","POST",{phone});
+  ok.textContent="✅ Código SMS enviado para "+phone;
+  document.getElementById("rst2").classList.remove("hidden");
+}
+async function doResetConf(){
+  const code=document.getElementById("rst-code").value.trim();
+  const pw=document.getElementById("rst-pw").value;
+  const err=document.getElementById("rst2-err"),ok=document.getElementById("rst2-ok");
+  err.textContent=""; ok.textContent="";
+  if(!code||!pw){ err.textContent="❌ Preenche os dois campos."; return; }
+  if(pw.length<6){ err.textContent="❌ Senha mínima 6 caracteres."; return; }
+  const d=await api("/api/reset/confirm","POST",{phone:RESET_PHONE,code,password:pw});
+  if(d.error){ err.textContent="❌ "+d.error; return; }
+  ok.textContent="✅ Senha alterada! Faz login.";
+  setTimeout(()=>{hideReset();atab("in");},2000);
+}
+
+/* ══ NAV ══ */
+function showApp(){
+  document.getElementById("s-auth").classList.remove("on");
+  document.getElementById("s-app").classList.add("on");
+  updN(); pg("home");
+}
+function pg(name){
+  ["p-home","p-wait","p-wallet","p-profile"].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display="none";
+  });
+  document.getElementById("s-game").style.display="none";
+  document.querySelectorAll(".nb").forEach(b=>b.classList.remove("on"));
+  if(name==="game"){document.getElementById("s-game").style.display="flex";return;}
+  const el=document.getElementById("p-"+name);
+  if(el) el.style.display="flex";
+  const nb=document.getElementById("nb-"+name);
+  if(nb) nb.classList.add("on");
+  if(name==="wallet") loadWallet();
+  if(name==="profile") loadProfile();
+  if(name==="home"){ updN(); loadLobby(); loadLeaderboard(); loadPublicStats(); }
+}
+function updN(){
+  if(!U)return;
+  document.getElementById("nbcl").textContent=fmt(U.balance)+" KZ";
+  document.getElementById("navt").textContent=U.name[0].toUpperCase();
+  const wins=U.wins||0;
+  let rank="🏅 Novato";
+  if(wins>=100) rank="👑 Lenda";
+  else if(wins>=50) rank="💎 Elite";
+  else if(wins>=20) rank="🥇 Mestre";
+  else if(wins>=10) rank="🥈 Experiente";
+  else if(wins>=3)  rank="🥉 Iniciado";
+  const rk=document.getElementById("prk"); if(rk) rk.textContent=rank;
+}
+
+/* ══ PUBLIC STATS ══ */
+async function loadPublicStats(){
+  try{
+    const d=await api("/api/stats/public");
+    if(!d.users) return;
+    document.getElementById("hs-u").textContent=d.online||d.users;
+    document.getElementById("hs-g").textContent=d.games||0;
+    if(U) document.getElementById("hs-k").textContent=U.wins||0;
+    document.getElementById("hs-p").textContent=fmt(d.paid||0)+" KZ";
+  }catch(e){}
+}
+
+/* ══ LEADERBOARD ══ */
+async function loadLeaderboard(){
+  const el=document.getElementById("lb"); if(!el) return;
+  el.innerHTML='<div class="empty">A carregar...</div>';
+  const d=await api("/api/leaderboard");
+  const rows=d.leaderboard||[];
+  if(!rows.length){ el.innerHTML='<div class="empty">Sem dados ainda. Sê o primeiro!</div>'; return; }
+  const medals=["🥇","🥈","🥉"];
+  el.innerHTML=`<div class="lb-head"><span style="width:32px">Pos</span><span style="width:36px"></span><span style="flex:1">Jogador</span><span>Vitórias</span><span style="min-width:100px;text-align:right">Ganhos</span></div>`+
+  rows.map((p,i)=>`
+    <div class="lbr">
+      <div class="lb-rank r${i+1}">${medals[i]||i+1}</div>
+      <div class="lb-av">${p.name[0].toUpperCase()}</div>
+      <div class="lb-nm">${p.name}</div>
+      <div class="lb-w">${p.wins}V</div>
+      <div class="lb-e" style="min-width:100px;text-align:right">${fmt(p.total_earned)} KZ</div>
+    </div>`).join("");
+}
+
+/* ══ LOBBY ══ */
+async function loadLobby(){
+  const d=await api("/api/lobby");
+  const g=document.getElementById("rms"), e=document.getElementById("no-rms");
+  if(!d.rooms||!d.rooms.length){ g.innerHTML=""; e.classList.remove("hidden"); return; }
+  e.classList.add("hidden");
+  const T={1000:["tbr","🥉 Bronze"],5000:["tsi","🥈 Prata"],10000:["tgo","🥇 Ouro"],50000:["tvip","👑 VIP"]};
+  g.innerHTML=d.rooms.map(r=>{
+    const[tc,tl]=T[r.bet]||["tbr","Bronze"];
+    const pr=Math.floor(r.bet*r.max*.90);
+    const full=r.players>=r.max;
+    return `<div class="room ${tc}" onclick="${!full?`joinRm("${r.id}",${r.bet})`:"void 0"}">
+      <div class="rb">
+        <div class="rt">${tl} · ${r.max} jogadores</div>
+        <div class="rv">${fmt(r.bet)}<small> Kz/jog.</small></div>
+        <div class="rp">💰 Prémio: ${fmt(pr)} Kz</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:5px;font-weight:600">por ${r.host}</div>
+      </div>
+      <div class="rf">
+        <div class="rh">👥 ${r.players}/${r.max}</div>
+        <div class="rpill ${full?"pf":"pw"}">${full?"Cheia":"A aguardar"}</div>
+      </div>
+    </div>`;
+  }).join("");
+  clearTimeout(LT);
+  LT=setTimeout(()=>{if(document.getElementById("p-home")?.style.display!=="none")loadLobby();},7000);
+}
+
+/* ══ BET/PLAYER PICKS ══ */
+function hpb(el,v){SBh=v;document.getElementById("bps-h").querySelectorAll(".bp").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
+function hnp(el,v){NPh=v;document.getElementById("npl-h").querySelectorAll(".np").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
+function mpb(el,v){SBm=v;document.getElementById("bps-m").querySelectorAll(".bp").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
+function mnp(el,v){NPm=v;document.getElementById("npl-m").querySelectorAll(".np").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
+function openMd(){document.getElementById("cmod").classList.remove("hidden");SBm=0;NPm=2;}
+function closeMd(){document.getElementById("cmod").classList.add("hidden");}
+
+async function createRm(){
+  const err=document.getElementById("herr"); err.textContent="";
+  if(!SBh){err.textContent="❌ Escolhe um valor.";return;}
+  const d=await api("/api/room/create","POST",{bet:SBh,max_players:NPh});
+  if(d.error){err.textContent="❌ "+d.error;return;}
+  RID=d.room_id; showWait(RID,SBh,NPh);
+}
+async function doCreate(){
+  const err=document.getElementById("merr"); err.textContent="";
+  if(!SBm){err.textContent="❌ Escolhe um valor.";return;}
+  const d=await api("/api/room/create","POST",{bet:SBm,max_players:NPm});
+  if(d.error){err.textContent="❌ "+d.error;return;}
+  closeMd(); RID=d.room_id; showWait(RID,SBm,NPm);
+}
+
+/* ══ WAITING ══ */
+function showWait(rid,bet,maxp){
+  clearTimeout(LT);
+  document.getElementById("wrid").textContent=rid;
+  document.getElementById("wbet").textContent=fmt(bet)+" Kz";
+  document.getElementById("wmaxp").textContent=maxp;
+  updateWaitSlots(1,maxp);
+  ["p-home","p-wallet","p-profile"].forEach(id=>document.getElementById(id).style.display="none");
+  document.getElementById("p-wait").style.display="flex";
+}
+function updateWaitSlots(filled,max){
+  const el=document.getElementById("wslots"); if(!el)return;
+  let html="";
+  for(let i=0;i<max;i++) html+=`<div class="ws ${i<filled?"on":""}">${i<filled?"✓":"?"}</div>`;
+  el.innerHTML=html;
+}
+async function cancelWait(){
+  if(RID) await api("/api/game/leave","POST",{room_id:RID});
+  RID=null; pg("home");
+}
+async function startEarly(){
+  if(!RID)return;
+  const d=await api("/api/room/start","POST",{room_id:RID});
+  if(d.error){toast(d.error,"ter");return;}
+  if(d.state) onGameStarted(d.state);
+}
+
+/* ══ JOIN ══ */
+async function joinRm(rid,bet){
+  if(!confirm("Entrar na sala? "+fmt(bet)+" Kz serão descontados."))return;
+  const d=await api("/api/room/join","POST",{room_id:rid});
+  if(d.error){toast("❌ "+d.error,"ter");return;}
+  RID=rid;
+  if(d.state&&d.state.started) onGameStarted(d.state);
+  else showWait(rid,d.state?.bet||bet,d.state?.max_p||2);
+}
+
+/* ══ GAME EVENTS ══ */
+function onGameStarted(state){
+  RID=state.room_id; CUR_STATE=state; PREV_STATE=null;
+  pg("game"); buildBoard(); renderState(state);
+  document.getElementById("chat-msgs").innerHTML="";
+  addChat("Sistema","Jogo iniciado com "+state.players.length+" jogadores!",true);
+  state.players.forEach(p=>addChat("Sistema",CNAME[p.color]+": "+p.name,true));
+}
+function onGameUpdate(state){
+  if(PREV_STATE&&BOARD) _triggerMoveAnimations(PREV_STATE,state);
+  PREV_STATE=CUR_STATE;
+  CUR_STATE=state;
+  renderState(state);
+}
+function _triggerMoveAnimations(prev,next){
+  if(!prev.players||!next.players) return;
+  next.players.forEach((pl)=>{
+    const prevPl=prev.players.find(p=>p.user_id===pl.user_id);
+    if(!prevPl) return;
+    pl.pos.forEach((pos,i)=>{
+      const prevPos=prevPl.pos[i];
+      const prevBase=!!prevPl.in_base[i];
+      const nextBase=!!pl.in_base[i];
+      if(pos===prevPos&&prevBase===nextBase) return;
+      if(!BOARD) return;
+      BOARD.animateMove(pl.color,i,prevPos,prevBase,pos,nextBase,null);
+    });
+  });
+}
+function onGameOver(d){
+  document.getElementById("goo").classList.remove("hidden");
+  const w=d.won;
+  document.getElementById("goic").textContent=w?"🏆":"💀";
+  document.getElementById("gott").textContent=w?"VITÓRIA!":"DERROTA";
+  document.getElementById("gosb").textContent=w?"Parabéns, venceste!":"Boa sorte da próxima!";
+  document.getElementById("gopr").textContent=(w?"+":"")+fmt(w?d.prize:0)+" KZ";
+  document.getElementById("gopr").style.color=w?"var(--jade)":"var(--red)";
+  document.getElementById("gocd").className="gocd"+(w?"":" lose");
+  if(d.balance!=null){U.balance=d.balance;updN();}
+  if(w){coinRain();showFlash("🏆");}
+}
+function closeGO(){ document.getElementById("goo").classList.add("hidden"); RID=null; pg("home"); }
+
+/* ══ CHAT ══ */
+function addChat(name,text,sys=false){
+  const el=document.getElementById("chat-msgs"); if(!el)return;
+  const d=document.createElement("div");
+  d.className="chat-msg"+(sys?" sys":"");
+  const isMe=name===U?.name;
+  d.innerHTML=`<span class="cm-name" style="color:${sys?"var(--jade)":isMe?"var(--g1)":"var(--t1)"}">${name}:</span><span class="cm-txt"> ${text}</span>`;
+  el.appendChild(d);
+  el.scrollTop=el.scrollHeight;
+  while(el.children.length>50) el.removeChild(el.firstChild);
+}
+async function sendChat(){
+  const inp=document.getElementById("chat-inp");
+  const msg=inp.value.trim();
+  if(!msg||!RID) return;
+  inp.value="";
+  addChat(U.name,msg,false);
+  await api("/api/game/chat","POST",{room_id:RID,message:msg}).catch(()=>{});
+}
+
+/* ══ ROLL / MOVE ══ */
+async function doRoll(){
+  if(!RID)return;
+  document.getElementById("rb").disabled=true;
+  const df=document.getElementById("dfc"); df.classList.add("rolling");
+  const d=await api("/api/game/roll","POST",{room_id:RID});
+  df.classList.remove("rolling");
+  if(d.error){ toast("❌ "+d.error,"ter"); return; }
+  df.textContent=["⚀","⚁","⚂","⚃","⚄","⚅"][d.dice-1];
+  document.getElementById("dnm").textContent=d.dice;
+  renderState(d);
+  const mv=await api("/api/game/movable","POST",{room_id:RID});
+  if(mv.movable&&mv.movable.length) highlightPcs(mv.movable,d);
+}
+async function movePc(idx){
+  if(!RID)return;
+  PREV_STATE=CUR_STATE?JSON.parse(JSON.stringify(CUR_STATE)):null;
+  const d=await api("/api/game/move","POST",{room_id:RID,piece:idx});
+  if(d.error){ toast("❌ "+d.error,"ter"); return; }
+  if(PREV_STATE&&BOARD) _triggerMoveAnimations(PREV_STATE,d);
+  PREV_STATE=CUR_STATE;
+  renderState(d);
+}
+async function leaveGame(){
+  if(!confirm("Abandonar? Perdes a aposta."))return;
+  if(RID) await api("/api/game/leave","POST",{room_id:RID});
+  RID=null; pg("home");
+}
+
+/* ══ CANVAS BOARD ══ */
+let BOARD=null;
+let CANVAS_ANIM_FRAME=null;
+let SELECTABLE_PIECES=[];
+let PULSE_T=0;
+let PREV_STATE=null;
+
+function initCanvas(){
+  const canvas=document.getElementById("ludo-canvas");
+  if(!canvas) return;
+  const size=Math.min(460,window.innerWidth-30);
+  canvas.width=size; canvas.height=size;
+  canvas.style.width=size+"px"; canvas.style.height=size+"px";
+  BOARD=new LudoBoard(canvas,size);
+  canvas.addEventListener("click",onCanvasClick);
+  startRenderLoop();
+}
+
+function startRenderLoop(){
+  cancelAnimationFrame(CANVAS_ANIM_FRAME);
+  function loop(){
+    PULSE_T+=0.05;
+    if(CUR_STATE&&BOARD) drawGameState(CUR_STATE);
+    CANVAS_ANIM_FRAME=requestAnimationFrame(loop);
+  }
+  CANVAS_ANIM_FRAME=requestAnimationFrame(loop);
+}
+
+function drawGameState(state){
+  if(!BOARD||!state||!state.players) return;
+  const canvas=document.getElementById("ludo-canvas");
+  if(!canvas) return;
+  BOARD.drawBoard();
+  state.players.forEach(pl=>{
+    pl.pos.forEach((pos,i)=>{
+      const coord=BOARD.getPieceCoord(pl.color,pos,!!pl.in_base[i],i);
+      const key=pl.color+"_"+i;
+      const piece=BOARD.pieces[key];
+      let drawX=coord.x, drawY=coord.y;
+      if(piece&&piece.animating){ drawX=piece.x; drawY=piece.y; }
+      else if(piece){ drawX=coord.x; drawY=coord.y; piece.x=coord.x; piece.y=coord.y; }
+      else{ BOARD.pieces[key]={x:coord.x,y:coord.y,animating:false}; }
+      const isSelectable=SELECTABLE_PIECES.includes(i)&&pl.user_id===U?.id&&isMeTurn(state);
+      BOARD.drawPiece(drawX,drawY,pl.color,i+1,isSelectable,PULSE_T);
+    });
+  });
+}
+
+function onCanvasClick(e){
+  if(!CUR_STATE||!BOARD||!isMeTurn(CUR_STATE)) return;
+  if(CUR_STATE.phase!==1) return;
+  const rect=e.target.getBoundingClientRect();
+  const x=e.clientX-rect.left;
+  const y=e.clientY-rect.top;
+  const cs=e.target.width/15;
+  const myPlayer=CUR_STATE.players.find(p=>p.user_id===U?.id);
+  if(!myPlayer) return;
+  myPlayer.pos.forEach((pos,i)=>{
+    if(!SELECTABLE_PIECES.includes(i)) return;
+    const coord=BOARD.getPieceCoord(myPlayer.color,pos,!!myPlayer.in_base[i],i);
+    const piece=BOARD.pieces[myPlayer.color+"_"+i];
+    const px=piece?piece.x:coord.x;
+    const py=piece?piece.y:coord.y;
+    const dist=Math.sqrt((x-px)**2+(y-py)**2);
+    if(dist<=cs*0.35+5) movePc(i);
+  });
+}
+
+function buildBoard(){ initCanvas(); }
+
+function renderState(state){
+  CUR_STATE=state; CUR_MV=[];
+  showExactHint(state);
+  if(!state.players) return;
+  const pc=document.getElementById("player-cards");
+  if(pc){
+    const midHtml=`<div class="gmid"><div class="ttx" id="ttx">${isMeTurn(state)?"Teu turno 🟢":"Aguarda 🔵"}</div><div class="rtx">RND ${state.round||0}</div></div>`;
+    pc.innerHTML=state.players.map((p,i)=>`
+      <div class="pc ${p.idx===state.turn?"mt":""}">
+        <div class="pdot" style="background:${CCSS(p.color)}"></div>
+        <div>
+          <div class="pnm2">${p.name}${p.user_id===U?.id?" (Tu)":""}</div>
+          <div class="pft">${CNAME[p.color]||p.color} · ${p.fin}/4</div>
+        </div>
+      </div>`
+    ).reduce((a,h,i)=>i===Math.floor(state.players.length/2)?a+midHtml+h:a+h,"");
+    const ttx=document.getElementById("ttx");
+    if(ttx) ttx.textContent=isMeTurn(state)?"Teu turno 🟢":"Aguarda 🔵";
+  }
+  document.getElementById("gbv").textContent=fmt(state.bet)+" KZ";
+  const rb=document.getElementById("rb");
+  rb.disabled=!isMeTurn(state)||state.phase!==0||state.over;
+  if(state.log&&state.log.length){
+    const le=document.getElementById("glog");
+    le.innerHTML=state.log.slice(-20).reverse().map(l=>`<div class="gli ${l.includes("VENCEU")||l.includes("🏆")?" gli-w":l.includes("💀")?" gli-d":""}">${l}</div>`).join("");
+  }
+  const co=document.getElementById("chat-online");
+  if(co) co.textContent=state.players.length+" online";
+  SELECTABLE_PIECES=[];
+  const rbtn=document.getElementById("rb");
+  if(rbtn&&isMeTurn(state)&&!state.over) rbtn.classList.add("my-turn-glow");
+  else if(rbtn) rbtn.classList.remove("my-turn-glow");
+}
+function isMeTurn(state){
+  if(!state||!state.players||!U) return false;
+  const p=state.players[state.turn];
+  return p&&p.user_id===U.id&&state.phase===0;
+}
+function highlightPcs(mv){ CUR_MV=mv||[]; SELECTABLE_PIECES=mv||[]; }
+
+/* ══ WALLET ══ */
+function sm(el){ el.closest(".mths").querySelectorAll(".mth").forEach(x=>x.classList.remove("on")); el.classList.add("on"); }
+function wprev(){
+  const v=parseFloat(document.getElementById("wv").value);
+  const el=document.getElementById("wpr");
+  // FIX: updated to reflect 10% fee and 1000 minimum
+  if(v>=1000) el.textContent="Receberás: "+fmt(Math.floor(v*.90))+" Kz";
+  else el.textContent="";
+}
+async function loadWallet(){
+  const u=await api("/api/me");
+  if(u.user){ U=u.user; updN(); document.getElementById("wbn").textContent=fmt(U.balance); }
+  const t=await api("/api/transactions"); renderTx(t.transactions||[]);
+  const dp=await api("/api/deposit/list"); renderDeps(dp.deposits||[]);
+  if(U?.express_number) document.getElementById("wnum").value=U.express_number;
+  loadDaily(); loadReferral(); loadTickets();
+}
+async function doDeposit(){
+  const v=parseFloat(document.getElementById("dv").value);
+  const ref=document.getElementById("dref").value.trim();
+  const payer=document.getElementById("dpayer").value.trim();
+  const err=document.getElementById("de"),ok=document.getElementById("dok");
+  err.textContent=""; ok.textContent="";
+  if(!v||v<500){ err.textContent="❌ Mínimo 500 Kz"; return; }
+  if(!ref){ err.textContent="❌ Insere a referência Express."; return; }
+  const d=await api("/api/deposit/request","POST",{amount:v,express_ref:ref,payer_name:payer});
+  if(d.error){ err.textContent="❌ "+d.error; return; }
+  ok.textContent="✅ Pedido enviado! Aguarda confirmação.";
+  document.getElementById("dv").value="";
+  document.getElementById("dref").value="";
+  document.getElementById("dpayer").value="";
+  loadWallet();
+}
+async function doWithdraw(){
+  const num=document.getElementById("wnum").value.trim();
+  const acn=document.getElementById("wacname").value.trim();
+  const v=parseFloat(document.getElementById("wv").value);
+  const err=document.getElementById("we"),ok=document.getElementById("wok");
+  err.textContent=""; ok.textContent="";
+  if(!num){ err.textContent="❌ Insere o número Express."; return; }
+  if(!acn){ err.textContent="❌ Insere o nome da conta Express."; return; }
+  // FIX 4: Mínimo 10.000 → 1.000
+  if(!v||v<1000){ err.textContent="❌ Mínimo 1.000 Kz"; return; }
+  const d=await api("/api/withdraw/request","POST",{amount:v,express_number:num,account_name:acn});
+  if(d.error){ err.textContent="❌ "+d.error; return; }
+  ok.textContent="✅ "+d.msg;
+  document.getElementById("wv").value=""; document.getElementById("wpr").textContent="";
+  loadWallet(); toast("Levantamento de "+fmt(v)+" Kz solicitado!","tin");
+}
+function renderTx(txs){
+  const b=document.getElementById("txb");
+  if(!txs.length){ b.innerHTML='<div class="empty">Sem transações</div>'; return; }
+  b.innerHTML=txs.slice(0,30).map(t=>{
+    const ic=t.type==="deposit"?"⬆️":t.type.includes("with")?"⬇️":t.amount>0?"🏆":"🎮";
+    const cl=t.type==="deposit"?"id":t.type.includes("with")?"iw":t.amount>0?"ig":"il";
+    const a=t.amount>=0?"pos":"neg";
+    const as=(t.amount>=0?"+":"")+fmt(t.amount);
+    return `<div class="txi"><div class="tic ${cl}">${ic}</div><div class="tin2"><div class="tds">${t.description||t.type}</div><div class="tdt">${fmtD(t.created_at)}</div></div><div class="tam ${a}">${as} KZ</div></div>`;
+  }).join("");
+}
+function renderDeps(deps){
+  const b=document.getElementById("dep-lst");
+  if(!deps.length){ b.innerHTML='<div class="empty">Sem pedidos</div>'; return; }
+  b.innerHTML=deps.slice(0,10).map(d=>{
+    const sc=d.status==="approved"?"dsa":d.status==="rejected"?"dsr":"dsp";
+    const sl=d.status==="approved"?"✅ Confirmado":d.status==="rejected"?"❌ Rejeitado":"⏳ Pendente";
+    return `<div class="txi"><div class="tic id">⬆️</div><div class="tin2"><div class="tds">Ref: ${d.express_ref}</div><div class="tdt">${fmt(d.amount)} Kz · ${fmtD(d.created_at)}</div></div><div><span class="dst ${sc}">${sl}</span></div></div>`;
+  }).join("");
+}
+
+/* ══ PROFILE ══ */
+async function loadProfile(){
+  const u=await api("/api/me"); if(u.user){ U=u.user; updN(); }
+  if(!U) return;
+  document.getElementById("pav").textContent=U.name[0].toUpperCase();
+  document.getElementById("pnm").textContent=U.name;
+  document.getElementById("pem").textContent=U.phone||U.email||"";
+  if(U.express_number) document.getElementById("exp-num").value=U.express_number;
+  document.getElementById("sg2").textContent=U.games_played||0;
+  document.getElementById("sw").textContent=U.wins||0;
+  document.getElementById("sl").textContent=U.losses||0;
+  const rt=U.games_played>0?Math.round(U.wins/U.games_played*100):0;
+  document.getElementById("sr").textContent=rt+"%";
+  document.getElementById("se").textContent=fmt(U.total_earned||0);
+  document.getElementById("sbl").textContent=fmt(U.balance||0);
+  const gr=await api("/api/games/history");
+  const b=document.getElementById("ghb");
+  const gs=gr.games||[];
+  if(!gs.length){ b.innerHTML='<div class="empty">Sem partidas ainda</div>'; return; }
+  b.innerHTML=gs.map(g=>`<div class="txi"><div class="tic ${g.is_win?"ig":"il"}">${g.is_win?"🏆":"💀"}</div><div class="tin2"><div class="tds">Sala ${g.room_id||"—"} · ${fmt(g.bet)} Kz</div><div class="tdt">${fmtD(g.played_at)}</div></div><div class="tam ${g.is_win?"pos":"neg"}">${g.is_win?"+"+fmt(g.prize):"-"+fmt(g.bet)} KZ</div></div>`).join("");
+}
+async function saveExp(){
+  const num=document.getElementById("exp-num").value.trim();
+  if(!num){ toast("❌ Número inválido.","ter"); return; }
+  await api("/api/set_express","POST",{number:num});
+  if(U) U.express_number=num;
+  toast("✅ Número Express guardado!","tok");
+}
+
+/* ══ BÓNUS DIÁRIO ══ */
+const BONUSES=[500,750,1000,1500,2000,2500,5000];
+const DAYS=["D1","D2","D3","D4","D5","D6","D7"];
+async function loadDaily(){
+  const d=await api("/api/bonus/daily/status");
+  const el=document.getElementById("daily-status");
+  const btn=document.getElementById("btn-daily");
+  const sd=document.getElementById("streak-days");
+  if(!el) return;
+  if(sd){
+    sd.innerHTML=BONUSES.map((v,i)=>`
+      <div class="sd ${i<(d.streak||0)?"done":""}">
+        <div class="sd-day">${DAYS[i]}</div>
+        <div class="sd-val">${v>=1000?(v/1000)+"K":v}</div>
+      </div>`).join("");
+  }
+  if(d.claimed){
+    el.innerHTML="✅ Recebido! Volta amanhã · Streak: <strong style='color:var(--g1)'>"+(d.streak||0)+"/7</strong>";
+    if(btn){ btn.disabled=true; btn.textContent="✓ Recebido hoje"; }
+  } else {
+    el.innerHTML="💰 Hoje recebes: <strong style='color:var(--g1)'>"+(d.next||500).toLocaleString("pt-AO")+" Kz</strong> · Streak: "+(d.streak||0)+"/7";
+    if(btn){ btn.disabled=false; btn.textContent="🎁 Receber Bónus"; }
+  }
+}
+async function claimDaily(){
+  const d=await api("/api/bonus/daily/claim","POST",{});
+  if(d.error){ toast("❌ "+d.error,"ter"); return; }
+  if(U){ U.balance=d.balance; updN(); document.getElementById("wbn").textContent=fmt(U.balance); }
+  toast("🎁 +"+d.amount.toLocaleString("pt-AO")+" Kz! Dia "+d.streak+" 🔥","tok");
+  coinRain(); loadDaily();
+}
+
+/* ══ PROMO ══ */
+async function usePromo(){
+  const code=document.getElementById("promo-inp").value.trim().toUpperCase();
+  const err=document.getElementById("promo-err"),ok=document.getElementById("promo-ok");
+  err.textContent=""; ok.textContent="";
+  if(!code){ err.textContent="❌ Insere o código."; return; }
+  const d=await api("/api/promo/use","POST",{code});
+  if(d.error){ err.textContent="❌ "+d.error; return; }
+  ok.textContent="✅ "+d.msg;
+  document.getElementById("promo-inp").value="";
+  if(U){ U.balance+=d.amount; updN(); document.getElementById("wbn").textContent=fmt(U.balance); }
+  coinRain(); toast(d.msg,"tok");
+}
+
+/* ══ REFERIDOS ══ */
+async function loadReferral(){
+  const d=await api("/api/referral/code");
+  const el=document.getElementById("ref-link");
+  const cnt=document.getElementById("ref-count");
+  if(!el) return;
+  el.textContent=d.link||""; el.dataset.link=d.link||"";
+  const r=await api("/api/referral/list");
+  const refs=r.referrals||[];
+  if(cnt) cnt.textContent=refs.length>0?"✅ "+refs.length+" amigo(s) referido(s) — +"+(refs.length*500).toLocaleString("pt-AO")+" Kz ganhos!":"Ainda não referiste ninguém.";
+}
+function copyRef(){
+  const el=document.getElementById("ref-link");
+  const link=el.dataset.link||el.textContent;
+  navigator.clipboard.writeText(link).catch(()=>{});
+  toast("📋 Link copiado!","tin");
+}
+function shareRef(){
+  const el=document.getElementById("ref-link");
+  const link=el.dataset.link||el.textContent;
+  const msg="Joga Ludo e ganha Kwanzas! Regista-te no LudoKz com o meu link e ganha 500 Kz de bónus: "+link;
+  if(navigator.share){ navigator.share({title:"LudoKz",text:msg,url:link}); }
+  else{ navigator.clipboard.writeText(msg).catch(()=>{}); toast("Link copiado para partilhar!","tin"); }
+}
+
+/* ══ SUPORTE ══ */
+async function sendSupport(){
+  const msg=document.getElementById("sup-msg").value.trim();
+  const ok=document.getElementById("sup-ok");
+  ok.textContent="";
+  if(!msg||msg.length<5){ toast("❌ Mensagem muito curta.","ter"); return; }
+  const d=await api("/api/support/ticket","POST",{message:msg});
+  if(d.error){ toast("❌ "+d.error,"ter"); return; }
+  ok.textContent="✅ Mensagem enviada! Responderemos em breve.";
+  document.getElementById("sup-msg").value="";
+  loadTickets();
+}
+async function loadTickets(){
+  const d=await api("/api/support/tickets");
+  const el=document.getElementById("tkts-list"); if(!el) return;
+  const tkts=d.tickets||[];
+  if(!tkts.length){ el.innerHTML=""; return; }
+  el.innerHTML='<div style="font-size:11px;font-weight:800;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px">Os teus pedidos</div>'+
+    tkts.map(t=>`
+      <div class="tkt">
+        <div style="color:var(--t2);font-weight:600">${t.message}</div>
+        ${t.reply?`<div style="color:var(--jade);margin-top:7px;font-weight:700">💬 Resposta: ${t.reply}</div>`:""}
+        <div style="font-size:11px;color:var(--t3);margin-top:5px">${fmtD(t.created_at)} · <span style="color:${t.status==="closed"?"var(--jade)":"var(--orange)"}">${t.status==="closed"?"✅ Respondido":"⏳ Aguarda"}</span></div>
+      </div>`).join("");
+}
+
+/* ══ EFFECTS ══ */
+function coinRain(){
+  for(let i=0;i<14;i++){
+    setTimeout(()=>{
+      const el=document.createElement("div");
+      el.className="coin-drop";
+      el.textContent=["💰","🎲","⭐","🏆","💎"][Math.floor(Math.random()*5)];
+      el.style.left=Math.random()*100+"vw";
+      el.style.top="0";
+      el.style.position="fixed";
+      document.body.appendChild(el);
+      setTimeout(()=>el.remove(),1100);
+    },i*70);
+  }
+}
+function showFlash(emoji){
+  const el=document.createElement("div");
+  el.className="flash-el"; el.textContent=emoji;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1000);
+}
+
+/* ══ ANIMAÇÕES ══ */
+function animatePieceMove(cellEl,color){
+  const pieces=cellEl.querySelectorAll(".piece");
+  pieces.forEach(p=>{
+    p.classList.add("piece-moving");
+    setTimeout(()=>p.classList.remove("piece-moving"),500);
+  });
+  const trail=document.createElement("div");
+  trail.className="trail-dot"; trail.style.background=color;
+  cellEl.appendChild(trail);
+  setTimeout(()=>trail.remove(),550);
+}
+function animateCapture(cellId){
+  const cell=document.getElementById(cellId); if(!cell) return;
+  const pieces=cell.querySelectorAll(".piece");
+  pieces.forEach(p=>{ p.classList.add("piece-captured"); setTimeout(()=>p.remove(),420); });
+}
+function animateDiceRoll(){
+  const el=document.getElementById("dfc"); if(!el) return;
+  el.classList.add("dice-rolling-3d");
+  setTimeout(()=>el.classList.remove("dice-rolling-3d"),650);
+}
+function animateFinish(cellId){
+  const cell=document.getElementById(cellId); if(!cell) return;
+  const pieces=cell.querySelectorAll(".piece");
+  pieces.forEach(p=>{ p.classList.add("piece-finish"); setTimeout(()=>p.classList.remove("piece-finish"),750); });
+}
+function starBurst(x,y){
+  const emojis=["⭐","🌟","✨","💫","🎯","🏆","💎"];
+  for(let i=0;i<10;i++){
+    setTimeout(()=>{
+      const el=document.createElement("div");
+      el.className="star-particle";
+      el.textContent=emojis[Math.floor(Math.random()*emojis.length)];
+      el.style.left=x+"px"; el.style.top=y+"px";
+      const angle=(i/10)*Math.PI*2;
+      const dist=80+Math.random()*80;
+      el.style.setProperty("--dx",Math.cos(angle)*dist+"px");
+      el.style.setProperty("--dy",Math.sin(angle)*dist+"px");
+      el.style.setProperty("--rot",(Math.random()*360)+"deg");
+      document.body.appendChild(el);
+      setTimeout(()=>el.remove(),950);
+    },i*40);
+  }
+}
+
+function showExactHint(state){
+  document.querySelectorAll(".cell-exact").forEach(c=>c.classList.remove("cell-exact"));
+  if(!state||!state.players||!U) return;
+  const myPlayer=state.players.find(p=>p.user_id===U.id);
+  if(!myPlayer||state.players[state.turn]?.user_id!==U.id) return;
+  if(state.phase!==1) return;
+  myPlayer.pos.forEach((pos,i)=>{
+    if(myPlayer.in_base[i]||pos<52||pos>=58) return;
+    const needed=58-pos;
+    if(state.dice===needed){
+      const HOMES={
+        r:[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
+        g:[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
+        b:[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
+        y:[[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]
+      };
+      const homeCoords=HOMES[myPlayer.color];
+      if(homeCoords){
+        const targetIdx=Math.min(pos-52,5);
+        const coord=homeCoords[targetIdx]||homeCoords[5];
+        const cellId="c"+coord[0]+"_"+coord[1];
+        const cell=document.getElementById(cellId);
+        if(cell) cell.classList.add("cell-exact");
+      }
+    }
+  });
+}
+
+/* ══ TOAST ══ */
+function toast(msg,cls="tin"){
+  const el=document.getElementById("tst");
+  el.textContent=msg; el.className=`tst show ${cls}`;
+  setTimeout(()=>el.classList.remove("show"),3600);
+}
+
+/* ══ INIT ══ */
+(async()=>{
+  const d=await api("/api/me");
+  if(d.user){ U=d.user; connectSSE(); showApp(); }
+})();
+</script>
+<script src="/static/ludo_board.js"></script>
+<script src="/static/game_patch.js"></script>
+<script src="/static/godot_bridge.js"></script>
+<script src="/static/ludo_game/index.js"></script>
+</body>
+</html>
