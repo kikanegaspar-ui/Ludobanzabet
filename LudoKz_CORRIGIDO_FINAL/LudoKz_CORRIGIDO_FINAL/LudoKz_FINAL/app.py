@@ -474,13 +474,14 @@ def api_chat():
     push_room(rid, "chat_message", {"name": u["name"], "text": msg, "system": False})
     return jsonify({"ok": True})
 
-@app.route("/api/events")
-@login_req
-def sse():
-    uid = session["uid"]
-    q   = queue.Queue(maxsize=200)
+@app.route("/api/admin/events")
+def sse_admin():
+    k = request.args.get("key", "") or request.headers.get("X-Admin-Key", "")
+    if k != ADMIN_KEY:
+        return jsonify({"error": "Acesso negado"}), 403
+    q = queue.Queue(maxsize=200)
     with _sse_lk:
-        _sse.setdefault(uid, []).append(q)
+        _sse.setdefault(-1, []).append(q)
     def gen():
         try:
             yield "event:connected\ndata:{\"ok\":true}\n\n"
@@ -489,7 +490,7 @@ def sse():
                 except queue.Empty: yield ": ping\n\n"
         finally:
             with _sse_lk:
-                lst = _sse.get(uid, [])
+                lst = _sse.get(-1, [])
                 if q in lst: lst.remove(q)
     return Response(stream_with_context(gen()),
                     mimetype="text/event-stream",
