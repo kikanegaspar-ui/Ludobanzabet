@@ -19,8 +19,15 @@ init_db()
 
 # ── Headers obrigatórios para o Godot HTML5 funcionar ─────────
 @app.after_request
+def add_godot_headers(response):
+    response.headers["Cross-Origin-Opener-Policy"]   = "same-origin"
+    response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+    return response
+
+@app.after_request
 def add_cors(response):
     response.headers["Access-Control-Allow-Origin"]      = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Headers"]     = "Content-Type"
     response.headers["Access-Control-Allow-Methods"]     = "GET,POST,OPTIONS"
     return response
