@@ -1,4 +1,4 @@
-﻿"""app.py ��� LudoKz Backend completo"""
+"""app.py — LudoKz Backend completo"""
 import json, queue, threading, os, secrets, time, uuid
 from functools import wraps
 from flask import (Flask, render_template, request, jsonify,
@@ -16,7 +16,7 @@ ADMIN_KEY        = os.environ.get("ADMIN_KEY", "ludokz2025")
 
 init_db()
 
-# ������ Headers obrigat+�rios para o Godot HTML5 funcionar ���������������������������
+# ── Headers obrigatórios para o Godot HTML5 funcionar ─────────
 @app.after_request
 def add_godot_headers(response):
     response.headers["Cross-Origin-Opener-Policy"]   = "same-origin"
@@ -35,11 +35,11 @@ def add_cors(response):
 def options_handler(path):
     return "", 204
 
-# ������ Helper de conex+�o PostgreSQL ���������������������������������������������������������������������������������������������
+# ── Helper de conexão PostgreSQL ───────────────────────────────
 def get_pg():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
-# ������ Salas activas ������������������������������������������������������������������������������������������������������������������������������������������
+# ── Salas activas ──────────────────────────────────────────────
 _rooms: dict = {}
 _rooms_lk = threading.Lock()
 
@@ -51,11 +51,11 @@ def _get_room(rid: str):
 def _make_rid() -> str:
     return str(uuid.uuid4())[:8].upper()
 
-# ������ SSE ������������������������������������������������������������������������������������������������������������������������������������������������������������������������
+# ── SSE ────────────────────────────────────────────────────────
 _sse: dict = {}
 _sse_lk = threading.Lock()
 
-# ������ Rate limiting OTP ������������������������������������������������������������������������������������������������������������������������������
+# ── Rate limiting OTP ──────────────────────────────────────────
 _otp_rate: dict = {}
 _otp_rate_lk = threading.Lock()
 
@@ -95,7 +95,7 @@ def login_req(f):
     @wraps(f)
     def d(*a, **kw):
         if "uid" not in session:
-            return jsonify({"error": "N+�o autenticado"}), 401
+            return jsonify({"error": "Não autenticado"}), 401
         return f(*a, **kw)
     return d
 
@@ -133,15 +133,15 @@ def api_otp_send():
     if not _otp_permitido(phone):
         return jsonify({"error": "Demasiados pedidos. Aguarda 1 minuto."}), 429
     if purpose == "register" and get_user_by_phone(phone):
-        return jsonify({"error": "N+�mero j+� registado. Faz login."}), 400
+        return jsonify({"error": "Número já registado. Faz login."}), 400
     if purpose == "login" and not get_user_by_phone(phone):
-        return jsonify({"error": "N+�mero n+�o encontrado. Regista-te primeiro."}), 404
+        return jsonify({"error": "Número não encontrado. Regista-te primeiro."}), 404
     code = criar_otp(phone, purpose)
     ok, msg = enviar_sms_simulado(phone, code, name)
     if not ok: return jsonify({"error": "Falha ao enviar SMS. Tenta novamente."}), 500
     op = operadora(phone)
     return jsonify({"ok": True, "phone": phone, "operadora": op,
-                    "msg": f"C+�digo enviado para {phone} ({op}). V+�lido por 2 minutos."})
+                    "msg": f"Código enviado para {phone} ({op}). Válido por 2 minutos."})
 
 @app.route("/api/otp/verify", methods=["POST"])
 def api_otp_verify():
@@ -166,18 +166,18 @@ def api_register():
     if not name or not phone or not pw:
         return jsonify({"error": "Preencha todos os campos."}), 400
     if len(pw) < 6:
-        return jsonify({"error": "Senha m+�nima 6 caracteres."}), 400
+        return jsonify({"error": "Senha mínima 6 caracteres."}), 400
     if not age_ok:
         return jsonify({"error": "Deves confirmar que tens 18 ou mais anos."}), 400
     if not terms_ok:
-        return jsonify({"error": "Deves aceitar os Termos e Condi+�+�es."}), 400
+        return jsonify({"error": "Deves aceitar os Termos e Condições."}), 400
 
-    # Verifica+�+�o OTP ��� aceita sess+�o do servidor OU confirma+�+�o do frontend
-    # (necess+�rio porque o Render na conta gratuita pode adormecer e perder sess+�es)
+    # Verificação OTP — aceita sessão do servidor OU confirmação do frontend
+    # (necessário porque o Render na conta gratuita pode adormecer e perder sessões)
     otp_sessao   = session.get("otp_ok_register") == phone
     otp_frontend = bool(d.get("phone_verified") or d.get("otp"))
     if not otp_sessao and not otp_frontend:
-        return jsonify({"error": "Verifica o n+�mero por SMS antes de te registares."}), 400
+        return jsonify({"error": "Verifica o número por SMS antes de te registares."}), 400
 
     try:
         uid = create_user(phone, pw, name, age_ok, terms_ok, ref_code)
@@ -194,7 +194,7 @@ def api_login():
     ph = d.get("phone", "").strip()
     pw = d.get("password", "")
     u  = verify_user(ph, pw)
-    if not u: return jsonify({"error": "N+�mero ou senha incorretos."}), 401
+    if not u: return jsonify({"error": "Número ou senha incorretos."}), 401
     session["uid"] = u["id"]
     return jsonify({"ok": True, "user": safe_user(u)})
 
@@ -213,11 +213,11 @@ def api_reset_req():
     phone = (request.json or {}).get("phone", "").strip()
     u = get_user_by_phone(phone)
     if not u:
-        return jsonify({"ok": True, "msg": "Se o n+�mero existir, receber+�s um SMS."})
+        return jsonify({"ok": True, "msg": "Se o número existir, receberás um SMS."})
     code = criar_otp(phone, "reset")
     enviar_sms_simulado(phone, code, u["name"])
     push_admin("password_reset", {"phone": phone, "code": code, "name": u["name"]})
-    return jsonify({"ok": True, "msg": f"C+�digo SMS enviado para {phone}."})
+    return jsonify({"ok": True, "msg": f"Código SMS enviado para {phone}."})
 
 @app.route("/api/reset/confirm", methods=["POST"])
 def api_reset_confirm():
@@ -225,11 +225,11 @@ def api_reset_confirm():
     phone  = d.get("phone", "").strip()
     code   = d.get("code", "").strip()
     new_pw = d.get("password", "")
-    if len(new_pw) < 6: return jsonify({"error": "Senha m+�nima 6 caracteres."}), 400
+    if len(new_pw) < 6: return jsonify({"error": "Senha mínima 6 caracteres."}), 400
     ok, msg = verificar_otp(phone, code, "reset")
     if not ok: return jsonify({"error": msg}), 400
     u = get_user_by_phone(phone)
-    if not u: return jsonify({"error": "N+�mero n+�o encontrado."}), 404
+    if not u: return jsonify({"error": "Número não encontrado."}), 404
     reset_password(u["id"], new_pw)
     return jsonify({"ok": True})
 
@@ -237,7 +237,7 @@ def api_reset_confirm():
 @login_req
 def api_set_express():
     num = (request.json or {}).get("number", "").strip()
-    if not num: return jsonify({"error": "N+�mero inv+�lido."}), 400
+    if not num: return jsonify({"error": "Número inválido."}), 400
     set_express(session["uid"], num)
     return jsonify({"ok": True})
 
@@ -246,11 +246,11 @@ def api_set_express():
 def api_dep_req():
     d = request.json or {}
     try:   amt = float(d.get("amount", 0))
-    except: return jsonify({"error": "Valor inv+�lido."}), 400
+    except: return jsonify({"error": "Valor inválido."}), 400
     ref   = d.get("express_ref", "").strip()
     payer = d.get("payer_name", "").strip()
-    if amt < 500: return jsonify({"error": "M+�nimo 500 Kz."}), 400
-    if not ref:   return jsonify({"error": "Insere a refer+�ncia Express."}), 400
+    if amt < 500: return jsonify({"error": "Mínimo 500 Kz."}), 400
+    if not ref:   return jsonify({"error": "Insere a referência Express."}), 400
     did  = create_deposit(session["uid"], amt, ref, payer)
     deps = get_pending_deposits()
     push_admin("new_deposit", {"deposit_id": did, "amount": amt, "ref": ref,
@@ -267,13 +267,13 @@ def api_dep_list():
 def api_wit_req():
     d = request.json or {}
     try:   amt = float(d.get("amount", 0))
-    except: return jsonify({"error": "Valor inv+�lido."}), 400
+    except: return jsonify({"error": "Valor inválido."}), 400
     num  = d.get("express_number", "").strip()
     name = d.get("account_name", "").strip()
     if not num:
         u   = get_user(session["uid"])
         num = u.get("express_number", "") or ""
-    if not num:  return jsonify({"error": "Insere o teu n+�mero Express Card."}), 400
+    if not num:  return jsonify({"error": "Insere o teu número Express Card."}), 400
     if not name: return jsonify({"error": "Insere o nome da conta Express."}), 400
     wid, err = create_withdrawal(session["uid"], amt, num, name)
     if err: return jsonify({"error": err}), 400
@@ -281,7 +281,7 @@ def api_wit_req():
     push_admin("new_withdrawal", {"wid": wid, "amount": amt, "net": net,
                                    "express": num, "account_name": name})
     return jsonify({"ok": True, "wid": wid, "net": net,
-                    "msg": f"Pedido enviado. Receber+�s {net:,.0f} Kz em {num}"})
+                    "msg": f"Pedido enviado. Receberás {net:,.0f} Kz em {num}"})
 
 @app.route("/api/withdraw/list")
 @login_req
@@ -313,10 +313,10 @@ def api_lobby():
 def api_create():
     d = request.json or {}
     try:   bet = float(d.get("bet", 0))
-    except: return jsonify({"error": "Aposta inv+�lida."}), 400
+    except: return jsonify({"error": "Aposta inválida."}), 400
     max_p = int(d.get("max_players", 2))
-    if bet not in BET_TIERS:   return jsonify({"error": "Valor inv+�lido."}), 400
-    if max_p not in [2, 3, 4]: return jsonify({"error": "N+�mero de jogadores inv+�lido."}), 400
+    if bet not in BET_TIERS:   return jsonify({"error": "Valor inválido."}), 400
+    if max_p not in [2, 3, 4]: return jsonify({"error": "Número de jogadores inválido."}), 400
     u = get_user(session["uid"])
     if u["balance"] < bet:     return jsonify({"error": "Saldo insuficiente."}), 400
     if not deduct_bet(session["uid"], bet):
@@ -335,7 +335,7 @@ def api_join():
     d   = request.json or {}
     rid = d.get("room_id", "").strip()
     r   = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     u = get_user(session["uid"])
     if u["balance"] < r.bet: return jsonify({"error": "Saldo insuficiente."}), 400
     if not deduct_bet(session["uid"], r.bet):
@@ -363,9 +363,9 @@ def api_join():
 def api_start():
     rid = (request.json or {}).get("room_id", "")
     r   = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     if r.players[0]["user_id"] != session["uid"]:
-        return jsonify({"error": "S+� o criador pode iniciar."}), 403
+        return jsonify({"error": "Só o criador pode iniciar."}), 403
     ok, err = r.start()
     if not ok: return jsonify({"error": err}), 400
     state = r.state_dict()
@@ -376,16 +376,16 @@ def api_start():
 @login_req
 def api_state(rid):
     r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     return jsonify(r.state_dict(session["uid"]))
 
 @app.route("/api/game/roll", methods=["POST"])
 @login_req
 def api_roll():
     rid = (request.json or {}).get("room_id", "").strip()
-    if not rid: return jsonify({"error": "ID inv+�lido."}), 400
+    if not rid: return jsonify({"error": "ID inválido."}), 400
     r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     dice, err = r.roll_dice(session["uid"])
     if err: return jsonify({"error": err}), 400
     state = r.state_dict(session["uid"])
@@ -400,9 +400,9 @@ def api_move():
     d   = request.json or {}
     rid = d.get("room_id", "").strip()
     try:   piece = int(d.get("piece", 0))
-    except: return jsonify({"error": "Pe+�a inv+�lida."}), 400
+    except: return jsonify({"error": "Peça inválida."}), 400
     r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     state, err = r.move_piece(session["uid"], piece)
     if err: return jsonify({"error": err}), 400
     push_room(rid, "game_update", state)
@@ -449,7 +449,7 @@ def _finish_game(rid: str):
     loser_ids = [p["user_id"] for p in r.players if p["user_id"] != winner_id]
     prize     = round(r.bet * len(r.players) * 0.95, 2)
     credit_prize(winner_id, loser_ids, r.bet, prize, r.round, rid)
-    add_tx(winner_id, "prize", prize, "Pr+�mio vit+�ria Ludo")
+    add_tx(winner_id, "prize", prize, "Prémio vitória Ludo")
     wu = get_user(winner_id)
     push(winner_id, "game_over", {
         "won": True, "prize": prize,
@@ -472,9 +472,9 @@ def api_chat():
     msg = d.get("message", "").strip()[:120]
     if not msg or not rid: return jsonify({"ok": False}), 400
     r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     if not any(p["user_id"] == session["uid"] for p in r.players):
-        return jsonify({"error": "N+�o est+�s nesta sala."}), 403
+        return jsonify({"error": "Não estás nesta sala."}), 403
     u = get_user(session["uid"])
     push_room(rid, "chat_message", {"name": u["name"], "text": msg, "system": False})
     return jsonify({"ok": True})
@@ -581,7 +581,7 @@ def adm_wit_reject(wid):
         if w:
             push(w["user_id"], "withdrawal_rejected", {
                 "amount": w["amount"],
-                "msg":    "Levantamento rejeitado. Saldo devolvido +� tua conta."
+                "msg":    "Levantamento rejeitado. Saldo devolvido à tua conta."
             })
     return jsonify({"ok": ok})
 
@@ -627,9 +627,9 @@ def adm_add_balance():
     uid    = int(d.get("user_id", 0))
     amount = float(d.get("amount", 0))
     reason = d.get("reason", "Ajuste manual")
-    if not uid or amount == 0: return jsonify({"error": "Dados inv+�lidos"}), 400
+    if not uid or amount == 0: return jsonify({"error": "Dados inválidos"}), 400
     u_check = get_user(uid)
-    if not u_check: return jsonify({"error": f"Utilizador {uid} n+�o encontrado."}), 404
+    if not u_check: return jsonify({"error": f"Utilizador {uid} não encontrado."}), 404
     conn = get_pg(); cur = conn.cursor()
     cur.execute("UPDATE users SET balance=balance+%s WHERE id=%s", (amount, uid))
     conn.commit(); cur.close(); conn.close()
@@ -684,7 +684,7 @@ def adm_play_join():
     name       = d.get("name", "Jogador").strip()
     player_idx = int(d.get("player_idx", 1))
     r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     ok, err = r.add_player(-(1000 + player_idx), name)
     if not ok: return jsonify({"error": err}), 400
     return jsonify({"ok": True})
@@ -694,7 +694,7 @@ def adm_play_join():
 def adm_play_start():
     rid = (request.json or {}).get("room_id", "")
     r   = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     ok, err = r.start()
     if not ok: return jsonify({"error": err}), 400
     state = r.state_dict()
@@ -708,7 +708,7 @@ def adm_play_roll():
     rid = d.get("room_id", "")
     uid = int(d.get("uid", -999))
     r   = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     dice, err = r.roll_dice(uid)
     if err: return jsonify({"error": err}), 400
     state = r.state_dict()
@@ -723,7 +723,7 @@ def adm_play_move():
     uid   = int(d.get("uid", -999))
     piece = int(d.get("piece", 0))
     r     = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     state, err = r.move_piece(uid, piece)
     if err: return jsonify({"error": err}), 400
     push_room(rid, "game_update", state)
@@ -743,7 +743,7 @@ def adm_play_movable():
 @admin_req
 def adm_play_state(rid):
     r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     return jsonify(r.state_dict())
 
 @app.route("/api/admin/play/bot_turn", methods=["POST"])
@@ -753,7 +753,7 @@ def adm_bot_turn():
     rid = d.get("room_id", "")
     uid = int(d.get("uid", -1000))
     r   = _get_room(rid)
-    if not r: return jsonify({"error": "Sala n+�o encontrada."}), 404
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     def run():
         state, err = r.bot_turn(uid)
         if state:
@@ -775,7 +775,7 @@ def adm_promo_create():
     amount   = float(d.get("amount", 0))
     max_uses = int(d.get("max_uses", 100))
     expires  = d.get("expires", "")
-    if not code or amount <= 0: return jsonify({"error": "Dados inv+�lidos"}), 400
+    if not code or amount <= 0: return jsonify({"error": "Dados inválidos"}), 400
     create_promo(code, amount, max_uses, expires)
     return jsonify({"ok": True})
 
@@ -822,13 +822,13 @@ def api_ref_list():
 @login_req
 def api_promo_use():
     code = (request.json or {}).get("code", "").strip()
-    if not code: return jsonify({"error": "Insere o c+�digo."}), 400
+    if not code: return jsonify({"error": "Insere o código."}), 400
     ok, result = use_promo(session["uid"], code)
     if not ok: return jsonify({"error": result}), 400
     u = get_user(session["uid"])
     push(session["uid"], "balance_update", {"balance": u["balance"]})
     return jsonify({"ok": True, "amount": result,
-                    "msg": f"B+�nus de {fmt_kz(result)} Kz aplicado!"})
+                    "msg": f"Bónus de {fmt_kz(result)} Kz aplicado!"})
 
 def fmt_kz(n):
     try:    return f"{float(n):,.0f}".replace(",", ".")
@@ -847,7 +847,7 @@ def api_daily_claim():
     u = get_user(session["uid"])
     push(session["uid"], "balance_update", {"balance": u["balance"]})
     add_tx(session["uid"], "daily_bonus", result["amount"],
-           f"B+�nus di+�rio dia {result['streak']}")
+           f"Bónus diário dia {result['streak']}")
     return jsonify({"ok": True, **result, "balance": u["balance"]})
 
 @app.route("/api/support/ticket", methods=["POST"])
@@ -922,10 +922,9 @@ def api_jackpot():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print("=" * 52)
-    print("  LudoKz ��� Servidor iniciado")
+    print("  LudoKz — Servidor iniciado")
     print(f"  Express : {PLATFORM_EXPRESS}")
     print(f"  Admin   : {ADMIN_KEY}")
     print(f"  URL     : http://0.0.0.0:{port}")
     print("=" * 52)
     app.run(debug=False, host="0.0.0.0", port=port, threaded=True)
-
