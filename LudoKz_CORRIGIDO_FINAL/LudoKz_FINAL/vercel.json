@@ -1,5 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://ludobanzabet.onrender.com/api/$1" }
-  ]
-}
