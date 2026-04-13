@@ -84,9 +84,9 @@ def enviar_sms_simulado(numero, codigo, nome="utilizador"):
     _notificar_admin(numero_e164, codigo, nome, op, SMS_PROVIDER.upper())
     if SMS_PROVIDER == "ombala":
         ok, msg = _enviar_ombala(numero_e164, mensagem)
-        if not ok:
-            print("[SMS] Ombala falhou: " + msg + " - usando simulado")
-            return _enviar_simulado(numero_e164, codigo, nome, mensagem)
+       if not ok:
+    print("[SMS] Ombala falhou: " + msg)
+    return False, "Falha ao enviar SMS: " + msg
         return True, msg
     else:
         return _enviar_simulado(numero_e164, codigo, nome, mensagem)
