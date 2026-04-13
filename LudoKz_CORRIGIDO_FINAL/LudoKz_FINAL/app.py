@@ -213,11 +213,16 @@ def api_reset_req():
     phone = (request.json or {}).get("phone", "").strip()
     u = get_user_by_phone(phone)
     if not u:
+        # Não revelar se o número existe ou não (segurança)
         return jsonify({"ok": True, "msg": "Se o número existir, receberás um SMS."})
+
+    name = u.get("name", "utilizador")   # <-- CORRECÇÃO: buscar o nome do utilizador
     code = criar_otp(phone, "reset")
     ok, msg = enviar_sms_simulado(phone, code, name)
-    if not ok: return jsonify({"error": "Falha ao enviar SMS. Tenta novamente."}), 500
-    push_admin("password_reset", {"phone": phone, "code": code, "name": u["name"]})
+    if not ok:
+        return jsonify({"error": "Falha ao enviar SMS. Tenta novamente."}), 500
+
+    push_admin("password_reset", {"phone": phone, "code": code, "name": name})
     return jsonify({"ok": True, "msg": f"Código SMS enviado para {phone}."})
 
 @app.route("/api/reset/confirm", methods=["POST"])
