@@ -10,8 +10,7 @@ from sms_service import formatar_numero_angola, enviar_sms_simulado, operadora
 from game_manager import GameManager
 
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)
-
+app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 PLATFORM_EXPRESS = os.environ.get("PLATFORM_EXPRESS", "922 745 946")
 ADMIN_KEY        = os.environ.get("ADMIN_KEY", "ludokz2025")
 
