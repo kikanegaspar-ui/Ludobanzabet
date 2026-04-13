@@ -11,7 +11,6 @@ from game_manager import GameManager
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
-
 PLATFORM_EXPRESS = os.environ.get("PLATFORM_EXPRESS", "922 745 946")
 ADMIN_KEY        = os.environ.get("ADMIN_KEY", "ludokz2025")
 
@@ -474,11 +473,12 @@ def api_chat():
     push_room(rid, "chat_message", {"name": u["name"], "text": msg, "system": False})
     return jsonify({"ok": True})
 
+# ── SSE para jogadores normais ─────────────────────────────────
 @app.route("/api/events")
 @login_req
-def sse():
+def sse_user():
     uid = session["uid"]
-    q   = queue.Queue(maxsize=200)
+    q = queue.Queue(maxsize=200)
     with _sse_lk:
         _sse.setdefault(uid, []).append(q)
     def gen():
@@ -495,6 +495,7 @@ def sse():
                     mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+# ── SSE para admin (aceita key via query param para EventSource) ──
 @app.route("/api/admin/events")
 def sse_admin():
     k = request.args.get("key", "") or request.headers.get("X-Admin-Key", "")
