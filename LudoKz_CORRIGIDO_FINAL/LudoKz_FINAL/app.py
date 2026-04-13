@@ -215,7 +215,8 @@ def api_reset_req():
     if not u:
         return jsonify({"ok": True, "msg": "Se o número existir, receberás um SMS."})
     code = criar_otp(phone, "reset")
-    enviar_sms_simulado(phone, code, u["name"])
+    ok, msg = enviar_sms_simulado(phone, code, name)
+    if not ok: return jsonify({"error": "Falha ao enviar SMS. Tenta novamente."}), 500
     push_admin("password_reset", {"phone": phone, "code": code, "name": u["name"]})
     return jsonify({"ok": True, "msg": f"Código SMS enviado para {phone}."})
 
