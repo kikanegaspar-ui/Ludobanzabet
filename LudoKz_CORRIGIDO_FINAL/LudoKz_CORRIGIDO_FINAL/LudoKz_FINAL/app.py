@@ -473,14 +473,14 @@ def api_chat():
     push_room(rid, "chat_message", {"name": u["name"], "text": msg, "system": False})
     return jsonify({"ok": True})
 
-@app.route("/api/admin/events")
-def sse_admin():
-    k = request.args.get("key", "") or request.headers.get("X-Admin-Key", "")
-    if k != ADMIN_KEY:
-        return jsonify({"error": "Acesso negado"}), 403
+# ── SSE para jogadores normais ─────────────────────────────────
+@app.route("/api/events")
+@login_req
+def sse_user():
+    uid = session["uid"]
     q = queue.Queue(maxsize=200)
     with _sse_lk:
-        _sse.setdefault(-1, []).append(q)
+        _sse.setdefault(uid, []).append(q)
     def gen():
         try:
             yield "event:connected\ndata:{\"ok\":true}\n\n"
@@ -489,15 +489,18 @@ def sse_admin():
                 except queue.Empty: yield ": ping\n\n"
         finally:
             with _sse_lk:
-                lst = _sse.get(-1, [])
+                lst = _sse.get(uid, [])
                 if q in lst: lst.remove(q)
     return Response(stream_with_context(gen()),
                     mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+# ── SSE para admin (aceita key via query param para EventSource) ──
 @app.route("/api/admin/events")
-@admin_req
 def sse_admin():
+    k = request.args.get("key", "") or request.headers.get("X-Admin-Key", "")
+    if k != ADMIN_KEY:
+        return jsonify({"error": "Acesso negado"}), 403
     q = queue.Queue(maxsize=200)
     with _sse_lk:
         _sse.setdefault(-1, []).append(q)
