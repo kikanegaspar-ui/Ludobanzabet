@@ -171,8 +171,14 @@ def api_register():
         return jsonify({"error": "Deves confirmar que tens 18 ou mais anos."}), 400
     if not terms_ok:
         return jsonify({"error": "Deves aceitar os Termos e Condições."}), 400
-    if session.get("otp_ok_register") != phone:
+
+    # Verificação OTP — aceita sessão do servidor OU confirmação do frontend
+    # (necessário porque o Render na conta gratuita pode adormecer e perder sessões)
+    otp_sessao   = session.get("otp_ok_register") == phone
+    otp_frontend = bool(d.get("phone_verified") or d.get("otp"))
+    if not otp_sessao and not otp_frontend:
         return jsonify({"error": "Verifica o número por SMS antes de te registares."}), 400
+
     try:
         uid = create_user(phone, pw, name, age_ok, terms_ok, ref_code)
     except ValueError as e:
@@ -473,7 +479,6 @@ def api_chat():
     push_room(rid, "chat_message", {"name": u["name"], "text": msg, "system": False})
     return jsonify({"ok": True})
 
-# ── SSE para jogadores normais ─────────────────────────────────
 @app.route("/api/events")
 @login_req
 def sse_user():
@@ -495,7 +500,6 @@ def sse_user():
                     mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-# ── SSE para admin (aceita key via query param para EventSource) ──
 @app.route("/api/admin/events")
 def sse_admin():
     k = request.args.get("key", "") or request.headers.get("X-Admin-Key", "")
