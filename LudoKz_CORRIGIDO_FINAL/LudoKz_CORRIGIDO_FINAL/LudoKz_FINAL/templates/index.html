@@ -118,36 +118,24 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .lb-nm{flex:1;font-weight:700;font-size:14px}
 .lb-w{color:var(--jade);font-size:13px;font-weight:700}
 .lb-e{font-family:"Bebas Neue",sans-serif;font-size:16px;color:var(--g1);letter-spacing:.5px}
-.rooms-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:28px}
-.room{background:linear-gradient(160deg,var(--c1),var(--c2));border:1px solid var(--rim);border-radius:18px;overflow:hidden;cursor:pointer;transition:all .24s cubic-bezier(.34,1.56,.64,1);position:relative}
-.room::before{content:"";position:absolute;top:0;left:0;right:0;height:3px}
-.tbr::before{background:linear-gradient(90deg,#cd7f32,#f5c518,#cd7f32)}
-.tsi::before{background:linear-gradient(90deg,#9e9e9e,#fff,#9e9e9e)}
-.tgo::before{background:linear-gradient(90deg,#f5c518,#ff9f0a,#f5c518)}
-.tvip::before{background:linear-gradient(90deg,#bf5af2,#ff375f,#bf5af2)}
-.room:hover{border-color:rgba(245,197,24,.3);transform:translateY(-5px) scale(1.01);box-shadow:0 20px 50px rgba(0,0,0,.55),0 0 0 1px rgba(245,197,24,.08)}
-.rb{padding:20px}
-.rt{font-size:10px;font-weight:800;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-bottom:10px}
-.rv{font-family:"Bebas Neue",sans-serif;font-size:30px;color:var(--g1);letter-spacing:1px;line-height:1}
-.rv small{font-size:14px;color:var(--t3);font-family:"Plus Jakarta Sans",sans-serif;font-weight:600;letter-spacing:0}
-.rp{font-size:13px;color:var(--jade);margin-top:6px;font-weight:700}
-.rf{display:flex;justify-content:space-between;align-items:center;padding:11px 20px;background:rgba(0,0,0,.2);border-top:1px solid rgba(255,255,255,.04)}
-.rh{font-size:12px;color:var(--t2);font-weight:700}
-.rpill{font-size:10px;padding:3px 10px;border-radius:20px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
-.pw{background:rgba(255,214,0,.1);color:var(--Y);border:1px solid rgba(255,214,0,.22)}
-.pf{background:rgba(255,45,85,.1);color:var(--red);border:1px solid rgba(255,45,85,.2)}
-.bps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+/* MATCHMAKING */
+.mm-card{background:linear-gradient(160deg,var(--c2),var(--c3));border:1.5px solid rgba(245,197,24,.25);border-radius:22px;padding:28px;max-width:480px;margin:0 auto 28px;box-shadow:0 0 60px rgba(245,197,24,.07)}
+.mm-title{font-family:"Bebas Neue",sans-serif;font-size:28px;letter-spacing:2px;color:var(--g1);margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.mm-sub{font-size:13px;color:var(--t2);font-weight:600;margin-bottom:20px;line-height:1.6}
+.mm-section{font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.bps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
 .bp{background:rgba(255,255,255,.03);border:1.5px solid var(--rim);border-radius:12px;padding:13px 6px;text-align:center;cursor:pointer;transition:all .18s}
 .bp:hover,.bp.on{border-color:var(--g1);background:rgba(245,197,24,.07);box-shadow:0 0 0 1px rgba(245,197,24,.15),0 4px 12px rgba(245,197,24,.1)}
-.bpa{font-family:"Bebas Neue",sans-serif;font-size:18px;color:var(--t1);letter-spacing:1px}
+.bpa{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--t1);letter-spacing:1px}
 .bp.on .bpa{color:var(--g1)}
 .bpl{font-size:10px;color:var(--t3);margin-top:2px;font-weight:700}
-.nps{display:flex;gap:8px;margin-bottom:14px}
+.nps{display:flex;gap:8px;margin-bottom:20px}
 .np{background:rgba(255,255,255,.03);border:1.5px solid var(--rim);border-radius:11px;padding:11px;flex:1;text-align:center;cursor:pointer;transition:all .18s}
 .np:hover,.np.on{border-color:var(--g1);background:rgba(245,197,24,.07)}
 .npa{font-family:"Bebas Neue",sans-serif;font-size:22px;color:var(--t1)}
 .np.on .npa{color:var(--g1)}
 .npl{font-size:10px;color:var(--t3);font-weight:700}
+.mm-prize{background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.15);border-radius:11px;padding:10px 16px;font-size:13px;color:var(--jade);font-weight:700;margin-bottom:16px;text-align:center}
 .wait-box{background:linear-gradient(160deg,var(--c2),var(--c3));border:1px solid rgba(245,197,24,.2);border-radius:22px;padding:40px;text-align:center;max-width:460px;width:100%;box-shadow:0 0 60px rgba(245,197,24,.07)}
 .spn{display:inline-block;width:52px;height:52px;border:3px solid rgba(245,197,24,.12);border-top-color:var(--g1);border-radius:50%;animation:sp .75s linear infinite;margin-bottom:18px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -171,7 +159,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .exl{list-style:none;font-size:13px;color:var(--t2);font-weight:600;line-height:2.1}
 .exl li::before{content:"→ ";color:var(--g1)}
 .mths{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-.mth{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;cursor:pointer;border:1.5px solid var(--rim);color:var(--t3);transition:all .15s;text-transform:uppercase;letter-spacing:.5px}
+.mth{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;cursor:pointer;border:1.5px solid var(--rim);color:var(--t3);transition:all .15px;text-transform:uppercase;letter-spacing:.5px}
 .mth.on{border-color:var(--g1);color:var(--g1);background:rgba(245,197,24,.08)}
 .pnote{font-size:11px;color:var(--t3);font-weight:600;margin-top:8px;line-height:1.6}
 .alrt{background:rgba(245,197,24,.06);border:1px solid rgba(245,197,24,.18);border-radius:11px;padding:14px;font-size:13px;font-weight:600;color:var(--t2);line-height:1.65;margin-bottom:14px}
@@ -265,11 +253,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .gopl{font-size:10px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;font-weight:800}
 .gopr{font-family:"Bebas Neue",sans-serif;font-size:48px;letter-spacing:2px;margin:6px 0 28px}
 .goa{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.mbg{position:fixed;inset:0;background:rgba(0,0,0,.86);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(10px)}
-.md{background:linear-gradient(160deg,var(--c2),var(--c3));border:1px solid rgba(245,197,24,.18);border-radius:22px;padding:30px;width:100%;max-width:450px;box-shadow:0 36px 80px rgba(0,0,0,.7)}
-.md h3{font-family:"Bebas Neue",sans-serif;font-size:26px;letter-spacing:1px;color:var(--g1);margin-bottom:6px}
-.md p{font-size:13px;color:var(--t2);margin-bottom:18px;font-weight:600;line-height:1.65}
-.mft{display:flex;gap:9px}
 .tst{position:fixed;bottom:24px;right:24px;z-index:600;background:var(--c2);border:1px solid var(--rim2);border-radius:14px;padding:14px 20px;font-size:13px;font-weight:700;max-width:290px;transform:translateY(70px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);box-shadow:0 12px 32px rgba(0,0,0,.5)}
 .tst.show{transform:translateY(0);opacity:1}
 .tok{border-color:var(--jade);color:var(--jade)}.ter{border-color:var(--red);color:var(--red)}.tin{border-color:var(--g1);color:var(--g1)}
@@ -385,7 +368,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
             </div>
           </div>
           <div id="terms-section" class="hidden">
-            <div style="background:rgba(255,255,255,.03);border:1px solid var(--rim);border-radius:11px;padding:14px;max-height:160px;overflow-y:auto;font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:14px" id="terms-text">
+            <div style="background:rgba(255,255,255,.03);border:1px solid var(--rim);border-radius:11px;padding:14px;max-height:160px;overflow-y:auto;font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:14px">
               <strong style="color:var(--g1);font-size:13px">TERMOS E CONDIÇÕES — LUDOKZ</strong><br><br>
               <strong>1. Elegibilidade</strong><br>Só podem jogar pessoas com 18 ou mais anos.<br><br>
               <strong>2. Apostas e Pagamentos</strong><br>Todas as apostas são em Kwanzas Angolanos (Kz). O LudoKz retém 10% de comissão sobre ganhos.<br><br>
@@ -463,7 +446,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
       <h1><span class="line1">Joga Ludo.</span><span class="line2">Ganha Kwanzas.</span></h1>
       <p>A plataforma de apostas Ludo #1 em Angola. Partidas reais, dinheiro real, pagamentos Express Card.</p>
       <div class="hcta">
-        <button class="btn bg bxl" onclick="openMd()">🎮 Jogar Agora</button>
+        <button class="btn bg bxl" onclick="pg('play')">🎮 Jogar Agora</button>
         <button class="btn bgh blg" onclick="pg('wallet')">💳 Depositar</button>
       </div>
     </div>
@@ -476,28 +459,34 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
     <div class="hbody">
       <h2 class="sh">🏆 Top Jogadores</h2>
       <div class="lb" id="lb"><div class="empty">A carregar...</div></div>
-      <h2 class="sh">🎯 Salas Disponíveis</h2>
-      <div class="rooms-grid" id="rms"></div>
-      <div id="no-rms" class="empty hidden">Sem salas. Cria a primeira!</div>
-      <h2 class="sh">⚡ Criar Sala</h2>
-      <div class="wc" style="max-width:400px">
-        <p style="font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600;line-height:1.65">Vencedor recebe <strong style="color:var(--jade)">90%</strong> do total apostado.</p>
-        <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Aposta por Jogador</div>
-        <div class="bps" id="bps-h">
-          <div class="bp" onclick="hpb(this,1000)"><div class="bpa">1K</div><div class="bpl">Kz</div></div>
-          <div class="bp" onclick="hpb(this,5000)"><div class="bpa">5K</div><div class="bpl">Kz</div></div>
-          <div class="bp" onclick="hpb(this,10000)"><div class="bpa">10K</div><div class="bpl">Kz</div></div>
-          <div class="bp" onclick="hpb(this,50000)"><div class="bpa">50K</div><div class="bpl">VIP</div></div>
-        </div>
-        <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Nº de Jogadores</div>
-        <div class="nps" id="npl-h">
-          <div class="np on" onclick="hnp(this,2)"><div class="npa">2</div><div class="npl">jogadores</div></div>
-          <div class="np" onclick="hnp(this,3)"><div class="npa">3</div><div class="npl">jogadores</div></div>
-          <div class="np" onclick="hnp(this,4)"><div class="npa">4</div><div class="npl">jogadores</div></div>
-        </div>
-        <div class="errt" id="herr"></div>
-        <button class="btn bg bfw" onclick="createRm()">Criar Sala</button>
+    </div>
+  </div>
+
+  <!-- PLAY — MATCHMAKING -->
+  <div id="p-play" class="screen z" style="flex-direction:column;align-items:center;justify-content:center;padding:30px;min-height:100vh">
+    <div class="mm-card">
+      <div class="mm-title">🎮 Jogar Ludo</div>
+      <div class="mm-sub">Escolhe o valor da aposta e o número de jogadores. O sistema encontra adversários automaticamente!</div>
+
+      <div class="mm-section">Aposta por Jogador</div>
+      <div class="bps" id="bps-play">
+        <div class="bp" onclick="mmBet(this,1000)"><div class="bpa">1K</div><div class="bpl">🥉 Bronze</div></div>
+        <div class="bp" onclick="mmBet(this,5000)"><div class="bpa">5K</div><div class="bpl">🥈 Prata</div></div>
+        <div class="bp" onclick="mmBet(this,10000)"><div class="bpa">10K</div><div class="bpl">🥇 Ouro</div></div>
+        <div class="bp" onclick="mmBet(this,50000)"><div class="bpa">50K</div><div class="bpl">👑 VIP</div></div>
       </div>
+
+      <div class="mm-section">Nº de Jogadores</div>
+      <div class="nps" id="nps-play">
+        <div class="np on" onclick="mmPlayers(this,2)"><div class="npa">2</div><div class="npl">jogadores</div></div>
+        <div class="np" onclick="mmPlayers(this,4)"><div class="npa">4</div><div class="npl">jogadores</div></div>
+      </div>
+
+      <div class="mm-prize" id="mm-prize-info">Selecciona a aposta para ver o prémio</div>
+
+      <div class="errt" id="mm-err"></div>
+      <button class="btn bg bfw" id="btn-mm" onclick="doMatchmaking()" style="font-size:16px;padding:16px">🚀 Encontrar Partida</button>
+      <button class="btn bgh bsm" onclick="pg('home')" style="width:100%;margin-top:10px">← Voltar</button>
     </div>
   </div>
 
@@ -507,17 +496,14 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
       <div class="spn"></div>
       <div style="font-size:12px;color:var(--jade);font-weight:800;text-transform:uppercase;letter-spacing:2px">● À Procura de Adversários</div>
       <div class="wait-id" id="wrid">----</div>
-      <div style="font-size:13px;color:var(--t3);font-weight:600;margin-bottom:8px">Código da sala — partilha por WhatsApp</div>
+      <div style="font-size:13px;color:var(--t3);font-weight:600;margin-bottom:8px">A aguardar jogadores...</div>
       <div style="font-size:14px;color:var(--t2);font-weight:700;margin-bottom:14px">
         Aposta: <span id="wbet" style="color:var(--g1);font-family:Bebas Neue,sans-serif;font-size:18px;letter-spacing:1px">—</span>
         &nbsp;·&nbsp; <span id="wmaxp" style="color:var(--g1)">2</span> jogadores
       </div>
       <div class="wait-slots" id="wslots"></div>
-      <p style="font-size:12px;color:var(--t3);font-weight:600;margin-bottom:18px">Mínimo 2 jogadores para iniciar</p>
-      <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap">
-        <button class="btn bj bsm" id="btn-start-early" onclick="startEarly()" style="display:none">▶ Iniciar Já</button>
-        <button class="btn brd bsm" onclick="cancelWait()">Cancelar</button>
-      </div>
+      <p style="font-size:12px;color:var(--t3);font-weight:600;margin-bottom:18px">O jogo começa automaticamente quando a sala estiver cheia</p>
+      <button class="btn brd bsm" onclick="cancelWait()">Cancelar</button>
     </div>
   </div>
 
@@ -635,7 +621,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
     </div>
   </div>
 
-  <!-- GAME -->
+  <!-- GAME (fallback canvas JS) -->
   <div id="s-game" class="screen z" style="flex-direction:column;padding:10px">
     <div style="max-width:900px;margin:0 auto;width:100%">
       <div id="player-cards" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;justify-content:center"></div>
@@ -646,9 +632,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <div style="display:flex;flex-direction:column;gap:11px;min-width:190px;max-width:240px;flex:1">
           <div class="gcd">
             <div class="btd"><div class="bdl">Aposta</div><div class="bdv" id="gbv">0 KZ</div></div>
-            <div style="text-align:center;margin:8px 0">
-              <div class="dice-face" id="dfc">⚀</div>
-            </div>
+            <div style="text-align:center;margin:8px 0"><div class="dice-face" id="dfc">⚀</div></div>
             <div id="dnm" style="font-family:Bebas Neue,sans-serif;font-size:34px;color:var(--g1);text-align:center;margin-bottom:8px;letter-spacing:2px">—</div>
             <button class="btn bg bfw" id="rb" onclick="doRoll()" style="font-size:13px" disabled>🎲 Lançar Dado</button>
           </div>
@@ -681,33 +665,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
     <div class="gopr" id="gopr">0 KZ</div>
     <div class="goa">
       <button class="btn bg blg" onclick="closeGO()">🏠 Início</button>
-      <button class="btn bgh blg" onclick="closeGO();openMd()">🔁 Jogar Novamente</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL -->
-<div class="mbg hidden" id="cmod">
-  <div class="md">
-    <h3>🎮 Nova Sala</h3>
-    <p>Escolhe a aposta e número de jogadores. Vencedor leva 90% do pote.</p>
-    <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Aposta</div>
-    <div class="bps" id="bps-m">
-      <div class="bp" onclick="mpb(this,1000)"><div class="bpa">1K</div><div class="bpl">Kz</div></div>
-      <div class="bp" onclick="mpb(this,5000)"><div class="bpa">5K</div><div class="bpl">Kz</div></div>
-      <div class="bp" onclick="mpb(this,10000)"><div class="bpa">10K</div><div class="bpl">Kz</div></div>
-      <div class="bp" onclick="mpb(this,50000)"><div class="bpa">50K</div><div class="bpl">VIP</div></div>
-    </div>
-    <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Jogadores</div>
-    <div class="nps" id="npl-m">
-      <div class="np on" onclick="mnp(this,2)"><div class="npa">2</div><div class="npl">jogadores</div></div>
-      <div class="np" onclick="mnp(this,3)"><div class="npa">3</div><div class="npl">jogadores</div></div>
-      <div class="np" onclick="mnp(this,4)"><div class="npa">4</div><div class="npl">jogadores</div></div>
-    </div>
-    <div class="errt" id="merr"></div>
-    <div class="mft">
-      <button class="btn bg" style="flex:1;font-size:13px" onclick="doCreate()">Criar Sala</button>
-      <button class="btn bgh bsm" onclick="closeMd()">Cancelar</button>
+      <button class="btn bgh blg" onclick="closeGO();pg('play')">🔁 Jogar Novamente</button>
     </div>
   </div>
 </div>
@@ -716,14 +674,13 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 <div class="mob-nav z">
   <button class="mnb" onclick="pg('home')"><span class="mnb-ic">🏠</span>Início</button>
   <button class="mnb" onclick="pg('wallet')"><span class="mnb-ic">💳</span>Carteira</button>
-  <button class="mnb" onclick="openMd()" style="color:var(--g1)"><span class="mnb-ic">🎮</span>Jogar</button>
+  <button class="mnb" onclick="pg('play')" style="color:var(--g1)"><span class="mnb-ic">🎮</span>Jogar</button>
   <button class="mnb" onclick="pg('profile')"><span class="mnb-ic">👤</span>Perfil</button>
 </div>
 
 <div class="tst" id="tst"></div>
 
 <script>
-/* PARTICLES */
 (function(){
   const c=document.getElementById("cvs"),x=c.getContext("2d");
   let pts=[];
@@ -748,32 +705,26 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
   })();
 })();
 
-/* STATE */
-let U=null,RID=null,SSE=null,SBh=0,SBm=0,NPh=2,NPm=2,LT=null;
+let U=null,RID=null,SSE=null,LT=null;
+let MM_BET=0,MM_PLAYERS=2;
 const fmt=n=>Number(n).toLocaleString("pt-AO");
 const fmtD=s=>new Date(s).toLocaleDateString("pt-AO",{day:"2-digit",month:"2-digit",year:"2-digit"});
-const CCSS=c=>c==="r"?"var(--R)":c==="g"?"var(--G)":c==="b"?"var(--B)":"var(--Y)";
-const CNAME={"r":"Vermelho","g":"Verde","b":"Azul","y":"Amarelo"};
 
 async function api(url,method="GET",body=null){
   const o={method,headers:{"Content-Type":"application/json"},credentials:"same-origin"};
   if(body)o.body=JSON.stringify(body);
-  try{
-    const r=await fetch(url,o);
-    return await r.json();
-  }catch(e){return{error:"Erro de ligação. Verifica a tua internet."};}
+  try{const r=await fetch(url,o);return await r.json();}
+  catch(e){return{error:"Erro de ligação."};}
 }
 
 /* JACKPOT */
 (function(){
   async function upd(){
-    try{
-      const d=await api("/api/jackpot");
-      const el=document.getElementById("jk-val");
-      if(el&&d.value)el.textContent=Math.floor(d.value).toLocaleString("pt-AO")+" KZ";
-    }catch(e){}
+    try{const d=await api("/api/jackpot");const el=document.getElementById("jk-val");if(el&&d.value)el.textContent=Math.floor(d.value).toLocaleString("pt-AO")+" KZ";}catch(e){}
   }
   upd();setInterval(upd,5000);
+  // Keep-alive para o Render não adormecer
+  setInterval(()=>{fetch('/api/jackpot').catch(()=>{});},600000);
 })();
 
 /* SSE */
@@ -787,35 +738,13 @@ function connectSSE(){
     const d=JSON.parse(e.data);
     toast("👥 "+d.name+" entrou! ("+d.players+"/"+d.max+")","tin");
     updateWaitSlots(d.players,d.max);
-    if(d.players>=2){const b=document.getElementById("btn-start-early");if(b)b.style.display="inline-flex";}
   });
-  SSE.addEventListener("chat_message",e=>{
-    const d=JSON.parse(e.data);
-    addChat(d.name,d.text,d.system||false);
-  });
-  SSE.addEventListener("deposit_approved",e=>{
-    const d=JSON.parse(e.data);
-    toast("✅ Depósito de "+fmt(d.amount)+" Kz confirmado!","tok");
-    if(U){U.balance=d.balance;updN();}
-  });
-  SSE.addEventListener("withdrawal_done",e=>{
-    const d=JSON.parse(e.data);
-    toast("💸 "+fmt(d.net)+" Kz enviados!","tin");
-  });
-  SSE.addEventListener("withdrawal_rejected",e=>{
-    const d=JSON.parse(e.data);
-    toast(d.msg||"Levantamento rejeitado. Saldo devolvido.","ter");
-    api("/api/me").then(r=>{if(r.user){U=r.user;updN();}});
-  });
-  SSE.addEventListener("balance_update",e=>{
-    const d=JSON.parse(e.data);
-    if(U){U.balance=d.balance;updN();}
-    if(d.msg)toast(d.msg,"tok");
-  });
-  SSE.addEventListener("support_reply",e=>{
-    const d=JSON.parse(e.data);
-    toast("💬 Suporte respondeu: "+d.reply.substring(0,60),"tin");
-  });
+  SSE.addEventListener("chat_message",e=>{const d=JSON.parse(e.data);addChat(d.name,d.text,d.system||false);});
+  SSE.addEventListener("deposit_approved",e=>{const d=JSON.parse(e.data);toast("✅ Depósito de "+fmt(d.amount)+" Kz confirmado!","tok");if(U){U.balance=d.balance;updN();}});
+  SSE.addEventListener("withdrawal_done",e=>{const d=JSON.parse(e.data);toast("💸 "+fmt(d.net)+" Kz enviados!","tin");});
+  SSE.addEventListener("withdrawal_rejected",e=>{const d=JSON.parse(e.data);toast(d.msg||"Levantamento rejeitado.","ter");api("/api/me").then(r=>{if(r.user){U=r.user;updN();}});});
+  SSE.addEventListener("balance_update",e=>{const d=JSON.parse(e.data);if(U){U.balance=d.balance;updN();}if(d.msg)toast(d.msg,"tok");});
+  SSE.addEventListener("support_reply",e=>{const d=JSON.parse(e.data);toast("💬 Suporte: "+d.reply.substring(0,60),"tin");});
   SSE.onerror=()=>setTimeout(connectSSE,4000);
 }
 
@@ -848,7 +777,7 @@ async function enviarOTP(){
   const pw=document.getElementById("rp").value;
   const err=document.getElementById("rerr");err.textContent="";
   if(!name){err.textContent="❌ Insere o teu nome.";return;}
-  if(!rawPhone){err.textContent="❌ Insere o número de telefone.";return;}
+  if(!rawPhone){err.textContent="❌ Insere o número.";return;}
   if(!pw||pw.length<6){err.textContent="❌ Senha mínima 6 caracteres.";return;}
   const phone="+244"+rawPhone;REG_PHONE=phone;
   const btn=document.getElementById("btn-send-otp");
@@ -856,8 +785,7 @@ async function enviarOTP(){
   const d=await api("/api/otp/send","POST",{phone,name,purpose:"register"});
   btn.disabled=false;btn.textContent="📱 Enviar Código SMS";
   if(d.error){err.textContent="❌ "+d.error;return;}
-  const ob=document.getElementById("op-badge");
-  if(ob)ob.textContent="📶 "+d.operadora;
+  const ob=document.getElementById("op-badge");if(ob)ob.textContent="📶 "+d.operadora;
   document.getElementById("reg-s1").classList.add("hidden");
   document.getElementById("reg-s2").classList.remove("hidden");
   document.getElementById("otp-msg").textContent=d.msg||"Código enviado para "+phone;
@@ -872,11 +800,7 @@ function iniciarTimerOTP(){
     const m=Math.floor(secs/60),s=secs%60;
     const el=document.getElementById("otp-timer");
     if(el)el.textContent=m+":"+(s<10?"0":"")+s;
-    if(secs<=0){
-      clearInterval(OTP_TIMER);
-      if(el){el.textContent="Expirado";el.style.color="var(--red)";}
-      document.getElementById("resend-btn").style.display="inline";
-    }
+    if(secs<=0){clearInterval(OTP_TIMER);if(el){el.textContent="Expirado";el.style.color="var(--red)";}document.getElementById("resend-btn").style.display="inline";}
   },1000);
 }
 
@@ -924,17 +848,9 @@ async function doLogout(){
   location.reload();
 }
 
-/* RESET */
 let RESET_PHONE="";
-function showReset(){
-  document.getElementById("fin").classList.add("hidden");
-  document.getElementById("fup").classList.add("hidden");
-  document.getElementById("frst").classList.remove("hidden");
-}
-function hideReset(){
-  document.getElementById("frst").classList.add("hidden");
-  document.getElementById("fin").classList.remove("hidden");
-}
+function showReset(){document.getElementById("fin").classList.add("hidden");document.getElementById("fup").classList.add("hidden");document.getElementById("frst").classList.remove("hidden");}
+function hideReset(){document.getElementById("frst").classList.add("hidden");document.getElementById("fin").classList.remove("hidden");}
 async function doResetReq(){
   const rawPhone=document.getElementById("rst-phone").value.trim().replace(/\s/g,"");
   const phone="+244"+rawPhone;RESET_PHONE=phone;
@@ -964,8 +880,9 @@ function showApp(){
   document.getElementById("s-app").classList.add("on");
   updN();pg("home");
 }
+
 function pg(name){
-  ["p-home","p-wait","p-wallet","p-profile"].forEach(id=>{
+  ["p-home","p-play","p-wait","p-wallet","p-profile"].forEach(id=>{
     const el=document.getElementById(id);if(el)el.style.display="none";
   });
   document.getElementById("s-game").style.display="none";
@@ -977,8 +894,9 @@ function pg(name){
   if(nb)nb.classList.add("on");
   if(name==="wallet")loadWallet();
   if(name==="profile")loadProfile();
-  if(name==="home"){updN();loadLobby();loadLeaderboard();loadPublicStats();}
+  if(name==="home"){updN();loadLeaderboard();loadPublicStats();}
 }
+
 function updN(){
   if(!U)return;
   document.getElementById("nbcl").textContent=fmt(U.balance)+" KZ";
@@ -993,7 +911,6 @@ function updN(){
   const rk=document.getElementById("prk");if(rk)rk.textContent=rank;
 }
 
-/* PUBLIC STATS */
 async function loadPublicStats(){
   try{
     const d=await api("/api/stats/public");
@@ -1005,7 +922,6 @@ async function loadPublicStats(){
   }catch(e){}
 }
 
-/* LEADERBOARD */
 async function loadLeaderboard(){
   const el=document.getElementById("lb");if(!el)return;
   el.innerHTML='<div class="empty">A carregar...</div>';
@@ -1014,102 +930,86 @@ async function loadLeaderboard(){
   if(!rows.length){el.innerHTML='<div class="empty">Sem dados ainda. Sê o primeiro!</div>';return;}
   const medals=["🥇","🥈","🥉"];
   el.innerHTML=`<div class="lb-head"><span style="width:32px">Pos</span><span style="width:36px"></span><span style="flex:1">Jogador</span><span>Vitórias</span><span style="min-width:100px;text-align:right">Ganhos</span></div>`+
-  rows.map((p,i)=>`
-    <div class="lbr">
-      <div class="lb-rank r${i+1}">${medals[i]||i+1}</div>
-      <div class="lb-av">${p.name[0].toUpperCase()}</div>
-      <div class="lb-nm">${p.name}</div>
-      <div class="lb-w">${p.wins}V</div>
-      <div class="lb-e" style="min-width:100px;text-align:right">${fmt(p.total_earned)} KZ</div>
-    </div>`).join("");
+  rows.map((p,i)=>`<div class="lbr"><div class="lb-rank r${i+1}">${medals[i]||i+1}</div><div class="lb-av">${p.name[0].toUpperCase()}</div><div class="lb-nm">${p.name}</div><div class="lb-w">${p.wins}V</div><div class="lb-e" style="min-width:100px;text-align:right">${fmt(p.total_earned)} KZ</div></div>`).join("");
 }
 
-/* LOBBY */
-async function loadLobby(){
-  const d=await api("/api/lobby");
-  const g=document.getElementById("rms"),e=document.getElementById("no-rms");
-  if(!d.rooms||!d.rooms.length){g.innerHTML="";e.classList.remove("hidden");return;}
-  e.classList.add("hidden");
-  const T={1000:["tbr","🥉 Bronze"],5000:["tsi","🥈 Prata"],10000:["tgo","🥇 Ouro"],50000:["tvip","👑 VIP"]};
-  g.innerHTML=d.rooms.map(r=>{
-    const[tc,tl]=T[r.bet]||["tbr","Bronze"];
-    const pr=Math.floor(r.bet*r.max*.90);
-    const full=r.players>=r.max;
-    return `<div class="room ${tc}" onclick="${!full?`joinRm("${r.id}",${r.bet})`:"void 0"}">
-      <div class="rb">
-        <div class="rt">${tl} · ${r.max} jogadores</div>
-        <div class="rv">${fmt(r.bet)}<small> Kz/jog.</small></div>
-        <div class="rp">💰 Prémio: ${fmt(pr)} Kz</div>
-        <div style="font-size:11px;color:var(--t3);margin-top:5px;font-weight:600">por ${r.host}</div>
-      </div>
-      <div class="rf">
-        <div class="rh">👥 ${r.players}/${r.max}</div>
-        <div class="rpill ${full?"pf":"pw"}">${full?"Cheia":"A aguardar"}</div>
-      </div>
-    </div>`;
-  }).join("");
-  clearTimeout(LT);
-  LT=setTimeout(()=>{if(document.getElementById("p-home")?.style.display!=="none")loadLobby();},7000);
+/* ── MATCHMAKING ────────────────────────────────────────────── */
+function mmBet(el,v){
+  MM_BET=v;
+  document.getElementById("bps-play").querySelectorAll(".bp").forEach(x=>x.classList.remove("on"));
+  el.classList.add("on");
+  const prize=Math.floor(v*MM_PLAYERS*0.90);
+  document.getElementById("mm-prize-info").textContent=
+    "💰 Prémio estimado: "+fmt(prize)+" Kz · Vencedor leva 90% do pote";
 }
 
-/* BET/PLAYER PICKS */
-function hpb(el,v){SBh=v;document.getElementById("bps-h").querySelectorAll(".bp").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
-function hnp(el,v){NPh=v;document.getElementById("npl-h").querySelectorAll(".np").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
-function mpb(el,v){SBm=v;document.getElementById("bps-m").querySelectorAll(".bp").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
-function mnp(el,v){NPm=v;document.getElementById("npl-m").querySelectorAll(".np").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
-function openMd(){document.getElementById("cmod").classList.remove("hidden");SBm=0;NPm=2;}
-function closeMd(){document.getElementById("cmod").classList.add("hidden");}
-
-async function createRm(){
-  const err=document.getElementById("herr");err.textContent="";
-  if(!SBh){err.textContent="❌ Escolhe um valor.";return;}
-  const d=await api("/api/room/create","POST",{bet:SBh,max_players:NPh});
-  if(d.error){err.textContent="❌ "+d.error;return;}
-  RID=d.room_id;showWait(RID,SBh,NPh);
-}
-async function doCreate(){
-  const err=document.getElementById("merr");err.textContent="";
-  if(!SBm){err.textContent="❌ Escolhe um valor.";return;}
-  const d=await api("/api/room/create","POST",{bet:SBm,max_players:NPm});
-  if(d.error){err.textContent="❌ "+d.error;return;}
-  closeMd();RID=d.room_id;showWait(RID,SBm,NPm);
+function mmPlayers(el,v){
+  MM_PLAYERS=v;
+  document.getElementById("nps-play").querySelectorAll(".np").forEach(x=>x.classList.remove("on"));
+  el.classList.add("on");
+  if(MM_BET>0){
+    const prize=Math.floor(MM_BET*v*0.90);
+    document.getElementById("mm-prize-info").textContent=
+      "💰 Prémio estimado: "+fmt(prize)+" Kz · Vencedor leva 90% do pote";
+  }
 }
 
-/* WAITING */
-function showWait(rid,bet,maxp){
-  clearTimeout(LT);
+async function doMatchmaking(){
+  const err=document.getElementById("mm-err");err.textContent="";
+  if(!MM_BET){err.textContent="❌ Escolhe o valor da aposta.";return;}
+  const btn=document.getElementById("btn-mm");
+  btn.disabled=true;btn.textContent="🔍 A procurar sala...";
+
+  // 1. Procura sala existente com o mesmo bet e max_players
+  const lobby=await api("/api/lobby");
+  let found=null;
+  if(lobby.rooms){
+    found=lobby.rooms.find(r=>r.bet===MM_BET&&r.max===MM_PLAYERS&&r.players<r.max);
+  }
+
+  if(found){
+    // Entrar na sala existente
+    const d=await api("/api/room/join","POST",{room_id:found.id});
+    btn.disabled=false;btn.textContent="🚀 Encontrar Partida";
+    if(d.error){err.textContent="❌ "+d.error;return;}
+    RID=found.id;
+    if(d.state&&d.state.started&&typeof onGameStarted==="function"){
+      onGameStarted(d.state);
+    } else {
+      showWait(found.id,MM_BET,MM_PLAYERS,d.state?.players||2);
+    }
+  } else {
+    // Criar nova sala
+    const d=await api("/api/room/create","POST",{bet:MM_BET,max_players:MM_PLAYERS});
+    btn.disabled=false;btn.textContent="🚀 Encontrar Partida";
+    if(d.error){err.textContent="❌ "+d.error;return;}
+    RID=d.room_id;
+    showWait(d.room_id,MM_BET,MM_PLAYERS,1);
+  }
+}
+
+function showWait(rid,bet,maxp,filled){
+  filled=filled||1;
   document.getElementById("wrid").textContent=rid;
   document.getElementById("wbet").textContent=fmt(bet)+" Kz";
   document.getElementById("wmaxp").textContent=maxp;
-  updateWaitSlots(1,maxp);
-  ["p-home","p-wallet","p-profile"].forEach(id=>document.getElementById(id).style.display="none");
+  updateWaitSlots(filled,maxp);
+  ["p-home","p-play","p-wallet","p-profile"].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display="none";
+  });
   document.getElementById("p-wait").style.display="flex";
 }
+
 function updateWaitSlots(filled,max){
   const el=document.getElementById("wslots");if(!el)return;
   let html="";
   for(let i=0;i<max;i++)html+=`<div class="ws ${i<filled?"on":""}">${i<filled?"✓":"?"}</div>`;
   el.innerHTML=html;
 }
+
 async function cancelWait(){
   if(RID)await api("/api/game/leave","POST",{room_id:RID});
-  RID=null;pg("home");
-}
-async function startEarly(){
-  if(!RID)return;
-  const d=await api("/api/room/start","POST",{room_id:RID});
-  if(d.error){toast(d.error,"ter");return;}
-  if(d.state&&typeof onGameStarted==="function")onGameStarted(d.state);
-}
-
-/* JOIN */
-async function joinRm(rid,bet){
-  if(!confirm("Entrar na sala? "+fmt(bet)+" Kz serão descontados."))return;
-  const d=await api("/api/room/join","POST",{room_id:rid});
-  if(d.error){toast("❌ "+d.error,"ter");return;}
-  RID=rid;
-  if(d.state&&d.state.started&&typeof onGameStarted==="function")onGameStarted(d.state);
-  else showWait(rid,d.state?.bet||bet,d.state?.max_p||2);
+  RID=null;pg("play");
 }
 
 /* GAME OVER */
@@ -1205,7 +1105,7 @@ async function loadProfile(){
   if(!U)return;
   document.getElementById("pav").textContent=U.name[0].toUpperCase();
   document.getElementById("pnm").textContent=U.name;
-  document.getElementById("pem").textContent=U.phone||U.email||"";
+  document.getElementById("pem").textContent=U.phone||"";
   if(U.express_number)document.getElementById("exp-num").value=U.express_number;
   document.getElementById("sg2").textContent=U.games_played||0;
   document.getElementById("sw").textContent=U.wins||0;
@@ -1237,13 +1137,7 @@ async function loadDaily(){
   const btn=document.getElementById("btn-daily");
   const sd=document.getElementById("streak-days");
   if(!el)return;
-  if(sd){
-    sd.innerHTML=BONUSES.map((v,i)=>`
-      <div class="sd ${i<(d.streak||0)?"done":""}">
-        <div class="sd-day">${DAYS[i]}</div>
-        <div class="sd-val">${v>=1000?(v/1000)+"K":v}</div>
-      </div>`).join("");
-  }
+  if(sd){sd.innerHTML=BONUSES.map((v,i)=>`<div class="sd ${i<(d.streak||0)?"done":""}"><div class="sd-day">${DAYS[i]}</div><div class="sd-val">${v>=1000?(v/1000)+"K":v}</div></div>`).join("");}
   if(d.claimed){
     el.innerHTML="✅ Recebido! Volta amanhã · Streak: <strong style='color:var(--g1)'>"+(d.streak||0)+"/7</strong>";
     if(btn){btn.disabled=true;btn.textContent="✓ Recebido hoje";}
@@ -1296,7 +1190,7 @@ function shareRef(){
   const link=el.dataset.link||el.textContent;
   const msg="Joga Ludo e ganha Kwanzas! Regista-te no LudoKz com o meu link e ganha 500 Kz de bónus: "+link;
   if(navigator.share){navigator.share({title:"LudoKz",text:msg,url:link});}
-  else{navigator.clipboard.writeText(msg).catch(()=>{});toast("Link copiado para partilhar!","tin");}
+  else{navigator.clipboard.writeText(msg).catch(()=>{});toast("Link copiado!","tin");}
 }
 
 /* SUPORTE */
@@ -1306,7 +1200,7 @@ async function sendSupport(){
   if(!msg||msg.length<5){toast("❌ Mensagem muito curta.","ter");return;}
   const d=await api("/api/support/ticket","POST",{message:msg});
   if(d.error){toast("❌ "+d.error,"ter");return;}
-  ok.textContent="✅ Mensagem enviada! Responderemos em breve.";
+  ok.textContent="✅ Mensagem enviada!";
   document.getElementById("sup-msg").value="";loadTickets();
 }
 async function loadTickets(){
@@ -1315,12 +1209,7 @@ async function loadTickets(){
   const tkts=d.tickets||[];
   if(!tkts.length){el.innerHTML="";return;}
   el.innerHTML='<div style="font-size:11px;font-weight:800;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px">Os teus pedidos</div>'+
-    tkts.map(t=>`
-      <div class="tkt">
-        <div style="color:var(--t2);font-weight:600">${t.message}</div>
-        ${t.reply?`<div style="color:var(--jade);margin-top:7px;font-weight:700">💬 Resposta: ${t.reply}</div>`:""}
-        <div style="font-size:11px;color:var(--t3);margin-top:5px">${fmtD(t.created_at)} · <span style="color:${t.status==="closed"?"var(--jade)":"var(--orange)"}">${t.status==="closed"?"✅ Respondido":"⏳ Aguarda"}</span></div>
-      </div>`).join("");
+    tkts.map(t=>`<div class="tkt"><div style="color:var(--t2);font-weight:600">${t.message}</div>${t.reply?`<div style="color:var(--jade);margin-top:7px;font-weight:700">💬 Resposta: ${t.reply}</div>`:""}<div style="font-size:11px;color:var(--t3);margin-top:5px">${fmtD(t.created_at)} · <span style="color:${t.status==="closed"?"var(--jade)":"var(--orange)"}">${t.status==="closed"?"✅ Respondido":"⏳ Aguarda"}</span></div></div>`).join("");
 }
 
 /* EFFECTS */
@@ -1341,12 +1230,50 @@ function showFlash(emoji){
   document.body.appendChild(el);setTimeout(()=>el.remove(),1000);
 }
 
-/* TOAST */
 function toast(msg,cls="tin"){
   const el=document.getElementById("tst");
   el.textContent=msg;el.className=`tst show ${cls}`;
   setTimeout(()=>el.classList.remove("show"),3600);
 }
+
+/* GAME FUNCTIONS (usadas pelo game_patch.js) */
+window.leaveGame=async function(){
+  if(!confirm("Abandonar? Perdes a aposta."))return;
+  if(RID){await api("/api/game/leave","POST",{room_id:RID});}
+  RID=null;pg("home");
+};
+
+window.doRoll=async function(){
+  if(!RID)return;
+  const rb=document.getElementById("rb");if(rb)rb.disabled=true;
+  const faceEl=document.getElementById("dfc");if(faceEl)faceEl.classList.add("rolling");
+  const d=await api("/api/game/roll","POST",{room_id:RID});
+  if(faceEl)faceEl.classList.remove("rolling");
+  if(d.error){toast("❌ "+d.error,"ter");return;}
+  if(window.BOARD){
+    window.BOARD.animateDice(d.dice,async function(){
+      if(typeof window.renderState==="function")window.renderState(d);
+      const mv=await api("/api/game/movable","POST",{room_id:RID});
+      if(mv.movable&&mv.movable.length&&typeof window.highlightPcs==="function")window.highlightPcs(mv.movable);
+    });
+  }else{
+    const faces=["⚀","⚁","⚂","⚃","⚄","⚅"];
+    if(faceEl)faceEl.textContent=faces[d.dice-1];
+    const dnm=document.getElementById("dnm");if(dnm)dnm.textContent=d.dice;
+    if(typeof window.renderState==="function")window.renderState(d);
+  }
+};
+
+window.movePc=async function(idx){
+  if(!RID)return;
+  window.PREV_STATE=window.CUR_STATE?JSON.parse(JSON.stringify(window.CUR_STATE)):null;
+  const d=await api("/api/game/move","POST",{room_id:RID,piece:idx});
+  if(d.error){toast("❌ "+d.error,"ter");return;}
+  if(window.PREV_STATE&&window.BOARD&&typeof window._triggerMoveAnimations==="function")
+    window._triggerMoveAnimations(window.PREV_STATE,d);
+  window.PREV_STATE=window.CUR_STATE;
+  if(typeof window.renderState==="function")window.renderState(d);
+};
 
 /* INIT */
 (async()=>{
@@ -1355,7 +1282,6 @@ function toast(msg,cls="tin"){
 })();
 </script>
 
-<!-- Scripts do jogo — carregados por último, substituem as funções de jogo -->
 <script src="/static/ludo_board.js"></script>
 <script src="/static/game_patch.js"></script>
 <script src="/static/godot_bridge.js"></script>
