@@ -19,24 +19,15 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{font-family:"Plus Jakarta Sans",sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;overflow-x:hidden;cursor:default}
-
-/* ─── NOISE TEXTURE ─── */
 body::before{content:"";position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
-
-/* ─── AURORA BG ─── */
 .aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .aurora-blob{position:absolute;border-radius:50%;filter:blur(80px);animation:drift linear infinite}
 @keyframes drift{0%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-20px) scale(1.05)}66%{transform:translate(-20px,15px) scale(.97)}100%{transform:translate(0,0) scale(1)}}
-
-/* ─── CANVAS ─── */
 #cvs{position:fixed;inset:0;z-index:0;pointer-events:none}
-
 .z{position:relative;z-index:2}
 .hidden{display:none!important}
 .screen{display:none;min-height:100vh;flex-direction:column;position:relative;z-index:2}
 .screen.on{display:flex}
-
-/* ═══ BUTTONS ═══ */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:12px;font-family:"Plus Jakarta Sans",sans-serif;font-weight:800;cursor:pointer;transition:all .18s cubic-bezier(.34,1.56,.64,1);letter-spacing:.3px;position:relative;overflow:hidden}
 .btn::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);opacity:0;transition:opacity .2s}
 .btn:hover::after{opacity:1}
@@ -57,8 +48,6 @@ body::before{content:"";position:fixed;inset:0;background-image:url("data:image/
 .bfw{width:100%}
 .btn:disabled{opacity:.35;cursor:not-allowed;transform:none!important;box-shadow:none!important}
 .btn:disabled::after{display:none}
-
-/* ═══ INPUTS ═══ */
 .fl{margin-bottom:15px}
 .fl label{display:block;font-size:11px;font-weight:800;color:var(--t3);margin-bottom:6px;letter-spacing:2px;text-transform:uppercase}
 .fl input,.fl select,.fl textarea{width:100%;padding:13px 16px;background:rgba(255,255,255,.04);border:1.5px solid var(--rim);border-radius:11px;color:var(--t1);font-family:"Plus Jakarta Sans",sans-serif;font-size:15px;font-weight:600;outline:none;transition:all .22s}
@@ -67,8 +56,6 @@ body::before{content:"";position:fixed;inset:0;background-image:url("data:image/
 .fl select option{background:#141030}
 .errt{color:var(--red);font-size:12px;font-weight:700;min-height:18px;margin-top:4px;display:flex;align-items:center;gap:5px}
 .okt{color:var(--jade);font-size:12px;font-weight:700;min-height:18px;margin-top:4px}
-
-/* ═══ NAV ═══ */
 nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(180%);border-bottom:1px solid rgba(245,197,24,.08);display:flex;align-items:center;padding:0 24px;gap:16px;position:sticky;top:0;z-index:200}
 .logo{display:flex;flex-direction:column;cursor:pointer}
 .logo-main{font-family:"Bebas Neue",sans-serif;font-size:28px;letter-spacing:3px;background:linear-gradient(135deg,var(--g4),var(--g2),var(--g1));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1;filter:drop-shadow(0 0 12px rgba(245,197,24,.5))}
@@ -82,8 +69,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .avt{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--blue));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;cursor:pointer;border:2px solid var(--rim2);transition:all .2s;font-family:"Bebas Neue",sans-serif}
 .avt:hover{border-color:var(--g1);transform:scale(1.05)}
 @media(max-width:580px){.nmenu{display:none}}
-
-/* ═══ AUTH PAGE ═══ */
 #s-auth{align-items:center;justify-content:center;padding:28px 16px;min-height:100vh}
 .auth-wrap{width:100%;max-width:420px}
 .auth-brand{text-align:center;margin-bottom:28px}
@@ -101,8 +86,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .auth-note{text-align:center;margin-top:13px;font-size:12px;color:var(--t3);font-weight:600}
 .reset-link{color:var(--g1);cursor:pointer;font-weight:800;font-size:12px;text-decoration:none}
 .reset-link:hover{text-decoration:underline}
-
-/* ═══ HOME ═══ */
 .jk-banner{background:linear-gradient(135deg,rgba(245,197,24,.12),rgba(255,159,10,.08));border-bottom:1px solid rgba(245,197,24,.12);padding:12px 24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}
 .jk-label{font-size:11px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase}
 .jk-val{font-family:"Bebas Neue",sans-serif;font-size:28px;color:var(--g1);letter-spacing:2px;filter:drop-shadow(0 0 8px rgba(245,197,24,.5));animation:jkpulse 2s ease-in-out infinite}
@@ -239,8 +222,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .scv{font-family:"Bebas Neue",sans-serif;font-size:26px;letter-spacing:.5px}
 .scl{font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:4px;font-weight:700}
 #s-game{background:linear-gradient(160deg,var(--bg),var(--bg1),var(--bg2));padding:14px;min-height:100vh}
-.gw{max-width:1000px;margin:0 auto;width:100%}
-.gtp{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .pc{display:flex;align-items:center;gap:10px;background:var(--c1);border:1.5px solid var(--rim);border-radius:14px;padding:11px 16px;min-width:185px;transition:all .25s}
 .pc.mt{border-color:var(--g1);box-shadow:0 0 24px rgba(245,197,24,.18),inset 0 1px 0 rgba(245,197,24,.1)}
 .pdot{width:13px;height:13px;border-radius:50%;flex-shrink:0}
@@ -249,49 +230,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .gmid{text-align:center}
 .ttx{font-size:12px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:.5px}
 .rtx{font-size:11px;color:var(--t3);margin-top:2px;font-family:"Bebas Neue",sans-serif;letter-spacing:1px}
-.gly{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
-.bouter{background:linear-gradient(135deg,#e8e4f0,#ddd8f2);border-radius:14px;padding:6px;box-shadow:0 0 70px rgba(0,0,0,.75),0 0 35px rgba(93,68,209,.2),inset 0 2px 0 rgba(255,255,255,.4);flex-shrink:0;position:relative}
-.bouter::before{content:"";position:absolute;inset:-3px;border-radius:17px;background:linear-gradient(135deg,rgba(245,197,24,.5),rgba(191,90,242,.3),rgba(245,197,24,.5));z-index:-1}
-.ludo{display:grid;grid-template-columns:repeat(15,1fr);width:min(460px,calc(100vw - 30px));height:min(460px,calc(100vw - 30px));border-radius:9px;overflow:hidden}
-.c{display:flex;align-items:center;justify-content:center;position:relative;border:.25px solid rgba(0,0,0,.1)}
-.cr{background:#e53935}.cg{background:#43a047}.cb{background:#1565c0}.cy{background:#f9a825}
-.ci{background:#fafafa}.cw{background:#fff}
-.hpr{background:#ef9a9a}.hpg{background:#a5d6a7}.hpb{background:#90caf9}.hpy{background:#fff59d}
-.tr{background:#e53935}.tg{background:#43a047}.tb{background:#1565c0}.ty{background:#f9a825}
-.ch{background:#fff}.ch::after{content:"★";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.65);color:rgba(0,0,0,.1);pointer-events:none;line-height:1}
-.sf{background:#fff}.sf::after{content:"☆";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.52);color:rgba(0,0,0,.18);pointer-events:none;line-height:1}
-.ar::after{content:"→";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.5);color:#e53935;font-weight:900;pointer-events:none}
-.ag::after{content:"↓";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.5);color:#43a047;font-weight:900;pointer-events:none}
-.ab::after{content:"←";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.5);color:#1565c0;font-weight:900;pointer-events:none}
-.ay::after{content:"↑";position:absolute;font-size:calc(min(460px,100vw - 30px)/15*.5);color:#f9a825;font-weight:900;pointer-events:none}
-.piece{position:absolute;width:66%;height:66%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:calc(min(460px,100vw - 30px)/15*.28);font-weight:700;cursor:pointer;z-index:5;transition:all .22s;border:2px solid rgba(255,255,255,.9);font-family:"Bebas Neue",sans-serif;letter-spacing:0}
-.p-r{background:radial-gradient(circle at 38% 32%,#ff8a80,#b71c1c);box-shadow:0 2px 10px rgba(183,28,28,.6)}
-.p-g{background:radial-gradient(circle at 38% 32%,#c8e6c9,#1b5e20);box-shadow:0 2px 10px rgba(27,94,32,.5)}
-.p-b{background:radial-gradient(circle at 38% 32%,#bbdefb,#0d47a1);box-shadow:0 2px 10px rgba(13,71,161,.5)}
-.p-y{background:radial-gradient(circle at 38% 32%,#fff9c4,#e65100);box-shadow:0 2px 10px rgba(230,81,0,.5)}
-.piece.sel{animation:pglow .45s ease-in-out infinite alternate}
-@keyframes piece-move{0%{transform:scale(1) translateY(0)}30%{transform:scale(1.4) translateY(-8px)}60%{transform:scale(1.1) translateY(-3px)}100%{transform:scale(1) translateY(0)}}
-.piece-moving{animation:piece-move .45s cubic-bezier(.34,1.56,.64,1) forwards!important}
-@keyframes piece-captured{0%{transform:scale(1);opacity:1}40%{transform:scale(1.8);opacity:.8}100%{transform:scale(0);opacity:0}}
-.piece-captured{animation:piece-captured .4s ease-in forwards!important}
-@keyframes piece-finish{0%{transform:scale(1) rotate(0deg)}25%{transform:scale(1.5) rotate(90deg)}50%{transform:scale(1.8) rotate(180deg)}75%{transform:scale(1.3) rotate(270deg)}100%{transform:scale(1) rotate(360deg)}}
-.piece-finish{animation:piece-finish .7s cubic-bezier(.34,1.56,.64,1) forwards!important}
-@keyframes dice-roll{0%{transform:rotateX(0) rotateY(0) scale(1)}25%{transform:rotateX(180deg) rotateY(90deg) scale(1.2)}50%{transform:rotateX(360deg) rotateY(180deg) scale(.9)}75%{transform:rotateX(270deg) rotateY(270deg) scale(1.1)}100%{transform:rotateX(360deg) rotateY(360deg) scale(1)}}
-.dice-rolling-3d{animation:dice-roll .6s cubic-bezier(.34,1.56,.64,1) forwards!important}
-@keyframes turn-pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,197,24,.5)}50%{box-shadow:0 0 0 10px rgba(245,197,24,0)}}
-.my-turn-glow{animation:turn-pulse 1.2s ease-in-out infinite}
-@keyframes safe-glow{0%,100%{background:#fff}50%{background:rgba(255,214,0,.25)}}
-@keyframes selectable-bounce{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.15) translateY(-4px)}}
-.piece.sel{animation:selectable-bounce .6s ease-in-out infinite!important}
-@keyframes base-blink{0%,100%{opacity:1;filter:brightness(1)}50%{opacity:.7;filter:brightness(1.5)}}
-@keyframes trail-fade{0%{opacity:.7;transform:scale(.6)}100%{opacity:0;transform:scale(1.4)}}
-.trail-dot{position:absolute;width:50%;height:50%;border-radius:50%;pointer-events:none;z-index:4;animation:trail-fade .5s ease-out forwards}
-@keyframes star-burst{0%{transform:translate(-50%,-50%) scale(0) rotate(0);opacity:1}100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1) rotate(var(--rot));opacity:0}}
-.star-particle{position:fixed;font-size:22px;z-index:998;pointer-events:none;animation:star-burst .9s ease-out forwards}
-.dice-face{transition:transform .1s;perspective:200px}
-.cell-exact{animation:safe-glow 1s ease-in-out infinite}
-@keyframes pglow{from{box-shadow:0 0 4px rgba(255,255,255,.4);transform:scale(1)}to{box-shadow:0 0 20px #fff,0 0 10px var(--g1);transform:scale(1.18)}}
-.gsd{display:flex;flex-direction:column;gap:13px;min-width:205px;max-width:260px;flex:1}
 .gcd{background:var(--c1);border:1px solid var(--rim);border-radius:16px;padding:18px}
 .btd{background:linear-gradient(135deg,rgba(245,197,24,.12),rgba(245,197,24,.06));border:1px solid rgba(245,197,24,.2);border-radius:11px;padding:10px 16px;text-align:center;margin-bottom:14px}
 .bdl{font-size:10px;font-weight:800;color:var(--g1);letter-spacing:2px;text-transform:uppercase}
@@ -299,7 +237,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .dice-face{font-size:60px;text-align:center;line-height:1;margin:8px 0;display:block;filter:drop-shadow(0 0 10px rgba(245,197,24,.5));transition:all .15s}
 .dice-face.rolling{animation:dr .08s steps(1) infinite}
 @keyframes dr{0%{opacity:.3}50%{opacity:1}}
-.dice-num{font-family:"Bebas Neue",sans-serif;font-size:36px;color:var(--g1);text-align:center;margin-bottom:11px;letter-spacing:2px;filter:drop-shadow(0 0 12px rgba(245,197,24,.5))}
 .chat-wrap{background:var(--c1);border:1px solid var(--rim);border-radius:16px;overflow:hidden}
 .chat-head{padding:11px 15px;border-bottom:1px solid var(--rim);font-size:11px;font-weight:800;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;display:flex;justify-content:space-between}
 .chat-msgs{height:150px;overflow-y:auto;padding:10px 13px;font-size:12px;display:flex;flex-direction:column;gap:6px}
@@ -315,8 +252,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .chat-send{background:var(--g1);color:#0a0800;border:none;border-radius:8px;padding:7px 14px;font-weight:800;cursor:pointer;font-size:13px;font-family:"Plus Jakarta Sans",sans-serif;transition:all .15s}
 .chat-send:hover{background:var(--g2)}
 .glog-wrap{max-height:150px;overflow-y:auto;font-size:12px}
-.glog-wrap::-webkit-scrollbar{width:3px}
-.glog-wrap::-webkit-scrollbar-thumb{background:var(--rim2);border-radius:3px}
 .gli{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);color:var(--t2);line-height:1.45;font-weight:600}
 .gli:last-child{border:none}
 .gli-w{color:var(--jade)!important}.gli-d{color:var(--red)!important}
@@ -351,11 +286,12 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .promo-inp{flex:1;padding:11px 14px;background:rgba(255,255,255,.04);border:1.5px solid var(--rim);border-radius:11px;color:var(--t1);font-family:"Plus Jakarta Sans",sans-serif;font-size:15px;font-weight:700;outline:none;transition:all .2s;text-transform:uppercase;letter-spacing:1px}
 .promo-inp:focus{border-color:var(--g1);background:rgba(255,255,255,.07)}
 .promo-inp::placeholder{text-transform:none;letter-spacing:0;font-weight:500}
+@keyframes my-turn-pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,197,24,.5)}50%{box-shadow:0 0 0 10px rgba(245,197,24,0)}}
+.my-turn-glow{animation:my-turn-pulse 1.2s ease-in-out infinite}
 </style>
 </head>
 <body>
 
-<!-- AURORA -->
 <div class="aurora">
   <div class="aurora-blob" style="width:600px;height:600px;background:rgba(93,68,209,.08);top:-200px;left:-100px;animation-duration:25s"></div>
   <div class="aurora-blob" style="width:500px;height:500px;background:rgba(245,197,24,.05);top:30%;right:-150px;animation-duration:20s;animation-delay:-8s"></div>
@@ -363,7 +299,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 </div>
 <canvas id="cvs"></canvas>
 
-<!-- ══════ AUTH ══════ -->
+<!-- AUTH -->
 <div id="s-auth" class="screen on z">
   <div class="auth-wrap">
     <div class="auth-brand">
@@ -382,8 +318,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <div class="tab on" onclick="atab('in')">Entrar</div>
         <div class="tab" onclick="atab('up')">Criar Conta</div>
       </div>
-
-      <!-- ═══ LOGIN ═══ -->
       <div id="fin">
         <div class="fl">
           <label>Número de Telefone Angola</label>
@@ -400,8 +334,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <a class="reset-link" onclick="showReset()">Recuperar</a>
         </div>
       </div>
-
-      <!-- ═══ REGISTER — Multi-step ═══ -->
       <div id="fup" class="hidden">
         <div id="reg-s1">
           <div class="fl"><label>Nome Completo</label><input id="rn" placeholder="O teu nome completo"></div>
@@ -418,7 +350,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <div class="errt" id="rerr"></div>
           <button class="btn bg bfw" id="btn-send-otp" onclick="enviarOTP()" style="font-size:14px">📱 Enviar Código SMS</button>
         </div>
-
         <div id="reg-s2" class="hidden">
           <div style="text-align:center;margin-bottom:16px">
             <div style="font-size:32px;margin-bottom:8px">📱</div>
@@ -439,7 +370,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <button class="btn bg bfw" onclick="verificarOTP()" style="font-size:14px">✓ Verificar Código</button>
           <button class="btn bgh bsm" onclick="voltarStep1()" style="width:100%;margin-top:8px;font-size:13px">← Voltar</button>
         </div>
-
         <div id="reg-s3" class="hidden">
           <div style="text-align:center;margin-bottom:18px">
             <div style="font-size:36px;margin-bottom:8px">✅</div>
@@ -457,32 +387,21 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <div id="terms-section" class="hidden">
             <div style="background:rgba(255,255,255,.03);border:1px solid var(--rim);border-radius:11px;padding:14px;max-height:160px;overflow-y:auto;font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:14px" id="terms-text">
               <strong style="color:var(--g1);font-size:13px">TERMOS E CONDIÇÕES — LUDOKZ</strong><br><br>
-              <strong>1. Elegibilidade</strong><br>
-              Só podem jogar pessoas com 18 ou mais anos. Ao registares-te declaras ter essa idade.<br><br>
-              <strong>2. Apostas e Pagamentos</strong><br>
-              Todas as apostas são em Kwanzas Angolanos (Kz). Os pagamentos são processados via Express Card ou Unitel Money. O LudoKz retém 10% de comissão sobre ganhos.<br><br>
-              <strong>3. Jogo Responsável</strong><br>
-              O LudoKz promove o jogo responsável. Se sentires que tens problemas com o jogo, contacta o nosso suporte.<br><br>
-              <strong>4. Política de Privacidade</strong><br>
-              Os teus dados pessoais (nome, número de telefone) são usados exclusivamente para gerir a tua conta e processar pagamentos. Não partilhamos com terceiros.<br><br>
-              <strong>5. Segurança</strong><br>
-              Não partilhes a tua senha ou código SMS com ninguém. O LudoKz nunca te pedirá estes dados por telefone.<br><br>
-              <strong>6. Proibições</strong><br>
-              É proibido criar múltiplas contas, usar bots ou manipular jogos. Infractores serão banidos permanentemente.<br><br>
-              <strong>7. Contacto</strong><br>
-              Suporte disponível dentro da plataforma através do chat de suporte.
+              <strong>1. Elegibilidade</strong><br>Só podem jogar pessoas com 18 ou mais anos.<br><br>
+              <strong>2. Apostas e Pagamentos</strong><br>Todas as apostas são em Kwanzas Angolanos (Kz). O LudoKz retém 10% de comissão sobre ganhos.<br><br>
+              <strong>3. Jogo Responsável</strong><br>O LudoKz promove o jogo responsável.<br><br>
+              <strong>4. Política de Privacidade</strong><br>Os teus dados são usados exclusivamente para gerir a tua conta.<br><br>
+              <strong>5. Proibições</strong><br>É proibido criar múltiplas contas ou usar bots. Infractores serão banidos.
             </div>
             <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:14px">
               <input type="checkbox" id="terms-check" style="width:18px;height:18px;margin-top:2px;accent-color:var(--g1)">
-              <span style="font-size:13px;color:var(--t2);line-height:1.5">Li e aceito os <span style="color:var(--g1);font-weight:700">Termos e Condições</span> e a <span style="color:var(--g1);font-weight:700">Política de Privacidade</span></span>
+              <span style="font-size:13px;color:var(--t2);line-height:1.5">Li e aceito os <span style="color:var(--g1);font-weight:700">Termos e Condições</span></span>
             </label>
             <div class="errt" id="terms-err"></div>
             <button class="btn bg bfw" onclick="doReg()" style="font-size:15px">🎮 Criar Conta</button>
           </div>
         </div>
       </div>
-
-      <!-- ═══ RESET SENHA ═══ -->
       <div id="frst" class="hidden">
         <div id="rst1">
           <div style="text-align:center;margin-bottom:14px;font-size:13px;color:var(--t2)">Vamos enviar um código SMS para repor a tua senha.</div>
@@ -512,7 +431,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
   </div>
 </div>
 
-<!-- ══════ APP ══════ -->
+<!-- APP -->
 <div id="s-app" class="screen z" style="flex-direction:column">
   <nav>
     <div class="logo" onclick="pg('home')">
@@ -562,7 +481,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
       <div id="no-rms" class="empty hidden">Sem salas. Cria a primeira!</div>
       <h2 class="sh">⚡ Criar Sala</h2>
       <div class="wc" style="max-width:400px">
-        <!-- FIX 1: 95% → 90% -->
         <p style="font-size:13px;color:var(--t2);margin-bottom:14px;font-weight:600;line-height:1.65">Vencedor recebe <strong style="color:var(--jade)">90%</strong> do total apostado.</p>
         <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Aposta por Jogador</div>
         <div class="bps" id="bps-h">
@@ -612,7 +530,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <div class="bln" id="wbn">0</div>
         <div class="blc">Kwanzas (Kz)</div>
       </div>
-
       <div class="daily-card">
         <h3>🎁 Bónus Diário</h3>
         <div id="daily-status" style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.8;margin-bottom:10px">A carregar...</div>
@@ -620,10 +537,8 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <button class="btn bg bfw" id="btn-daily" onclick="claimDaily()" style="font-size:13px;margin-top:6px">🎁 Receber Bónus</button>
         <p class="pnote">Entra todos os dias e sobe o streak! Dia 7 = 5.000 Kz</p>
       </div>
-
       <div class="wc" style="margin-bottom:16px">
         <h3>🎟️ Código Promo</h3>
-        <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6">Tens um código promocional? Usa aqui!</p>
         <div class="promo-row">
           <input class="promo-inp" id="promo-inp" placeholder="Ex: ANGOLA2025" onkeydown="if(event.key==='Enter')usePromo()">
           <button class="btn bg bsm" onclick="usePromo()">Usar</button>
@@ -631,13 +546,10 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <div class="errt" id="promo-err"></div>
         <div class="okt" id="promo-ok"></div>
       </div>
-
       <div class="exb">
         <h4>📲 Depositar — Express Card</h4>
-        <ul class="exl">
-          <li>Transfere para o número da plataforma:</li>
-        </ul>
-        <div class="exn" id="plat-exp">{{ platform_express }}</div>
+        <ul class="exl"><li>Transfere para o número da plataforma:</li></ul>
+        <div class="exn" id="plat-exp">922 745 946</div>
         <ul class="exl">
           <li>Escreve o teu nome na descrição</li>
           <li>Copia a referência e submete abaixo</li>
@@ -659,8 +571,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         </div>
         <div class="wc">
           <h3>⬇️ Levantar</h3>
-          <!-- FIX 3: Taxa 5% → Taxa 10% e Mínimo 10.000 Kz → 1.000 Kz -->
-          <div class="alrt"><strong>Taxa 10%</strong> · Mínimo 1.000 Kz<br>Verificação de nome obrigatória</div>
+          <div class="alrt"><strong>Taxa 10%</strong> · Mínimo 1.000 Kz</div>
           <div class="fl"><label>Nº Express Card</label><input id="wnum" placeholder="9XX XXX XXX"></div>
           <div class="fl"><label>Nome da Conta</label><input id="wacname" placeholder="Nome exacto da conta"></div>
           <div class="fl"><label>Valor (Kz)</label><input type="number" id="wv" placeholder="1000" min="1000" oninput="wprev()"></div>
@@ -669,7 +580,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <button class="btn bpu bfw" onclick="doWithdraw()" style="font-size:13px">Solicitar Levantamento</button>
         </div>
       </div>
-
       <div class="ref-card">
         <h3>👥 Referidos</h3>
         <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6;margin-bottom:12px">Convida amigos — ganha <strong style="color:var(--jade)">500 Kz</strong> por cada um!</p>
@@ -680,16 +590,13 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         </div>
         <div id="ref-count" style="font-size:12px;color:var(--t3);margin-top:10px;font-weight:600"></div>
       </div>
-
       <div class="sup-card">
         <h3>💬 Suporte</h3>
-        <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6;margin-bottom:12px">Tens um problema? Envia-nos uma mensagem.</p>
         <div class="fl" style="margin-bottom:9px"><label>Mensagem</label><textarea id="sup-msg" rows="3" placeholder="Descreve o teu problema..."></textarea></div>
         <button class="btn bpu bfw" onclick="sendSupport()" style="font-size:13px">Enviar</button>
         <div class="okt" id="sup-ok" style="margin-top:7px"></div>
         <div id="tkts-list" style="margin-top:14px"></div>
       </div>
-
       <h2 class="sh" style="margin-top:4px">📋 Depósitos</h2>
       <div class="txp"><div class="txh"><span>Referência</span><span>Estado</span></div><div id="dep-lst"></div></div>
       <br>
@@ -714,7 +621,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <h3 style="font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:1px;color:var(--g1);margin-bottom:12px">📲 Número Express</h3>
         <div class="fl" style="margin-bottom:9px"><label>Número</label><input id="exp-num" placeholder="9XX XXX XXX"></div>
         <button class="btn bj bsm" onclick="saveExp()">Guardar</button>
-        <p class="pnote">Usado automaticamente nos levantamentos</p>
       </div>
       <div class="sg">
         <div class="sc"><div class="scv" id="sg2" style="color:#00e5ff">0</div><div class="scl">Partidas</div></div>
@@ -735,17 +641,15 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
       <div id="player-cards" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;justify-content:center"></div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;align-items:flex-start">
         <div style="position:relative;flex-shrink:0">
-          <canvas id="ludo-canvas" style="border-radius:12px;box-shadow:0 0 60px rgba(0,0,0,.8),0 0 30px rgba(93,68,209,.2);display:block;max-width:min(460px,calc(100vw - 30px));max-height:min(460px,calc(100vw - 30px))"></canvas>
+          <canvas id="ludo-canvas" style="border-radius:12px;box-shadow:0 0 60px rgba(0,0,0,.8);display:block;max-width:min(460px,calc(100vw - 30px));max-height:min(460px,calc(100vw - 30px))"></canvas>
         </div>
         <div style="display:flex;flex-direction:column;gap:11px;min-width:190px;max-width:240px;flex:1">
           <div class="gcd">
             <div class="btd"><div class="bdl">Aposta</div><div class="bdv" id="gbv">0 KZ</div></div>
-            <div id="dice-container" style="display:flex;justify-content:center;align-items:center;margin:8px 0;perspective:200px">
-              <div id="dice-3d" style="width:64px;height:64px;position:relative;transform-style:preserve-3d;transition:transform .1s;cursor:pointer" onclick="doRoll()">
-                <div style="position:absolute;inset:0;background:linear-gradient(135deg,#fff8e1,#fff);border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:40px" id="dfc">⚀</div>
-              </div>
+            <div style="text-align:center;margin:8px 0">
+              <div class="dice-face" id="dfc">⚀</div>
             </div>
-            <div id="dnm" style="font-family:Bebas Neue,sans-serif;font-size:34px;color:var(--g1);text-align:center;margin-bottom:8px;letter-spacing:2px;filter:drop-shadow(0 0 8px rgba(245,197,24,.5))">—</div>
+            <div id="dnm" style="font-family:Bebas Neue,sans-serif;font-size:34px;color:var(--g1);text-align:center;margin-bottom:8px;letter-spacing:2px">—</div>
             <button class="btn bg bfw" id="rb" onclick="doRoll()" style="font-size:13px" disabled>🎲 Lançar Dado</button>
           </div>
           <div class="chat-wrap">
@@ -786,7 +690,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 <div class="mbg hidden" id="cmod">
   <div class="md">
     <h3>🎮 Nova Sala</h3>
-    <!-- FIX 2: 95% → 90% -->
     <p>Escolhe a aposta e número de jogadores. Vencedor leva 90% do pote.</p>
     <div style="font-size:10px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Aposta</div>
     <div class="bps" id="bps-m">
@@ -820,39 +723,33 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 <div class="tst" id="tst"></div>
 
 <script>
-/* ══════════════════════════════════════════
-   PARTICLES
-══════════════════════════════════════════ */
+/* PARTICLES */
 (function(){
   const c=document.getElementById("cvs"),x=c.getContext("2d");
   let pts=[];
   const resize=()=>{c.width=innerWidth;c.height=innerHeight;};
   resize();addEventListener("resize",resize);
   for(let i=0;i<80;i++) pts.push({
-    x:Math.random()*innerWidth, y:Math.random()*innerHeight,
-    vx:(Math.random()-.5)*.3, vy:(Math.random()-.5)*.3,
+    x:Math.random()*innerWidth,y:Math.random()*innerHeight,
+    vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,
     r:Math.random()*1.8+.3,
-    col:Math.random()<.5
-      ? `rgba(245,197,24,${(Math.random()*.15+.03).toFixed(2)})`
-      : `rgba(93,68,209,${(Math.random()*.12+.02).toFixed(2)})`
+    col:Math.random()<.5?`rgba(245,197,24,${(Math.random()*.15+.03).toFixed(2)})`:`rgba(93,68,209,${(Math.random()*.12+.02).toFixed(2)})`
   });
   (function loop(){
     x.clearRect(0,0,c.width,c.height);
     pts.forEach(p=>{
-      p.x+=p.vx; p.y+=p.vy;
-      if(p.x<0)p.x=c.width; if(p.x>c.width)p.x=0;
-      if(p.y<0)p.y=c.height; if(p.y>c.height)p.y=0;
-      x.beginPath(); x.arc(p.x,p.y,p.r,0,Math.PI*2);
-      x.fillStyle=p.col; x.fill();
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0)p.x=c.width;if(p.x>c.width)p.x=0;
+      if(p.y<0)p.y=c.height;if(p.y>c.height)p.y=0;
+      x.beginPath();x.arc(p.x,p.y,p.r,0,Math.PI*2);
+      x.fillStyle=p.col;x.fill();
     });
     requestAnimationFrame(loop);
   })();
 })();
 
-/* ══════════════════════════════════════════
-   STATE
-══════════════════════════════════════════ */
-let U=null, RID=null, SSE=null, SBh=0, SBm=0, NPh=2, NPm=2, LT=null, CUR_STATE=null, CUR_MV=[];
+/* STATE */
+let U=null,RID=null,SSE=null,SBh=0,SBm=0,NPh=2,NPm=2,LT=null;
 const fmt=n=>Number(n).toLocaleString("pt-AO");
 const fmtD=s=>new Date(s).toLocaleDateString("pt-AO",{day:"2-digit",month:"2-digit",year:"2-digit"});
 const CCSS=c=>c==="r"?"var(--R)":c==="g"?"var(--G)":c==="b"?"var(--B)":"var(--Y)";
@@ -860,35 +757,32 @@ const CNAME={"r":"Vermelho","g":"Verde","b":"Azul","y":"Amarelo"};
 
 async function api(url,method="GET",body=null){
   const o={method,headers:{"Content-Type":"application/json"},credentials:"same-origin"};
-  if(body) o.body=JSON.stringify(body);
+  if(body)o.body=JSON.stringify(body);
   try{
     const r=await fetch(url,o);
-    const data=await r.json();
-    return data;
-  }catch(e){
-    return {error:"Erro de ligação. Verifica a tua internet."};
-  }
+    return await r.json();
+  }catch(e){return{error:"Erro de ligação. Verifica a tua internet."};}
 }
 
-/* ══ JACKPOT ══ */
+/* JACKPOT */
 (function(){
   async function upd(){
     try{
       const d=await api("/api/jackpot");
       const el=document.getElementById("jk-val");
-      if(el&&d.value) el.textContent=Math.floor(d.value).toLocaleString("pt-AO")+" KZ";
+      if(el&&d.value)el.textContent=Math.floor(d.value).toLocaleString("pt-AO")+" KZ";
     }catch(e){}
   }
-  upd(); setInterval(upd,5000);
+  upd();setInterval(upd,5000);
 })();
 
-/* ══ SSE ══ */
+/* SSE */
 function connectSSE(){
-  if(SSE) SSE.close();
+  if(SSE)SSE.close();
   SSE=new EventSource("/api/events",{withCredentials:true});
-  SSE.addEventListener("game_started",e=>onGameStarted(JSON.parse(e.data)));
-  SSE.addEventListener("game_update",e=>onGameUpdate(JSON.parse(e.data)));
-  SSE.addEventListener("game_over",e=>onGameOver(JSON.parse(e.data)));
+  SSE.addEventListener("game_started",e=>{if(typeof onGameStarted==="function")onGameStarted(JSON.parse(e.data));});
+  SSE.addEventListener("game_update",e=>{if(typeof onGameUpdate==="function")onGameUpdate(JSON.parse(e.data));});
+  SSE.addEventListener("game_over",e=>{if(typeof onGameOver==="function")onGameOver(JSON.parse(e.data));});
   SSE.addEventListener("player_joined",e=>{
     const d=JSON.parse(e.data);
     toast("👥 "+d.name+" entrou! ("+d.players+"/"+d.max+")","tin");
@@ -916,7 +810,7 @@ function connectSSE(){
   SSE.addEventListener("balance_update",e=>{
     const d=JSON.parse(e.data);
     if(U){U.balance=d.balance;updN();}
-    if(d.msg) toast(d.msg,"tok");
+    if(d.msg)toast(d.msg,"tok");
   });
   SSE.addEventListener("support_reply",e=>{
     const d=JSON.parse(e.data);
@@ -925,11 +819,8 @@ function connectSSE(){
   SSE.onerror=()=>setTimeout(connectSSE,4000);
 }
 
-/* ══ AUTH — PHONE + OTP ══ */
-let REG_PHONE="";
-let OTP_TIMER=null;
-let AGE_CONFIRMED=false;
-let PHONE_VERIFIED=false;
+/* AUTH */
+let REG_PHONE="",OTP_TIMER=null,AGE_CONFIRMED=false,PHONE_VERIFIED=false;
 
 function atab(t){
   document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("on",i===(t==="in"?0:1)));
@@ -938,41 +829,35 @@ function atab(t){
   document.getElementById("frst").classList.add("hidden");
 }
 
-function getPhone(inputId){
-  const raw=document.getElementById(inputId)?.value.trim().replace(/\s/g,"")||"";
-  return "+244"+raw;
-}
-
 async function doLogin(){
-  const phone=getPhone("lp-phone");
+  const phone="+244"+document.getElementById("lp-phone").value.trim().replace(/\s/g,"");
   const pw=document.getElementById("lp-pw").value;
-  const err=document.getElementById("lerr"); err.textContent="";
-  if(phone==="+244"||!pw){ err.textContent="❌ Preencha todos os campos."; return; }
+  const err=document.getElementById("lerr");err.textContent="";
+  if(phone==="+244"||!pw){err.textContent="❌ Preencha todos os campos.";return;}
   const btn=document.getElementById("btn-login");
-  btn.disabled=true; btn.textContent="A entrar...";
+  btn.disabled=true;btn.textContent="A entrar...";
   const d=await api("/api/login","POST",{phone,password:pw});
-  btn.disabled=false; btn.textContent="Entrar";
-  if(d.error){ err.textContent="❌ "+d.error; return; }
-  U=d.user; connectSSE(); showApp();
+  btn.disabled=false;btn.textContent="Entrar";
+  if(d.error){err.textContent="❌ "+d.error;return;}
+  U=d.user;connectSSE();showApp();
 }
 
 async function enviarOTP(){
   const name=document.getElementById("rn").value.trim();
   const rawPhone=document.getElementById("rphone").value.trim().replace(/\s/g,"");
   const pw=document.getElementById("rp").value;
-  const err=document.getElementById("rerr"); err.textContent="";
-  if(!name){ err.textContent="❌ Insere o teu nome."; return; }
-  if(!rawPhone){ err.textContent="❌ Insere o número de telefone."; return; }
-  if(!pw||pw.length<6){ err.textContent="❌ Senha mínima 6 caracteres."; return; }
-  const phone="+244"+rawPhone;
-  REG_PHONE=phone;
+  const err=document.getElementById("rerr");err.textContent="";
+  if(!name){err.textContent="❌ Insere o teu nome.";return;}
+  if(!rawPhone){err.textContent="❌ Insere o número de telefone.";return;}
+  if(!pw||pw.length<6){err.textContent="❌ Senha mínima 6 caracteres.";return;}
+  const phone="+244"+rawPhone;REG_PHONE=phone;
   const btn=document.getElementById("btn-send-otp");
-  btn.disabled=true; btn.textContent="A enviar SMS...";
+  btn.disabled=true;btn.textContent="A enviar SMS...";
   const d=await api("/api/otp/send","POST",{phone,name,purpose:"register"});
-  btn.disabled=false; btn.textContent="📱 Enviar Código SMS";
-  if(d.error){ err.textContent="❌ "+d.error; return; }
+  btn.disabled=false;btn.textContent="📱 Enviar Código SMS";
+  if(d.error){err.textContent="❌ "+d.error;return;}
   const ob=document.getElementById("op-badge");
-  if(ob) ob.textContent="📶 "+d.operadora;
+  if(ob)ob.textContent="📶 "+d.operadora;
   document.getElementById("reg-s1").classList.add("hidden");
   document.getElementById("reg-s2").classList.remove("hidden");
   document.getElementById("otp-msg").textContent=d.msg||"Código enviado para "+phone;
@@ -980,17 +865,16 @@ async function enviarOTP(){
 }
 
 function iniciarTimerOTP(){
-  clearInterval(OTP_TIMER);
-  let secs=120;
+  clearInterval(OTP_TIMER);let secs=120;
   document.getElementById("resend-btn").style.display="none";
   OTP_TIMER=setInterval(()=>{
     secs--;
-    const m=Math.floor(secs/60), s=secs%60;
+    const m=Math.floor(secs/60),s=secs%60;
     const el=document.getElementById("otp-timer");
-    if(el) el.textContent=m+":"+(s<10?"0":"")+s;
+    if(el)el.textContent=m+":"+(s<10?"0":"")+s;
     if(secs<=0){
       clearInterval(OTP_TIMER);
-      if(el){ el.textContent="Expirado"; el.style.color="var(--red)"; }
+      if(el){el.textContent="Expirado";el.style.color="var(--red)";}
       document.getElementById("resend-btn").style.display="inline";
     }
   },1000);
@@ -998,12 +882,11 @@ function iniciarTimerOTP(){
 
 async function verificarOTP(){
   const code=document.getElementById("rotp").value.trim();
-  const err=document.getElementById("otp-err"); err.textContent="";
-  if(!code||code.length!==6){ err.textContent="❌ Código de 6 dígitos."; return; }
+  const err=document.getElementById("otp-err");err.textContent="";
+  if(!code||code.length!==6){err.textContent="❌ Código de 6 dígitos.";return;}
   const d=await api("/api/otp/verify","POST",{phone:REG_PHONE,code,purpose:"register"});
-  if(d.error){ err.textContent="❌ "+d.error; return; }
-  clearInterval(OTP_TIMER);
-  PHONE_VERIFIED=true;
+  if(d.error){err.textContent="❌ "+d.error;return;}
+  clearInterval(OTP_TIMER);PHONE_VERIFIED=true;
   document.getElementById("reg-s2").classList.add("hidden");
   document.getElementById("reg-s3").classList.remove("hidden");
 }
@@ -1015,40 +898,33 @@ function voltarStep1(){
 }
 
 function confirmarIdade(sim){
-  if(!sim){ toast("❌ Tens de ter 18+ anos para jogar.","ter"); atab("in"); return; }
+  if(!sim){toast("❌ Tens de ter 18+ anos para jogar.","ter");atab("in");return;}
   AGE_CONFIRMED=true;
   document.getElementById("terms-section").classList.remove("hidden");
-  document.getElementById("terms-text").scrollTop=0;
 }
 
 async function doReg(){
   const terms=document.getElementById("terms-check").checked;
-  const err=document.getElementById("terms-err"); err.textContent="";
-  if(!AGE_CONFIRMED){ err.textContent="❌ Confirma que tens 18+ anos."; return; }
-  if(!terms){ err.textContent="❌ Aceita os Termos e Condições."; return; }
-  if(!PHONE_VERIFIED){ err.textContent="❌ Verifica o número primeiro."; return; }
+  const err=document.getElementById("terms-err");err.textContent="";
+  if(!AGE_CONFIRMED){err.textContent="❌ Confirma que tens 18+ anos.";return;}
+  if(!terms){err.textContent="❌ Aceita os Termos e Condições.";return;}
+  if(!PHONE_VERIFIED){err.textContent="❌ Verifica o número primeiro.";return;}
   const name=document.getElementById("rn").value.trim();
   const pw=document.getElementById("rp").value;
   const ref=document.getElementById("rref")?.value.trim()||"";
-  const otp=document.getElementById("rotp").value.trim();
-  const d=await api("/api/register","POST",{
-    name, phone:REG_PHONE, password:pw,
-    otp, ref_code:ref,
-    age_confirmed:true, terms_accepted:true
-  });
-  if(d.error){ err.textContent="❌ "+d.error; return; }
-  U=d.user; connectSSE(); showApp();
-  toast("🎉 Conta criada! Deposita para começar.","tok");
-  coinRain();
+  const d=await api("/api/register","POST",{name,phone:REG_PHONE,password:pw,ref_code:ref,age_confirmed:true,terms_accepted:true});
+  if(d.error){err.textContent="❌ "+d.error;return;}
+  U=d.user;connectSSE();showApp();
+  toast("🎉 Conta criada! Deposita para começar.","tok");coinRain();
 }
 
 async function doLogout(){
   await api("/api/logout","POST");
-  if(SSE) SSE.close();
+  if(SSE)SSE.close();
   location.reload();
 }
 
-/* ══ RESET SENHA POR SMS ══ */
+/* RESET */
 let RESET_PHONE="";
 function showReset(){
   document.getElementById("fin").classList.add("hidden");
@@ -1061,11 +937,10 @@ function hideReset(){
 }
 async function doResetReq(){
   const rawPhone=document.getElementById("rst-phone").value.trim().replace(/\s/g,"");
-  const phone="+244"+rawPhone;
-  RESET_PHONE=phone;
+  const phone="+244"+rawPhone;RESET_PHONE=phone;
   const err=document.getElementById("rst-err"),ok=document.getElementById("rst-ok");
-  err.textContent=""; ok.textContent="";
-  if(!rawPhone){ err.textContent="❌ Insere o número."; return; }
+  err.textContent="";ok.textContent="";
+  if(!rawPhone){err.textContent="❌ Insere o número.";return;}
   await api("/api/reset/request","POST",{phone});
   ok.textContent="✅ Código SMS enviado para "+phone;
   document.getElementById("rst2").classList.remove("hidden");
@@ -1074,20 +949,20 @@ async function doResetConf(){
   const code=document.getElementById("rst-code").value.trim();
   const pw=document.getElementById("rst-pw").value;
   const err=document.getElementById("rst2-err"),ok=document.getElementById("rst2-ok");
-  err.textContent=""; ok.textContent="";
-  if(!code||!pw){ err.textContent="❌ Preenche os dois campos."; return; }
-  if(pw.length<6){ err.textContent="❌ Senha mínima 6 caracteres."; return; }
+  err.textContent="";ok.textContent="";
+  if(!code||!pw){err.textContent="❌ Preenche os dois campos.";return;}
+  if(pw.length<6){err.textContent="❌ Senha mínima 6 caracteres.";return;}
   const d=await api("/api/reset/confirm","POST",{phone:RESET_PHONE,code,password:pw});
-  if(d.error){ err.textContent="❌ "+d.error; return; }
+  if(d.error){err.textContent="❌ "+d.error;return;}
   ok.textContent="✅ Senha alterada! Faz login.";
   setTimeout(()=>{hideReset();atab("in");},2000);
 }
 
-/* ══ NAV ══ */
+/* NAV */
 function showApp(){
   document.getElementById("s-auth").classList.remove("on");
   document.getElementById("s-app").classList.add("on");
-  updN(); pg("home");
+  updN();pg("home");
 }
 function pg(name){
   ["p-home","p-wait","p-wallet","p-profile"].forEach(id=>{
@@ -1097,12 +972,12 @@ function pg(name){
   document.querySelectorAll(".nb").forEach(b=>b.classList.remove("on"));
   if(name==="game"){document.getElementById("s-game").style.display="flex";return;}
   const el=document.getElementById("p-"+name);
-  if(el) el.style.display="flex";
+  if(el)el.style.display="flex";
   const nb=document.getElementById("nb-"+name);
-  if(nb) nb.classList.add("on");
-  if(name==="wallet") loadWallet();
-  if(name==="profile") loadProfile();
-  if(name==="home"){ updN(); loadLobby(); loadLeaderboard(); loadPublicStats(); }
+  if(nb)nb.classList.add("on");
+  if(name==="wallet")loadWallet();
+  if(name==="profile")loadProfile();
+  if(name==="home"){updN();loadLobby();loadLeaderboard();loadPublicStats();}
 }
 function updN(){
   if(!U)return;
@@ -1110,33 +985,33 @@ function updN(){
   document.getElementById("navt").textContent=U.name[0].toUpperCase();
   const wins=U.wins||0;
   let rank="🏅 Novato";
-  if(wins>=100) rank="👑 Lenda";
-  else if(wins>=50) rank="💎 Elite";
-  else if(wins>=20) rank="🥇 Mestre";
-  else if(wins>=10) rank="🥈 Experiente";
-  else if(wins>=3)  rank="🥉 Iniciado";
-  const rk=document.getElementById("prk"); if(rk) rk.textContent=rank;
+  if(wins>=100)rank="👑 Lenda";
+  else if(wins>=50)rank="💎 Elite";
+  else if(wins>=20)rank="🥇 Mestre";
+  else if(wins>=10)rank="🥈 Experiente";
+  else if(wins>=3)rank="🥉 Iniciado";
+  const rk=document.getElementById("prk");if(rk)rk.textContent=rank;
 }
 
-/* ══ PUBLIC STATS ══ */
+/* PUBLIC STATS */
 async function loadPublicStats(){
   try{
     const d=await api("/api/stats/public");
-    if(!d.users) return;
+    if(!d.users)return;
     document.getElementById("hs-u").textContent=d.online||d.users;
     document.getElementById("hs-g").textContent=d.games||0;
-    if(U) document.getElementById("hs-k").textContent=U.wins||0;
+    if(U)document.getElementById("hs-k").textContent=U.wins||0;
     document.getElementById("hs-p").textContent=fmt(d.paid||0)+" KZ";
   }catch(e){}
 }
 
-/* ══ LEADERBOARD ══ */
+/* LEADERBOARD */
 async function loadLeaderboard(){
-  const el=document.getElementById("lb"); if(!el) return;
+  const el=document.getElementById("lb");if(!el)return;
   el.innerHTML='<div class="empty">A carregar...</div>';
   const d=await api("/api/leaderboard");
   const rows=d.leaderboard||[];
-  if(!rows.length){ el.innerHTML='<div class="empty">Sem dados ainda. Sê o primeiro!</div>'; return; }
+  if(!rows.length){el.innerHTML='<div class="empty">Sem dados ainda. Sê o primeiro!</div>';return;}
   const medals=["🥇","🥈","🥉"];
   el.innerHTML=`<div class="lb-head"><span style="width:32px">Pos</span><span style="width:36px"></span><span style="flex:1">Jogador</span><span>Vitórias</span><span style="min-width:100px;text-align:right">Ganhos</span></div>`+
   rows.map((p,i)=>`
@@ -1149,11 +1024,11 @@ async function loadLeaderboard(){
     </div>`).join("");
 }
 
-/* ══ LOBBY ══ */
+/* LOBBY */
 async function loadLobby(){
   const d=await api("/api/lobby");
-  const g=document.getElementById("rms"), e=document.getElementById("no-rms");
-  if(!d.rooms||!d.rooms.length){ g.innerHTML=""; e.classList.remove("hidden"); return; }
+  const g=document.getElementById("rms"),e=document.getElementById("no-rms");
+  if(!d.rooms||!d.rooms.length){g.innerHTML="";e.classList.remove("hidden");return;}
   e.classList.add("hidden");
   const T={1000:["tbr","🥉 Bronze"],5000:["tsi","🥈 Prata"],10000:["tgo","🥇 Ouro"],50000:["tvip","👑 VIP"]};
   g.innerHTML=d.rooms.map(r=>{
@@ -1177,7 +1052,7 @@ async function loadLobby(){
   LT=setTimeout(()=>{if(document.getElementById("p-home")?.style.display!=="none")loadLobby();},7000);
 }
 
-/* ══ BET/PLAYER PICKS ══ */
+/* BET/PLAYER PICKS */
 function hpb(el,v){SBh=v;document.getElementById("bps-h").querySelectorAll(".bp").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
 function hnp(el,v){NPh=v;document.getElementById("npl-h").querySelectorAll(".np").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
 function mpb(el,v){SBm=v;document.getElementById("bps-m").querySelectorAll(".bp").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
@@ -1186,21 +1061,21 @@ function openMd(){document.getElementById("cmod").classList.remove("hidden");SBm
 function closeMd(){document.getElementById("cmod").classList.add("hidden");}
 
 async function createRm(){
-  const err=document.getElementById("herr"); err.textContent="";
+  const err=document.getElementById("herr");err.textContent="";
   if(!SBh){err.textContent="❌ Escolhe um valor.";return;}
   const d=await api("/api/room/create","POST",{bet:SBh,max_players:NPh});
   if(d.error){err.textContent="❌ "+d.error;return;}
-  RID=d.room_id; showWait(RID,SBh,NPh);
+  RID=d.room_id;showWait(RID,SBh,NPh);
 }
 async function doCreate(){
-  const err=document.getElementById("merr"); err.textContent="";
+  const err=document.getElementById("merr");err.textContent="";
   if(!SBm){err.textContent="❌ Escolhe um valor.";return;}
   const d=await api("/api/room/create","POST",{bet:SBm,max_players:NPm});
   if(d.error){err.textContent="❌ "+d.error;return;}
-  closeMd(); RID=d.room_id; showWait(RID,SBm,NPm);
+  closeMd();RID=d.room_id;showWait(RID,SBm,NPm);
 }
 
-/* ══ WAITING ══ */
+/* WAITING */
 function showWait(rid,bet,maxp){
   clearTimeout(LT);
   document.getElementById("wrid").textContent=rid;
@@ -1211,265 +1086,81 @@ function showWait(rid,bet,maxp){
   document.getElementById("p-wait").style.display="flex";
 }
 function updateWaitSlots(filled,max){
-  const el=document.getElementById("wslots"); if(!el)return;
+  const el=document.getElementById("wslots");if(!el)return;
   let html="";
-  for(let i=0;i<max;i++) html+=`<div class="ws ${i<filled?"on":""}">${i<filled?"✓":"?"}</div>`;
+  for(let i=0;i<max;i++)html+=`<div class="ws ${i<filled?"on":""}">${i<filled?"✓":"?"}</div>`;
   el.innerHTML=html;
 }
 async function cancelWait(){
-  if(RID) await api("/api/game/leave","POST",{room_id:RID});
-  RID=null; pg("home");
+  if(RID)await api("/api/game/leave","POST",{room_id:RID});
+  RID=null;pg("home");
 }
 async function startEarly(){
   if(!RID)return;
   const d=await api("/api/room/start","POST",{room_id:RID});
   if(d.error){toast(d.error,"ter");return;}
-  if(d.state) onGameStarted(d.state);
+  if(d.state&&typeof onGameStarted==="function")onGameStarted(d.state);
 }
 
-/* ══ JOIN ══ */
+/* JOIN */
 async function joinRm(rid,bet){
   if(!confirm("Entrar na sala? "+fmt(bet)+" Kz serão descontados."))return;
   const d=await api("/api/room/join","POST",{room_id:rid});
   if(d.error){toast("❌ "+d.error,"ter");return;}
   RID=rid;
-  if(d.state&&d.state.started) onGameStarted(d.state);
+  if(d.state&&d.state.started&&typeof onGameStarted==="function")onGameStarted(d.state);
   else showWait(rid,d.state?.bet||bet,d.state?.max_p||2);
 }
 
-/* ══ GAME EVENTS ══ */
-function onGameStarted(state){
-  RID=state.room_id; CUR_STATE=state; PREV_STATE=null;
-  pg("game"); buildBoard(); renderState(state);
-  document.getElementById("chat-msgs").innerHTML="";
-  addChat("Sistema","Jogo iniciado com "+state.players.length+" jogadores!",true);
-  state.players.forEach(p=>addChat("Sistema",CNAME[p.color]+": "+p.name,true));
-}
-function onGameUpdate(state){
-  if(PREV_STATE&&BOARD) _triggerMoveAnimations(PREV_STATE,state);
-  PREV_STATE=CUR_STATE;
-  CUR_STATE=state;
-  renderState(state);
-}
-function _triggerMoveAnimations(prev,next){
-  if(!prev.players||!next.players) return;
-  next.players.forEach((pl)=>{
-    const prevPl=prev.players.find(p=>p.user_id===pl.user_id);
-    if(!prevPl) return;
-    pl.pos.forEach((pos,i)=>{
-      const prevPos=prevPl.pos[i];
-      const prevBase=!!prevPl.in_base[i];
-      const nextBase=!!pl.in_base[i];
-      if(pos===prevPos&&prevBase===nextBase) return;
-      if(!BOARD) return;
-      BOARD.animateMove(pl.color,i,prevPos,prevBase,pos,nextBase,null);
-    });
-  });
-}
-function onGameOver(d){
-  document.getElementById("goo").classList.remove("hidden");
-  const w=d.won;
-  document.getElementById("goic").textContent=w?"🏆":"💀";
-  document.getElementById("gott").textContent=w?"VITÓRIA!":"DERROTA";
-  document.getElementById("gosb").textContent=w?"Parabéns, venceste!":"Boa sorte da próxima!";
-  document.getElementById("gopr").textContent=(w?"+":"")+fmt(w?d.prize:0)+" KZ";
-  document.getElementById("gopr").style.color=w?"var(--jade)":"var(--red)";
-  document.getElementById("gocd").className="gocd"+(w?"":" lose");
-  if(d.balance!=null){U.balance=d.balance;updN();}
-  if(w){coinRain();showFlash("🏆");}
-}
-function closeGO(){ document.getElementById("goo").classList.add("hidden"); RID=null; pg("home"); }
+/* GAME OVER */
+function closeGO(){document.getElementById("goo").classList.add("hidden");RID=null;pg("home");}
 
-/* ══ CHAT ══ */
+/* CHAT */
 function addChat(name,text,sys=false){
-  const el=document.getElementById("chat-msgs"); if(!el)return;
+  const el=document.getElementById("chat-msgs");if(!el)return;
   const d=document.createElement("div");
   d.className="chat-msg"+(sys?" sys":"");
   const isMe=name===U?.name;
   d.innerHTML=`<span class="cm-name" style="color:${sys?"var(--jade)":isMe?"var(--g1)":"var(--t1)"}">${name}:</span><span class="cm-txt"> ${text}</span>`;
-  el.appendChild(d);
-  el.scrollTop=el.scrollHeight;
-  while(el.children.length>50) el.removeChild(el.firstChild);
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+  while(el.children.length>50)el.removeChild(el.firstChild);
 }
 async function sendChat(){
   const inp=document.getElementById("chat-inp");
   const msg=inp.value.trim();
-  if(!msg||!RID) return;
-  inp.value="";
-  addChat(U.name,msg,false);
+  if(!msg||!RID)return;
+  inp.value="";addChat(U.name,msg,false);
   await api("/api/game/chat","POST",{room_id:RID,message:msg}).catch(()=>{});
 }
 
-/* ══ ROLL / MOVE ══ */
-async function doRoll(){
-  if(!RID)return;
-  document.getElementById("rb").disabled=true;
-  const df=document.getElementById("dfc"); df.classList.add("rolling");
-  const d=await api("/api/game/roll","POST",{room_id:RID});
-  df.classList.remove("rolling");
-  if(d.error){ toast("❌ "+d.error,"ter"); return; }
-  df.textContent=["⚀","⚁","⚂","⚃","⚄","⚅"][d.dice-1];
-  document.getElementById("dnm").textContent=d.dice;
-  renderState(d);
-  const mv=await api("/api/game/movable","POST",{room_id:RID});
-  if(mv.movable&&mv.movable.length) highlightPcs(mv.movable,d);
-}
-async function movePc(idx){
-  if(!RID)return;
-  PREV_STATE=CUR_STATE?JSON.parse(JSON.stringify(CUR_STATE)):null;
-  const d=await api("/api/game/move","POST",{room_id:RID,piece:idx});
-  if(d.error){ toast("❌ "+d.error,"ter"); return; }
-  if(PREV_STATE&&BOARD) _triggerMoveAnimations(PREV_STATE,d);
-  PREV_STATE=CUR_STATE;
-  renderState(d);
-}
-async function leaveGame(){
-  if(!confirm("Abandonar? Perdes a aposta."))return;
-  if(RID) await api("/api/game/leave","POST",{room_id:RID});
-  RID=null; pg("home");
-}
-
-/* ══ CANVAS BOARD ══ */
-let BOARD=null;
-let CANVAS_ANIM_FRAME=null;
-let SELECTABLE_PIECES=[];
-let PULSE_T=0;
-let PREV_STATE=null;
-
-function initCanvas(){
-  const canvas=document.getElementById("ludo-canvas");
-  if(!canvas) return;
-  const size=Math.min(460,window.innerWidth-30);
-  canvas.width=size; canvas.height=size;
-  canvas.style.width=size+"px"; canvas.style.height=size+"px";
-  BOARD=new LudoBoard(canvas,size);
-  canvas.addEventListener("click",onCanvasClick);
-  startRenderLoop();
-}
-
-function startRenderLoop(){
-  cancelAnimationFrame(CANVAS_ANIM_FRAME);
-  function loop(){
-    PULSE_T+=0.05;
-    if(CUR_STATE&&BOARD) drawGameState(CUR_STATE);
-    CANVAS_ANIM_FRAME=requestAnimationFrame(loop);
-  }
-  CANVAS_ANIM_FRAME=requestAnimationFrame(loop);
-}
-
-function drawGameState(state){
-  if(!BOARD||!state||!state.players) return;
-  const canvas=document.getElementById("ludo-canvas");
-  if(!canvas) return;
-  BOARD.drawBoard();
-  state.players.forEach(pl=>{
-    pl.pos.forEach((pos,i)=>{
-      const coord=BOARD.getPieceCoord(pl.color,pos,!!pl.in_base[i],i);
-      const key=pl.color+"_"+i;
-      const piece=BOARD.pieces[key];
-      let drawX=coord.x, drawY=coord.y;
-      if(piece&&piece.animating){ drawX=piece.x; drawY=piece.y; }
-      else if(piece){ drawX=coord.x; drawY=coord.y; piece.x=coord.x; piece.y=coord.y; }
-      else{ BOARD.pieces[key]={x:coord.x,y:coord.y,animating:false}; }
-      const isSelectable=SELECTABLE_PIECES.includes(i)&&pl.user_id===U?.id&&isMeTurn(state);
-      BOARD.drawPiece(drawX,drawY,pl.color,i+1,isSelectable,PULSE_T);
-    });
-  });
-}
-
-function onCanvasClick(e){
-  if(!CUR_STATE||!BOARD||!isMeTurn(CUR_STATE)) return;
-  if(CUR_STATE.phase!==1) return;
-  const rect=e.target.getBoundingClientRect();
-  const x=e.clientX-rect.left;
-  const y=e.clientY-rect.top;
-  const cs=e.target.width/15;
-  const myPlayer=CUR_STATE.players.find(p=>p.user_id===U?.id);
-  if(!myPlayer) return;
-  myPlayer.pos.forEach((pos,i)=>{
-    if(!SELECTABLE_PIECES.includes(i)) return;
-    const coord=BOARD.getPieceCoord(myPlayer.color,pos,!!myPlayer.in_base[i],i);
-    const piece=BOARD.pieces[myPlayer.color+"_"+i];
-    const px=piece?piece.x:coord.x;
-    const py=piece?piece.y:coord.y;
-    const dist=Math.sqrt((x-px)**2+(y-py)**2);
-    if(dist<=cs*0.35+5) movePc(i);
-  });
-}
-
-function buildBoard(){ initCanvas(); }
-
-function renderState(state){
-  CUR_STATE=state; CUR_MV=[];
-  showExactHint(state);
-  if(!state.players) return;
-  const pc=document.getElementById("player-cards");
-  if(pc){
-    const midHtml=`<div class="gmid"><div class="ttx" id="ttx">${isMeTurn(state)?"Teu turno 🟢":"Aguarda 🔵"}</div><div class="rtx">RND ${state.round||0}</div></div>`;
-    pc.innerHTML=state.players.map((p,i)=>`
-      <div class="pc ${p.idx===state.turn?"mt":""}">
-        <div class="pdot" style="background:${CCSS(p.color)}"></div>
-        <div>
-          <div class="pnm2">${p.name}${p.user_id===U?.id?" (Tu)":""}</div>
-          <div class="pft">${CNAME[p.color]||p.color} · ${p.fin}/4</div>
-        </div>
-      </div>`
-    ).reduce((a,h,i)=>i===Math.floor(state.players.length/2)?a+midHtml+h:a+h,"");
-    const ttx=document.getElementById("ttx");
-    if(ttx) ttx.textContent=isMeTurn(state)?"Teu turno 🟢":"Aguarda 🔵";
-  }
-  document.getElementById("gbv").textContent=fmt(state.bet)+" KZ";
-  const rb=document.getElementById("rb");
-  rb.disabled=!isMeTurn(state)||state.phase!==0||state.over;
-  if(state.log&&state.log.length){
-    const le=document.getElementById("glog");
-    le.innerHTML=state.log.slice(-20).reverse().map(l=>`<div class="gli ${l.includes("VENCEU")||l.includes("🏆")?" gli-w":l.includes("💀")?" gli-d":""}">${l}</div>`).join("");
-  }
-  const co=document.getElementById("chat-online");
-  if(co) co.textContent=state.players.length+" online";
-  SELECTABLE_PIECES=[];
-  const rbtn=document.getElementById("rb");
-  if(rbtn&&isMeTurn(state)&&!state.over) rbtn.classList.add("my-turn-glow");
-  else if(rbtn) rbtn.classList.remove("my-turn-glow");
-}
-function isMeTurn(state){
-  if(!state||!state.players||!U) return false;
-  const p=state.players[state.turn];
-  return p&&p.user_id===U.id&&state.phase===0;
-}
-function highlightPcs(mv){ CUR_MV=mv||[]; SELECTABLE_PIECES=mv||[]; }
-
-/* ══ WALLET ══ */
-function sm(el){ el.closest(".mths").querySelectorAll(".mth").forEach(x=>x.classList.remove("on")); el.classList.add("on"); }
+/* WALLET */
+function sm(el){el.closest(".mths").querySelectorAll(".mth").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
 function wprev(){
   const v=parseFloat(document.getElementById("wv").value);
   const el=document.getElementById("wpr");
-  // FIX: updated to reflect 10% fee and 1000 minimum
-  if(v>=1000) el.textContent="Receberás: "+fmt(Math.floor(v*.90))+" Kz";
+  if(v>=1000)el.textContent="Receberás: "+fmt(Math.floor(v*.90))+" Kz";
   else el.textContent="";
 }
 async function loadWallet(){
   const u=await api("/api/me");
-  if(u.user){ U=u.user; updN(); document.getElementById("wbn").textContent=fmt(U.balance); }
-  const t=await api("/api/transactions"); renderTx(t.transactions||[]);
-  const dp=await api("/api/deposit/list"); renderDeps(dp.deposits||[]);
-  if(U?.express_number) document.getElementById("wnum").value=U.express_number;
-  loadDaily(); loadReferral(); loadTickets();
+  if(u.user){U=u.user;updN();document.getElementById("wbn").textContent=fmt(U.balance);}
+  const t=await api("/api/transactions");renderTx(t.transactions||[]);
+  const dp=await api("/api/deposit/list");renderDeps(dp.deposits||[]);
+  if(U?.express_number)document.getElementById("wnum").value=U.express_number;
+  loadDaily();loadReferral();loadTickets();
 }
 async function doDeposit(){
   const v=parseFloat(document.getElementById("dv").value);
   const ref=document.getElementById("dref").value.trim();
   const payer=document.getElementById("dpayer").value.trim();
   const err=document.getElementById("de"),ok=document.getElementById("dok");
-  err.textContent=""; ok.textContent="";
-  if(!v||v<500){ err.textContent="❌ Mínimo 500 Kz"; return; }
-  if(!ref){ err.textContent="❌ Insere a referência Express."; return; }
+  err.textContent="";ok.textContent="";
+  if(!v||v<500){err.textContent="❌ Mínimo 500 Kz";return;}
+  if(!ref){err.textContent="❌ Insere a referência Express.";return;}
   const d=await api("/api/deposit/request","POST",{amount:v,express_ref:ref,payer_name:payer});
-  if(d.error){ err.textContent="❌ "+d.error; return; }
+  if(d.error){err.textContent="❌ "+d.error;return;}
   ok.textContent="✅ Pedido enviado! Aguarda confirmação.";
-  document.getElementById("dv").value="";
-  document.getElementById("dref").value="";
-  document.getElementById("dpayer").value="";
+  document.getElementById("dv").value="";document.getElementById("dref").value="";document.getElementById("dpayer").value="";
   loadWallet();
 }
 async function doWithdraw(){
@@ -1477,20 +1168,19 @@ async function doWithdraw(){
   const acn=document.getElementById("wacname").value.trim();
   const v=parseFloat(document.getElementById("wv").value);
   const err=document.getElementById("we"),ok=document.getElementById("wok");
-  err.textContent=""; ok.textContent="";
-  if(!num){ err.textContent="❌ Insere o número Express."; return; }
-  if(!acn){ err.textContent="❌ Insere o nome da conta Express."; return; }
-  // FIX 4: Mínimo 10.000 → 1.000
-  if(!v||v<1000){ err.textContent="❌ Mínimo 1.000 Kz"; return; }
+  err.textContent="";ok.textContent="";
+  if(!num){err.textContent="❌ Insere o número Express.";return;}
+  if(!acn){err.textContent="❌ Insere o nome da conta Express.";return;}
+  if(!v||v<1000){err.textContent="❌ Mínimo 1.000 Kz";return;}
   const d=await api("/api/withdraw/request","POST",{amount:v,express_number:num,account_name:acn});
-  if(d.error){ err.textContent="❌ "+d.error; return; }
+  if(d.error){err.textContent="❌ "+d.error;return;}
   ok.textContent="✅ "+d.msg;
-  document.getElementById("wv").value=""; document.getElementById("wpr").textContent="";
-  loadWallet(); toast("Levantamento de "+fmt(v)+" Kz solicitado!","tin");
+  document.getElementById("wv").value="";document.getElementById("wpr").textContent="";
+  loadWallet();toast("Levantamento de "+fmt(v)+" Kz solicitado!","tin");
 }
 function renderTx(txs){
   const b=document.getElementById("txb");
-  if(!txs.length){ b.innerHTML='<div class="empty">Sem transações</div>'; return; }
+  if(!txs.length){b.innerHTML='<div class="empty">Sem transações</div>';return;}
   b.innerHTML=txs.slice(0,30).map(t=>{
     const ic=t.type==="deposit"?"⬆️":t.type.includes("with")?"⬇️":t.amount>0?"🏆":"🎮";
     const cl=t.type==="deposit"?"id":t.type.includes("with")?"iw":t.amount>0?"ig":"il";
@@ -1501,7 +1191,7 @@ function renderTx(txs){
 }
 function renderDeps(deps){
   const b=document.getElementById("dep-lst");
-  if(!deps.length){ b.innerHTML='<div class="empty">Sem pedidos</div>'; return; }
+  if(!deps.length){b.innerHTML='<div class="empty">Sem pedidos</div>';return;}
   b.innerHTML=deps.slice(0,10).map(d=>{
     const sc=d.status==="approved"?"dsa":d.status==="rejected"?"dsr":"dsp";
     const sl=d.status==="approved"?"✅ Confirmado":d.status==="rejected"?"❌ Rejeitado":"⏳ Pendente";
@@ -1509,14 +1199,14 @@ function renderDeps(deps){
   }).join("");
 }
 
-/* ══ PROFILE ══ */
+/* PROFILE */
 async function loadProfile(){
-  const u=await api("/api/me"); if(u.user){ U=u.user; updN(); }
-  if(!U) return;
+  const u=await api("/api/me");if(u.user){U=u.user;updN();}
+  if(!U)return;
   document.getElementById("pav").textContent=U.name[0].toUpperCase();
   document.getElementById("pnm").textContent=U.name;
   document.getElementById("pem").textContent=U.phone||U.email||"";
-  if(U.express_number) document.getElementById("exp-num").value=U.express_number;
+  if(U.express_number)document.getElementById("exp-num").value=U.express_number;
   document.getElementById("sg2").textContent=U.games_played||0;
   document.getElementById("sw").textContent=U.wins||0;
   document.getElementById("sl").textContent=U.losses||0;
@@ -1527,18 +1217,18 @@ async function loadProfile(){
   const gr=await api("/api/games/history");
   const b=document.getElementById("ghb");
   const gs=gr.games||[];
-  if(!gs.length){ b.innerHTML='<div class="empty">Sem partidas ainda</div>'; return; }
+  if(!gs.length){b.innerHTML='<div class="empty">Sem partidas ainda</div>';return;}
   b.innerHTML=gs.map(g=>`<div class="txi"><div class="tic ${g.is_win?"ig":"il"}">${g.is_win?"🏆":"💀"}</div><div class="tin2"><div class="tds">Sala ${g.room_id||"—"} · ${fmt(g.bet)} Kz</div><div class="tdt">${fmtD(g.played_at)}</div></div><div class="tam ${g.is_win?"pos":"neg"}">${g.is_win?"+"+fmt(g.prize):"-"+fmt(g.bet)} KZ</div></div>`).join("");
 }
 async function saveExp(){
   const num=document.getElementById("exp-num").value.trim();
-  if(!num){ toast("❌ Número inválido.","ter"); return; }
+  if(!num){toast("❌ Número inválido.","ter");return;}
   await api("/api/set_express","POST",{number:num});
-  if(U) U.express_number=num;
+  if(U)U.express_number=num;
   toast("✅ Número Express guardado!","tok");
 }
 
-/* ══ BÓNUS DIÁRIO ══ */
+/* BÓNUS DIÁRIO */
 const BONUSES=[500,750,1000,1500,2000,2500,5000];
 const DAYS=["D1","D2","D3","D4","D5","D6","D7"];
 async function loadDaily(){
@@ -1546,7 +1236,7 @@ async function loadDaily(){
   const el=document.getElementById("daily-status");
   const btn=document.getElementById("btn-daily");
   const sd=document.getElementById("streak-days");
-  if(!el) return;
+  if(!el)return;
   if(sd){
     sd.innerHTML=BONUSES.map((v,i)=>`
       <div class="sd ${i<(d.streak||0)?"done":""}">
@@ -1556,44 +1246,44 @@ async function loadDaily(){
   }
   if(d.claimed){
     el.innerHTML="✅ Recebido! Volta amanhã · Streak: <strong style='color:var(--g1)'>"+(d.streak||0)+"/7</strong>";
-    if(btn){ btn.disabled=true; btn.textContent="✓ Recebido hoje"; }
-  } else {
+    if(btn){btn.disabled=true;btn.textContent="✓ Recebido hoje";}
+  }else{
     el.innerHTML="💰 Hoje recebes: <strong style='color:var(--g1)'>"+(d.next||500).toLocaleString("pt-AO")+" Kz</strong> · Streak: "+(d.streak||0)+"/7";
-    if(btn){ btn.disabled=false; btn.textContent="🎁 Receber Bónus"; }
+    if(btn){btn.disabled=false;btn.textContent="🎁 Receber Bónus";}
   }
 }
 async function claimDaily(){
   const d=await api("/api/bonus/daily/claim","POST",{});
-  if(d.error){ toast("❌ "+d.error,"ter"); return; }
-  if(U){ U.balance=d.balance; updN(); document.getElementById("wbn").textContent=fmt(U.balance); }
+  if(d.error){toast("❌ "+d.error,"ter");return;}
+  if(U){U.balance=d.balance;updN();document.getElementById("wbn").textContent=fmt(U.balance);}
   toast("🎁 +"+d.amount.toLocaleString("pt-AO")+" Kz! Dia "+d.streak+" 🔥","tok");
-  coinRain(); loadDaily();
+  coinRain();loadDaily();
 }
 
-/* ══ PROMO ══ */
+/* PROMO */
 async function usePromo(){
   const code=document.getElementById("promo-inp").value.trim().toUpperCase();
   const err=document.getElementById("promo-err"),ok=document.getElementById("promo-ok");
-  err.textContent=""; ok.textContent="";
-  if(!code){ err.textContent="❌ Insere o código."; return; }
+  err.textContent="";ok.textContent="";
+  if(!code){err.textContent="❌ Insere o código.";return;}
   const d=await api("/api/promo/use","POST",{code});
-  if(d.error){ err.textContent="❌ "+d.error; return; }
+  if(d.error){err.textContent="❌ "+d.error;return;}
   ok.textContent="✅ "+d.msg;
   document.getElementById("promo-inp").value="";
-  if(U){ U.balance+=d.amount; updN(); document.getElementById("wbn").textContent=fmt(U.balance); }
-  coinRain(); toast(d.msg,"tok");
+  if(U){U.balance+=d.amount;updN();document.getElementById("wbn").textContent=fmt(U.balance);}
+  coinRain();toast(d.msg,"tok");
 }
 
-/* ══ REFERIDOS ══ */
+/* REFERIDOS */
 async function loadReferral(){
   const d=await api("/api/referral/code");
   const el=document.getElementById("ref-link");
   const cnt=document.getElementById("ref-count");
-  if(!el) return;
-  el.textContent=d.link||""; el.dataset.link=d.link||"";
+  if(!el)return;
+  el.textContent=d.link||"";el.dataset.link=d.link||"";
   const r=await api("/api/referral/list");
   const refs=r.referrals||[];
-  if(cnt) cnt.textContent=refs.length>0?"✅ "+refs.length+" amigo(s) referido(s) — +"+(refs.length*500).toLocaleString("pt-AO")+" Kz ganhos!":"Ainda não referiste ninguém.";
+  if(cnt)cnt.textContent=refs.length>0?"✅ "+refs.length+" amigo(s) referido(s) — +"+(refs.length*500).toLocaleString("pt-AO")+" Kz ganhos!":"Ainda não referiste ninguém.";
 }
 function copyRef(){
   const el=document.getElementById("ref-link");
@@ -1605,27 +1295,25 @@ function shareRef(){
   const el=document.getElementById("ref-link");
   const link=el.dataset.link||el.textContent;
   const msg="Joga Ludo e ganha Kwanzas! Regista-te no LudoKz com o meu link e ganha 500 Kz de bónus: "+link;
-  if(navigator.share){ navigator.share({title:"LudoKz",text:msg,url:link}); }
-  else{ navigator.clipboard.writeText(msg).catch(()=>{}); toast("Link copiado para partilhar!","tin"); }
+  if(navigator.share){navigator.share({title:"LudoKz",text:msg,url:link});}
+  else{navigator.clipboard.writeText(msg).catch(()=>{});toast("Link copiado para partilhar!","tin");}
 }
 
-/* ══ SUPORTE ══ */
+/* SUPORTE */
 async function sendSupport(){
   const msg=document.getElementById("sup-msg").value.trim();
-  const ok=document.getElementById("sup-ok");
-  ok.textContent="";
-  if(!msg||msg.length<5){ toast("❌ Mensagem muito curta.","ter"); return; }
+  const ok=document.getElementById("sup-ok");ok.textContent="";
+  if(!msg||msg.length<5){toast("❌ Mensagem muito curta.","ter");return;}
   const d=await api("/api/support/ticket","POST",{message:msg});
-  if(d.error){ toast("❌ "+d.error,"ter"); return; }
+  if(d.error){toast("❌ "+d.error,"ter");return;}
   ok.textContent="✅ Mensagem enviada! Responderemos em breve.";
-  document.getElementById("sup-msg").value="";
-  loadTickets();
+  document.getElementById("sup-msg").value="";loadTickets();
 }
 async function loadTickets(){
   const d=await api("/api/support/tickets");
-  const el=document.getElementById("tkts-list"); if(!el) return;
+  const el=document.getElementById("tkts-list");if(!el)return;
   const tkts=d.tickets||[];
-  if(!tkts.length){ el.innerHTML=""; return; }
+  if(!tkts.length){el.innerHTML="";return;}
   el.innerHTML='<div style="font-size:11px;font-weight:800;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px">Os teus pedidos</div>'+
     tkts.map(t=>`
       <div class="tkt">
@@ -1635,115 +1323,39 @@ async function loadTickets(){
       </div>`).join("");
 }
 
-/* ══ EFFECTS ══ */
+/* EFFECTS */
 function coinRain(){
   for(let i=0;i<14;i++){
     setTimeout(()=>{
       const el=document.createElement("div");
       el.className="coin-drop";
       el.textContent=["💰","🎲","⭐","🏆","💎"][Math.floor(Math.random()*5)];
-      el.style.left=Math.random()*100+"vw";
-      el.style.top="0";
-      el.style.position="fixed";
-      document.body.appendChild(el);
-      setTimeout(()=>el.remove(),1100);
+      el.style.left=Math.random()*100+"vw";el.style.top="0";el.style.position="fixed";
+      document.body.appendChild(el);setTimeout(()=>el.remove(),1100);
     },i*70);
   }
 }
 function showFlash(emoji){
   const el=document.createElement("div");
-  el.className="flash-el"; el.textContent=emoji;
-  document.body.appendChild(el);
-  setTimeout(()=>el.remove(),1000);
+  el.className="flash-el";el.textContent=emoji;
+  document.body.appendChild(el);setTimeout(()=>el.remove(),1000);
 }
 
-/* ══ ANIMAÇÕES ══ */
-function animatePieceMove(cellEl,color){
-  const pieces=cellEl.querySelectorAll(".piece");
-  pieces.forEach(p=>{
-    p.classList.add("piece-moving");
-    setTimeout(()=>p.classList.remove("piece-moving"),500);
-  });
-  const trail=document.createElement("div");
-  trail.className="trail-dot"; trail.style.background=color;
-  cellEl.appendChild(trail);
-  setTimeout(()=>trail.remove(),550);
-}
-function animateCapture(cellId){
-  const cell=document.getElementById(cellId); if(!cell) return;
-  const pieces=cell.querySelectorAll(".piece");
-  pieces.forEach(p=>{ p.classList.add("piece-captured"); setTimeout(()=>p.remove(),420); });
-}
-function animateDiceRoll(){
-  const el=document.getElementById("dfc"); if(!el) return;
-  el.classList.add("dice-rolling-3d");
-  setTimeout(()=>el.classList.remove("dice-rolling-3d"),650);
-}
-function animateFinish(cellId){
-  const cell=document.getElementById(cellId); if(!cell) return;
-  const pieces=cell.querySelectorAll(".piece");
-  pieces.forEach(p=>{ p.classList.add("piece-finish"); setTimeout(()=>p.classList.remove("piece-finish"),750); });
-}
-function starBurst(x,y){
-  const emojis=["⭐","🌟","✨","💫","🎯","🏆","💎"];
-  for(let i=0;i<10;i++){
-    setTimeout(()=>{
-      const el=document.createElement("div");
-      el.className="star-particle";
-      el.textContent=emojis[Math.floor(Math.random()*emojis.length)];
-      el.style.left=x+"px"; el.style.top=y+"px";
-      const angle=(i/10)*Math.PI*2;
-      const dist=80+Math.random()*80;
-      el.style.setProperty("--dx",Math.cos(angle)*dist+"px");
-      el.style.setProperty("--dy",Math.sin(angle)*dist+"px");
-      el.style.setProperty("--rot",(Math.random()*360)+"deg");
-      document.body.appendChild(el);
-      setTimeout(()=>el.remove(),950);
-    },i*40);
-  }
-}
-
-function showExactHint(state){
-  document.querySelectorAll(".cell-exact").forEach(c=>c.classList.remove("cell-exact"));
-  if(!state||!state.players||!U) return;
-  const myPlayer=state.players.find(p=>p.user_id===U.id);
-  if(!myPlayer||state.players[state.turn]?.user_id!==U.id) return;
-  if(state.phase!==1) return;
-  myPlayer.pos.forEach((pos,i)=>{
-    if(myPlayer.in_base[i]||pos<52||pos>=58) return;
-    const needed=58-pos;
-    if(state.dice===needed){
-      const HOMES={
-        r:[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
-        g:[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
-        b:[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
-        y:[[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]
-      };
-      const homeCoords=HOMES[myPlayer.color];
-      if(homeCoords){
-        const targetIdx=Math.min(pos-52,5);
-        const coord=homeCoords[targetIdx]||homeCoords[5];
-        const cellId="c"+coord[0]+"_"+coord[1];
-        const cell=document.getElementById(cellId);
-        if(cell) cell.classList.add("cell-exact");
-      }
-    }
-  });
-}
-
-/* ══ TOAST ══ */
+/* TOAST */
 function toast(msg,cls="tin"){
   const el=document.getElementById("tst");
-  el.textContent=msg; el.className=`tst show ${cls}`;
+  el.textContent=msg;el.className=`tst show ${cls}`;
   setTimeout(()=>el.classList.remove("show"),3600);
 }
 
-/* ══ INIT ══ */
+/* INIT */
 (async()=>{
   const d=await api("/api/me");
-  if(d.user){ U=d.user; connectSSE(); showApp(); }
+  if(d.user){U=d.user;connectSSE();showApp();}
 })();
 </script>
+
+<!-- Scripts do jogo — carregados por último, substituem as funções de jogo -->
 <script src="/static/ludo_board.js"></script>
 <script src="/static/game_patch.js"></script>
 <script src="/static/godot_bridge.js"></script>
