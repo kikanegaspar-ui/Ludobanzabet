@@ -2,7 +2,6 @@ import os
 import json
 import urllib.request
 import urllib.error
-import ssl
 
 SMS_PROVIDER = os.environ.get("SMS_PROVIDER", "ombala").strip().lower()
 
@@ -68,12 +67,19 @@ def _enviar_ombala(numero_e164, mensagem):
         "Authorization": f"Token {token}",
         "Content-Type":  "application/json",
         "Accept":        "application/json",
+        # Headers para contornar o Cloudflare Error 1010
+        # (bloqueia pedidos sem User-Agent de browser)
+        "User-Agent":    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Origin":        "https://api.useombala.ao",
+        "Referer":       "https://api.useombala.ao/",
     }
 
     try:
         req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
-        ctx = ssl.create_default_context()
-        with urllib.request.urlopen(req, context=ctx, timeout=20) as resp:
+        # CORRECAO: Nao criar ssl.create_default_context() manualmente.
+        # O gevent no Render faz monkey-patch do ssl e causa recursao infinita.
+        # Deixar o urllib gerir o SSL automaticamente (sem contexto manual).
+        with urllib.request.urlopen(req, timeout=20) as resp:
             body   = resp.read().decode("utf-8")
             status = resp.status
             print(f"[SMS OMBALA] HTTP {status} — {body[:200]}")
