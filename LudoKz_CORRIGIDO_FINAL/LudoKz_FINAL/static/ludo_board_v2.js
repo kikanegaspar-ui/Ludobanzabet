@@ -87,7 +87,6 @@ class LudoBoardV2 {
   }
 
   _buildPieceElements() {
-    // Criar elementos de peças para cada jogador
     PLAYERS_LIST.forEach(player => {
       this.pieceEls[player] = [];
       for (let i = 0; i < 4; i++) {
@@ -127,20 +126,14 @@ class LudoBoardV2 {
   }
 
   _loadBackground() {
-    // Usa a imagem base64 embutida no ludo.html original
-    // Se não disponível, usa CSS simples
     const img = new Image();
     img.onload = () => {
       this.boardEl.style.backgroundImage = `url('${img.src}')`;
       this.boardEl.style.backgroundSize = 'contain';
       this.boardEl.style.backgroundRepeat = 'no-repeat';
     };
-    // Tenta carregar imagem do tabuleiro
     img.src = '/static/ludo_board.png';
-    img.onerror = () => {
-      // Fallback: tabuleiro CSS simples
-      this._buildCSSBoard();
-    };
+    img.onerror = () => { this._buildCSSBoard(); };
   }
 
   _buildCSSBoard() {
@@ -286,7 +279,7 @@ class LudoGameLocal {
     this.turnIndex = -1;
     this.turn = 0;
     this.diceValue = 0;
-    this.phase = 'DICE'; // DICE | MOVE
+    this.phase = 'DICE';
     this.finished = [];
     this._initPieces();
     this._nextTurn();
@@ -435,3 +428,186 @@ class LudoGameLocal {
 }
 
 console.log('[LudoKz] ludo_board_v2.js carregado ✓');
+
+// ══════════════════════════════════════════════
+//  LUDOBOARD — SHIM CANVAS PARA ADMIN.HTML
+//  Desenha o tabuleiro completo num <canvas>
+//  com os métodos drawBoard(), _toScreen(), drawPiece()
+// ══════════════════════════════════════════════
+class LudoBoard {
+  constructor(canvas, size) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.size = size;
+    this.cs = size / 15;          // tamanho de cada célula
+    this.pieces = {};
+    this._boardImg = null;
+    this._boardReady = false;
+    this._preloadBoard();
+  }
+
+  // Tenta carregar a imagem do tabuleiro; se falhar, usa CSS canvas
+  _preloadBoard() {
+    const img = new Image();
+    img.onload = () => { this._boardImg = img; this._boardReady = true; };
+    img.onerror = () => { this._boardReady = true; }; // fallback para drawBoard CSS
+    img.src = '/static/ludo_board.png';
+    this._boardImg = img;
+  }
+
+  // Converte coordenada de grelha (col, row) para pixel central no canvas
+  _toScreen(x, y) {
+    return {
+      sx: x * this.cs + this.cs / 2,
+      sy: y * this.cs + this.cs / 2
+    };
+  }
+
+  // Desenha o tabuleiro completo no canvas
+  drawBoard() {
+    const ctx = this.ctx;
+    const s = this.size;
+    const cs = this.cs;
+
+    // Se imagem carregada, usa-a
+    if (this._boardImg && this._boardImg.complete && this._boardImg.naturalWidth > 0) {
+      ctx.clearRect(0, 0, s, s);
+      ctx.drawImage(this._boardImg, 0, 0, s, s);
+      return;
+    }
+
+    // Fallback: desenha tabuleiro CSS no canvas
+    ctx.clearRect(0, 0, s, s);
+
+    // Fundo branco
+    ctx.fillStyle = '#f5f5f5';
+    ctx.fillRect(0, 0, s, s);
+
+    // Definição das cores por zona
+    const getZoneColor = (r, c) => {
+      // Bases (cantos 6x6)
+      if (r <= 5 && c <= 5) return r >= 1 && r <= 4 && c >= 1 && c <= 4 ? '#c8e6c9' : '#43a047';
+      if (r <= 5 && c >= 9) return r >= 1 && r <= 4 && c >= 10 && c <= 13 ? '#fff9c4' : '#f9a825';
+      if (r >= 9 && c <= 5) return r >= 10 && r <= 13 && c >= 1 && c <= 4 ? '#ffcdd2' : '#e53935';
+      if (r >= 9 && c >= 9) return r >= 10 && r <= 13 && c >= 10 && c <= 13 ? '#bbdefb' : '#1565c0';
+      // Centro (triângulos)
+      if (r >= 6 && r <= 8 && c >= 6 && c <= 8) {
+        if (r === 6 && c === 6) return '#43a047';
+        if (r === 6 && c === 8) return '#f9a825';
+        if (r === 8 && c === 6) return '#e53935';
+        if (r === 8 && c === 8) return '#1565c0';
+        return '#ffffff';
+      }
+      // Retas finais coloridas
+      if (c === 7 && r >= 1 && r <= 5) return '#a5d6a7';  // verde
+      if (r === 7 && c >= 9 && c <= 13) return '#fff59d'; // amarelo
+      if (c === 7 && r >= 9 && r <= 13) return '#ef9a9a'; // vermelho
+      if (r === 7 && c >= 1 && c <= 5) return '#90caf9';  // azul
+      // Caminho normal
+      return '#ffffff';
+    };
+
+    // Desenha todas as células
+    for (let r = 0; r < 15; r++) {
+      for (let c = 0; c < 15; c++) {
+        const color = getZoneColor(r, c);
+        ctx.fillStyle = color;
+        ctx.fillRect(c * cs, r * cs, cs, cs);
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(c * cs, r * cs, cs, cs);
+      }
+    }
+
+    // Casas seguras (estrela)
+    const safeSpots = [[2,6],[6,12],[12,8],[8,2],[2,8],[6,2],[12,6],[8,12]];
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.font = `bold ${cs * 0.55}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    safeSpots.forEach(([r, c]) => {
+      ctx.fillText('★', c * cs + cs / 2, r * cs + cs / 2);
+    });
+
+    // Setas de entrada
+    const arrows = [
+      [6, 0, '→', '#e53935'],
+      [0, 8, '↓', '#43a047'],
+      [8, 14, '←', '#1565c0'],
+      [14, 7, '↑', '#f9a825'],
+    ];
+    arrows.forEach(([r, c, arrow, color]) => {
+      ctx.fillStyle = color;
+      ctx.font = `bold ${cs * 0.6}px sans-serif`;
+      ctx.fillText(arrow, c * cs + cs / 2, r * cs + cs / 2);
+    });
+
+    // Bordas externas
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, s - 2, s - 2);
+  }
+
+  // Desenha uma peça no canvas
+  drawPiece(sx, sy, color, num, selected, t) {
+    const ctx = this.ctx;
+    const r = this.cs * 0.36;
+    const colorMap = {
+      r: '#e53935', g: '#43a047', b: '#1565c0', y: '#f9a825',
+      red: '#e53935', green: '#43a047', blue: '#1565c0', yellow: '#f9a825'
+    };
+    const innerMap = {
+      r: '#ef9a9a', g: '#81c784', b: '#90caf9', y: '#fff176',
+      red: '#ef9a9a', green: '#81c784', blue: '#90caf9', yellow: '#fff176'
+    };
+    const scale = selected ? 1 + 0.15 * Math.sin(t * 3) : 1;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.scale(scale, scale);
+
+    // Sombra
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 2;
+
+    // Círculo exterior
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.05, 0, 0, r);
+    grad.addColorStop(0, innerMap[color] || '#ccc');
+    grad.addColorStop(1, colorMap[color] || '#888');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Borda branca
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Halo dourado se selecionado
+    if (selected) {
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+
+    // Número da peça
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${r * 0.85}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 2;
+    ctx.fillText(num, 0, 0);
+
+    ctx.restore();
+  }
+}
+
+// Expor ambas as classes globalmente
+window.LudoBoard   = LudoBoard;
+window.LudoBoardV2 = LudoBoardV2;
