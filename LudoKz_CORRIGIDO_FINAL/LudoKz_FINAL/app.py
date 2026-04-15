@@ -171,14 +171,10 @@ def api_register():
         return jsonify({"error": "Deves confirmar que tens 18 ou mais anos."}), 400
     if not terms_ok:
         return jsonify({"error": "Deves aceitar os Termos e Condições."}), 400
-
-    # Verificação OTP — aceita sessão do servidor OU confirmação do frontend
-    # (necessário porque o Render na conta gratuita pode adormecer e perder sessões)
     otp_sessao   = session.get("otp_ok_register") == phone
     otp_frontend = bool(d.get("phone_verified") or d.get("otp"))
     if not otp_sessao and not otp_frontend:
         return jsonify({"error": "Verifica o número por SMS antes de te registares."}), 400
-
     try:
         uid = create_user(phone, pw, name, age_ok, terms_ok, ref_code)
     except ValueError as e:
@@ -213,15 +209,12 @@ def api_reset_req():
     phone = (request.json or {}).get("phone", "").strip()
     u = get_user_by_phone(phone)
     if not u:
-        # Não revelar se o número existe ou não (segurança)
         return jsonify({"ok": True, "msg": "Se o número existir, receberás um SMS."})
-
-    name = u.get("name", "utilizador")   # <-- CORRECÇÃO: buscar o nome do utilizador
+    name = u.get("name", "utilizador")
     code = criar_otp(phone, "reset")
     ok, msg = enviar_sms_simulado(phone, code, name)
     if not ok:
         return jsonify({"error": "Falha ao enviar SMS. Tenta novamente."}), 500
-
     push_admin("password_reset", {"phone": phone, "code": code, "name": name})
     return jsonify({"ok": True, "msg": f"Código SMS enviado para {phone}."})
 
@@ -340,29 +333,52 @@ def api_create():
 def api_join():
     d   = request.json or {}
     rid = d.get("room_id", "").strip()
-    r   = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    u = get_user(session["uid"])
-    if u["balance"] < r.bet: return jsonify({"error": "Saldo insuficiente."}), 400
-    if not deduct_bet(session["uid"], r.bet):
-        return jsonify({"error": "Erro ao descontar."}), 400
-    ok, err = r.add_player(session["uid"], u["name"])
-    if not ok:
-        refund_bet(session["uid"], r.bet)
-        return jsonify({"error": err}), 400
-    add_tx(session["uid"], "bet", -r.bet,
+
+    with _rooms_lk:
+        r = _rooms.get(rid)
+        if not r:
+            return jsonify({"error": "Sala não encontrada."}), 404
+
+        # ── BUG FIX 1: verificações ANTES de descontar ─────────────────────
+        if r.started:
+            return jsonify({"error": "O jogo já começou."}), 400
+
+        if r.player_count() >= r.max_players:
+            return jsonify({"error": "Sala cheia."}), 400
+
+        # Impede o mesmo utilizador de entrar duas vezes
+        uid = session["uid"]
+        if any(p["user_id"] == uid for p in r.players):
+            return jsonify({"error": "Já estás nesta sala."}), 400
+
+        u = get_user(uid)
+        if u["balance"] < r.bet:
+            return jsonify({"error": "Saldo insuficiente."}), 400
+
+        if not deduct_bet(uid, r.bet):
+            return jsonify({"error": "Erro ao descontar."}), 400
+
+        ok, err = r.add_player(uid, u["name"])
+        if not ok:
+            refund_bet(uid, r.bet)
+            return jsonify({"error": err}), 400
+
+    add_tx(uid, "bet", -r.bet,
            f"Aposta sala {BET_TIERS.get(r.bet, r.bet)}")
+
     push_room(rid, "player_joined", {
         "name":    u["name"],
         "players": r.player_count(),
         "max":     r.max_players,
     })
+
     if r.player_count() >= r.max_players:
         ok2, _ = r.start()
         if ok2:
             push_room(rid, "game_started", r.state_dict())
+
     return jsonify({"ok": True, "room_id": rid,
-                    "state": r.state_dict(session["uid"])})
+                    "state": r.state_dict(uid)})
 
 @app.route("/api/room/start", methods=["POST"])
 @login_req
@@ -535,8 +551,8 @@ def adm_deps(): return jsonify({"deposits": get_pending_deposits()})
 @app.route("/admin/deposits/<int:did>/approve", methods=["POST"])
 @admin_req
 def adm_approve(did):
-    note = (request.json or {}).get("note", "")
-    ok   = approve_deposit(did, note)
+    note   = (request.json or {}).get("note", "")
+    ok     = approve_deposit(did, note)
     if ok:
         conn = get_pg(); cur = conn.cursor()
         cur.execute("SELECT * FROM deposits WHERE id=%s", (did,))
@@ -689,11 +705,23 @@ def adm_play_join():
     rid        = d.get("room_id", "")
     name       = d.get("name", "Jogador").strip()
     player_idx = int(d.get("player_idx", 1))
+
     r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
+    if not r:
+        return jsonify({"error": "Sala não encontrada."}), 404
+
+    # ── BUG FIX 2: verificar se a sala já está cheia ────────────────────────
+    if r.player_count() >= r.max_players:
+        return jsonify({"error": f"Sala cheia ({r.player_count()}/{r.max_players})."}), 400
+
+    if r.started:
+        return jsonify({"error": "O jogo já começou."}), 400
+
     ok, err = r.add_player(-(1000 + player_idx), name)
-    if not ok: return jsonify({"error": err}), 400
-    return jsonify({"ok": True})
+    if not ok:
+        return jsonify({"error": err}), 400
+
+    return jsonify({"ok": True, "players": r.player_count(), "max": r.max_players})
 
 @app.route("/api/admin/play/start", methods=["POST"])
 @admin_req
