@@ -7,19 +7,29 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#020208;--bg1:#05040f;--bg2:#080618;--bg3:#0c0920;
-  --c1:#0f0d28;--c2:#141030;--c3:#1a1538;
-  --rim:#1e1a40;--rim2:#2d285a;--rim3:#4038a0;
-  --g1:#f5c518;--g2:#ffdb4d;--g3:#e6a800;--g4:#fff8e1;
-  --jade:#00e676;--jade2:#00c853;
+  --bg:#02020a;--bg1:#050712;--bg2:#07112c;--bg3:#02040c;
+  --c1:#09122c;--c2:#0f1b43;--c3:#142850;
+  --rim:#162039;--rim2:#253b67;--rim3:#4a6ab4;
+  --g1:#ffd64d;--g2:#ffce3d;--g3:#f8c439;--g4:#fff2c0;
+  --jade:#d4b04f;--jade2:#b58f2e;
   --red:#ff2d55;--blue:#0a84ff;--purple:#bf5af2;--orange:#ff9f0a;
-  --t1:#f0eeff;--t2:#9890c0;--t3:#4a4470;
+  --t1:#f4f2f8;--t2:#b8b3d5;--t3:#7b7aa3;
   --R:#ff453a;--G:#30d158;--B:#0a84ff;--Y:#ffd60a;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{font-family:"Plus Jakarta Sans",sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;overflow-x:hidden;cursor:default}
+body{font-family:"Plus Jakarta Sans",sans-serif;background:radial-gradient(circle at top, rgba(255,214,85,.08), transparent 22%), linear-gradient(145deg,#02020a,#06112c 28%,#02040c 68%,#02020a);color:var(--t1);min-height:100vh;overflow-x:hidden;cursor:default}
 body::before{content:"";position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(circle at center, rgba(255,199,79,.16), transparent 22%),radial-gradient(circle at 50% 55%, rgba(255,255,255,.08), transparent 12%);}
+.wealth-background{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:radial-gradient(circle at top, rgba(255,204,64,.14), transparent 20%),radial-gradient(circle at top left, rgba(25,61,112,.28), transparent 24%),radial-gradient(circle at bottom right, rgba(2,6,18,.85), transparent 30%);}
+.wealth-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at center, rgba(255,186,0,.22), transparent 24%),radial-gradient(circle at center, rgba(255,255,255,.08), transparent 12%);}
+.wealth-particles{position:absolute;inset:0;pointer-events:none}
+.wealth-particles span{position:absolute;width:6px;height:6px;border-radius:50%;background:radial-gradient(circle, rgba(255,229,148,1) 0%, rgba(255,180,0,.95) 45%, rgba(255,180,0,0) 75%);box-shadow:0 0 14px rgba(255,186,64,.55);opacity:.85;animation-duration:calc(10s * var(--s));animation-timing-function:linear;animation-name:particle-fall;animation-iteration-count:infinite;transform:translate3d(0,0,0)}
+.wealth-particles span::before{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:0 0 18px rgba(255,214,89,.8);}
+.gold-coin{position:absolute;border-radius:50%;background:radial-gradient(circle, rgba(255,238,156,.98) 0%, rgba(255,189,46,.95) 50%, rgba(255,189,46,.15) 75%);border:2px solid rgba(255,214,89,.25);box-shadow:0 0 30px rgba(255,187,52,.28);pointer-events:none;}
+.gold-coin::before{content:"";position:absolute;inset:12%;border-radius:50%;border:1px solid rgba(255,255,255,.5);}
+.gold-coin::after{content:"$";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;color:rgba(255,243,195,.9);font-family:"Bebas Neue",sans-serif;text-shadow:0 0 14px rgba(255,209,84,.75);}
+@keyframes particle-fall{0%{transform:translate(var(--x),calc(var(--y) - 22vh)) scale(var(--s));opacity:0}10%{opacity:1}100%{transform:translate(var(--x),calc(var(--y) + 122vh)) scale(var(--s));opacity:0}}
 .aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .aurora-blob{position:absolute;border-radius:50%;filter:blur(80px);animation:drift linear infinite}
 @keyframes drift{0%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-20px) scale(1.05)}66%{transform:translate(-20px,15px) scale(.97)}100%{transform:translate(0,0) scale(1)}}
@@ -275,10 +285,29 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 </head>
 <body>
 
+<div class="wealth-background">
+  <div class="wealth-glow"></div>
+  <div class="wealth-particles">
+    <span style="--x:6vw;--y:8vh;--s:.8;animation-delay:-2.4s"></span>
+    <span style="--x:22vw;--y:15vh;--s:.95;animation-delay:-1.2s"></span>
+    <span style="--x:40vw;--y:5vh;--s:.7;animation-delay:-3.5s"></span>
+    <span style="--x:28vw;--y:12vh;--s:1.1;animation-delay:-4.1s"></span>
+    <span style="--x:55vw;--y:18vh;--s:.85;animation-delay:-2.6s"></span>
+    <span style="--x:70vw;--y:11vh;--s:.75;animation-delay:-3.1s"></span>
+    <span style="--x:80vw;--y:20vh;--s:.9;animation-delay:-1.8s"></span>
+    <span style="--x:15vw;--y:25vh;--s:1.05;animation-delay:-5.2s"></span>
+    <span style="--x:65vw;--y:30vh;--s:.7;animation-delay:-2.9s"></span>
+    <span style="--x:92vw;--y:22vh;--s:.8;animation-delay:-4.6s"></span>
+    <span style="--x:50vw;--y:2vh;--s:.6;animation-delay:-3.9s"></span>
+    <span style="--x:32vw;--y:4vh;--s:1;animation-delay:-5.8s"></span>
+  </div>
+  <div class="gold-coin" style="top:18%;left:10%;width:72px;height:72px"></div>
+  <div class="gold-coin" style="top:42%;right:10%;width:84px;height:84px"></div>
+</div>
 <div class="aurora">
-  <div class="aurora-blob" style="width:600px;height:600px;background:rgba(93,68,209,.08);top:-200px;left:-100px;animation-duration:25s"></div>
-  <div class="aurora-blob" style="width:500px;height:500px;background:rgba(245,197,24,.05);top:30%;right:-150px;animation-duration:20s;animation-delay:-8s"></div>
-  <div class="aurora-blob" style="width:400px;height:400px;background:rgba(0,230,118,.04);bottom:-100px;left:30%;animation-duration:22s;animation-delay:-5s"></div>
+  <div class="aurora-blob" style="width:620px;height:620px;background:rgba(10,52,104,.16);top:-220px;left:-110px;animation-duration:28s"></div>
+  <div class="aurora-blob" style="width:520px;height:520px;background:rgba(255,203,66,.08);top:28%;right:-160px;animation-duration:22s;animation-delay:-8s"></div>
+  <div class="aurora-blob" style="width:420px;height:420px;background:rgba(20,38,72,.12);bottom:-110px;left:30%;animation-duration:24s;animation-delay:-5s"></div>
 </div>
 <canvas id="cvs"></canvas>
 
