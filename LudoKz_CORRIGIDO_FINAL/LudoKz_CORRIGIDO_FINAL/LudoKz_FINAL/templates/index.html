@@ -118,7 +118,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .lb-nm{flex:1;font-weight:700;font-size:14px}
 .lb-w{color:var(--jade);font-size:13px;font-weight:700}
 .lb-e{font-family:"Bebas Neue",sans-serif;font-size:16px;color:var(--g1);letter-spacing:.5px}
-/* MATCHMAKING */
 .mm-card{background:linear-gradient(160deg,var(--c2),var(--c3));border:1.5px solid rgba(245,197,24,.25);border-radius:22px;padding:28px;max-width:480px;margin:0 auto 28px;box-shadow:0 0 60px rgba(245,197,24,.07)}
 .mm-title{font-family:"Bebas Neue",sans-serif;font-size:28px;letter-spacing:2px;color:var(--g1);margin-bottom:6px;display:flex;align-items:center;gap:10px}
 .mm-sub{font-size:13px;color:var(--t2);font-weight:600;margin-bottom:20px;line-height:1.6}
@@ -159,7 +158,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .exl{list-style:none;font-size:13px;color:var(--t2);font-weight:600;line-height:2.1}
 .exl li::before{content:"→ ";color:var(--g1)}
 .mths{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-.mth{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;cursor:pointer;border:1.5px solid var(--rim);color:var(--t3);transition:all .15px;text-transform:uppercase;letter-spacing:.5px}
+.mth{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;cursor:pointer;border:1.5px solid var(--rim);color:var(--t3);transition:all .15s;text-transform:uppercase;letter-spacing:.5px}
 .mth.on{border-color:var(--g1);color:var(--g1);background:rgba(245,197,24,.08)}
 .pnote{font-size:11px;color:var(--t3);font-weight:600;margin-top:8px;line-height:1.6}
 .alrt{background:rgba(245,197,24,.06);border:1px solid rgba(245,197,24,.18);border-radius:11px;padding:14px;font-size:13px;font-weight:600;color:var(--t2);line-height:1.65;margin-bottom:14px}
@@ -282,7 +281,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 </div>
 <canvas id="cvs"></canvas>
 
-<!-- AUTH -->
+<!-- AUTH SCREEN -->
 <div id="s-auth" class="screen on z">
   <div class="auth-wrap">
     <div class="auth-brand">
@@ -301,6 +300,8 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <div class="tab on" onclick="atab('in')">Entrar</div>
         <div class="tab" onclick="atab('up')">Criar Conta</div>
       </div>
+
+      <!-- LOGIN FORM -->
       <div id="fin">
         <div class="fl">
           <label>Número de Telefone Angola</label>
@@ -309,7 +310,10 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
             <input id="lp-phone" type="tel" placeholder="9XX XXX XXX" style="flex:1" onkeydown="if(event.key==='Enter')document.getElementById('lp-pw').focus()">
           </div>
         </div>
-        <div class="fl"><label>Senha</label><input id="lp-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div class="fl">
+          <label>Senha</label>
+          <input id="lp-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
         <div class="errt" id="lerr"></div>
         <button class="btn bg bfw" id="btn-login" onclick="doLogin()" style="margin-top:6px;font-size:15px">Entrar</button>
         <div style="text-align:center;margin-top:13px">
@@ -317,6 +321,8 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <a class="reset-link" onclick="showReset()">Recuperar</a>
         </div>
       </div>
+
+      <!-- REGISTER FORM -->
       <div id="fup" class="hidden">
         <div id="reg-s1">
           <div class="fl"><label>Nome Completo</label><input id="rn" placeholder="O teu nome completo"></div>
@@ -329,10 +335,14 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
             <div id="op-badge" style="font-size:11px;color:var(--jade);margin-top:4px;font-weight:700"></div>
           </div>
           <div class="fl"><label>Senha</label><input id="rp" type="password" placeholder="Mínimo 6 caracteres"></div>
-          <div class="fl"><label>Código de Referido <span style="color:var(--jade);font-size:10px">+500 Kz bónus</span></label><input id="rref" placeholder="Opcional"></div>
+          <div class="fl">
+            <label>Código de Referido <span style="color:var(--jade);font-size:10px">+500 Kz bónus</span></label>
+            <input id="rref" placeholder="Opcional">
+          </div>
           <div class="errt" id="rerr"></div>
           <button class="btn bg bfw" id="btn-send-otp" onclick="enviarOTP()" style="font-size:14px">📱 Enviar Código SMS</button>
         </div>
+
         <div id="reg-s2" class="hidden">
           <div style="text-align:center;margin-bottom:16px">
             <div style="font-size:32px;margin-bottom:8px">📱</div>
@@ -344,8 +354,8 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           </div>
           <div style="text-align:center;margin-bottom:14px">
             <span style="font-size:13px;color:var(--t3)">Expira em: </span>
-            <span id="otp-timer" style="font-family:Bebas Neue,sans-serif;font-size:18px;color:var(--g1)">2:00</span>
-            <span style="font-size:12px;color:var(--t3);margin-left:8px" id="resend-btn" style="cursor:pointer;display:none">
+            <span id="otp-timer" style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--g1)">2:00</span>
+            <span id="resend-btn" style="font-size:12px;color:var(--t3);margin-left:8px;display:none">
               · <a onclick="enviarOTP()" style="color:var(--g1);cursor:pointer;font-weight:700">Reenviar</a>
             </span>
           </div>
@@ -353,6 +363,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <button class="btn bg bfw" onclick="verificarOTP()" style="font-size:14px">✓ Verificar Código</button>
           <button class="btn bgh bsm" onclick="voltarStep1()" style="width:100%;margin-top:8px;font-size:13px">← Voltar</button>
         </div>
+
         <div id="reg-s3" class="hidden">
           <div style="text-align:center;margin-bottom:18px">
             <div style="font-size:36px;margin-bottom:8px">✅</div>
@@ -385,6 +396,8 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           </div>
         </div>
       </div>
+
+      <!-- RESET PASSWORD FORM -->
       <div id="frst" class="hidden">
         <div id="rst1">
           <div style="text-align:center;margin-bottom:14px;font-size:13px;color:var(--t2)">Vamos enviar um código SMS para repor a tua senha.</div>
@@ -414,7 +427,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
   </div>
 </div>
 
-<!-- APP -->
+<!-- APP SCREEN -->
 <div id="s-app" class="screen z" style="flex-direction:column">
   <nav>
     <div class="logo" onclick="pg('home')">
@@ -434,7 +447,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
     </div>
   </nav>
 
-  <!-- HOME -->
+  <!-- HOME PAGE -->
   <div id="p-home" class="screen on z" style="flex-direction:column">
     <div class="jk-banner">
       <span class="jk-label">Jackpot do Dia</span>
@@ -443,7 +456,10 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
       <span class="jk-label">ao vivo</span>
     </div>
     <div class="hero">
-      <h1><span class="line1">Joga Ludo.</span><span class="line2">Ganha Kwanzas.</span></h1>
+      <h1>
+        <span class="line1">Joga Ludo.</span>
+        <span class="line2">Ganha Kwanzas.</span>
+      </h1>
       <p>A plataforma de apostas Ludo #1 em Angola. Partidas reais, dinheiro real, pagamentos Express Card.</p>
       <div class="hcta">
         <button class="btn bg bxl" onclick="pg('play')">🎮 Jogar Agora</button>
@@ -467,7 +483,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
     <div class="mm-card">
       <div class="mm-title">🎮 Jogar Ludo</div>
       <div class="mm-sub">Escolhe o valor da aposta e o número de jogadores. O sistema encontra adversários automaticamente!</div>
-
       <div class="mm-section">Aposta por Jogador</div>
       <div class="bps" id="bps-play">
         <div class="bp" onclick="mmBet(this,1000)"><div class="bpa">1K</div><div class="bpl">🥉 Bronze</div></div>
@@ -475,22 +490,19 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <div class="bp" onclick="mmBet(this,10000)"><div class="bpa">10K</div><div class="bpl">🥇 Ouro</div></div>
         <div class="bp" onclick="mmBet(this,50000)"><div class="bpa">50K</div><div class="bpl">👑 VIP</div></div>
       </div>
-
       <div class="mm-section">Nº de Jogadores</div>
       <div class="nps" id="nps-play">
         <div class="np on" onclick="mmPlayers(this,2)"><div class="npa">2</div><div class="npl">jogadores</div></div>
         <div class="np" onclick="mmPlayers(this,4)"><div class="npa">4</div><div class="npl">jogadores</div></div>
       </div>
-
       <div class="mm-prize" id="mm-prize-info">Selecciona a aposta para ver o prémio</div>
-
       <div class="errt" id="mm-err"></div>
       <button class="btn bg bfw" id="btn-mm" onclick="doMatchmaking()" style="font-size:16px;padding:16px">🚀 Encontrar Partida</button>
       <button class="btn bgh bsm" onclick="pg('home')" style="width:100%;margin-top:10px">← Voltar</button>
     </div>
   </div>
 
-  <!-- WAITING -->
+  <!-- WAITING ROOM -->
   <div id="p-wait" class="screen z" style="flex-direction:column;align-items:center;justify-content:center;padding:30px">
     <div class="wait-box">
       <div class="spn"></div>
@@ -498,7 +510,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
       <div class="wait-id" id="wrid">----</div>
       <div style="font-size:13px;color:var(--t3);font-weight:600;margin-bottom:8px">A aguardar jogadores...</div>
       <div style="font-size:14px;color:var(--t2);font-weight:700;margin-bottom:14px">
-        Aposta: <span id="wbet" style="color:var(--g1);font-family:Bebas Neue,sans-serif;font-size:18px;letter-spacing:1px">—</span>
+        Aposta: <span id="wbet" style="color:var(--g1);font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px">—</span>
         &nbsp;·&nbsp; <span id="wmaxp" style="color:var(--g1)">2</span> jogadores
       </div>
       <div class="wait-slots" id="wslots"></div>
@@ -551,7 +563,8 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <div class="fl"><label>Valor (Kz)</label><input type="number" id="dv" placeholder="5000" min="500"></div>
           <div class="fl"><label>Referência</label><input id="dref" placeholder="TXN20250312345"></div>
           <div class="fl"><label>Teu Nome</label><input id="dpayer" placeholder="João Silva"></div>
-          <div class="errt" id="de"></div><div class="okt" id="dok"></div>
+          <div class="errt" id="de"></div>
+          <div class="okt" id="dok"></div>
           <button class="btn bj bfw" onclick="doDeposit()" style="font-size:13px">Enviar Pedido</button>
           <p class="pnote">Mínimo 500 Kz · Confirmação manual</p>
         </div>
@@ -562,7 +575,8 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <div class="fl"><label>Nome da Conta</label><input id="wacname" placeholder="Nome exacto da conta"></div>
           <div class="fl"><label>Valor (Kz)</label><input type="number" id="wv" placeholder="1000" min="1000" oninput="wprev()"></div>
           <div class="okt" id="wpr"></div>
-          <div class="errt" id="we"></div><div class="okt" id="wok"></div>
+          <div class="errt" id="we"></div>
+          <div class="okt" id="wok"></div>
           <button class="btn bpu bfw" onclick="doWithdraw()" style="font-size:13px">Solicitar Levantamento</button>
         </div>
       </div>
@@ -578,16 +592,25 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
       </div>
       <div class="sup-card">
         <h3>💬 Suporte</h3>
-        <div class="fl" style="margin-bottom:9px"><label>Mensagem</label><textarea id="sup-msg" rows="3" placeholder="Descreve o teu problema..."></textarea></div>
+        <div class="fl" style="margin-bottom:9px">
+          <label>Mensagem</label>
+          <textarea id="sup-msg" rows="3" placeholder="Descreve o teu problema..."></textarea>
+        </div>
         <button class="btn bpu bfw" onclick="sendSupport()" style="font-size:13px">Enviar</button>
         <div class="okt" id="sup-ok" style="margin-top:7px"></div>
         <div id="tkts-list" style="margin-top:14px"></div>
       </div>
       <h2 class="sh" style="margin-top:4px">📋 Depósitos</h2>
-      <div class="txp"><div class="txh"><span>Referência</span><span>Estado</span></div><div id="dep-lst"></div></div>
+      <div class="txp">
+        <div class="txh"><span>Referência</span><span>Estado</span></div>
+        <div id="dep-lst"></div>
+      </div>
       <br>
       <h2 class="sh">📊 Histórico</h2>
-      <div class="txp"><div class="txh"><span>Descrição</span><span>Valor</span></div><div id="txb"></div></div>
+      <div class="txp">
+        <div class="txh"><span>Descrição</span><span>Valor</span></div>
+        <div id="txb"></div>
+      </div>
     </div>
   </div>
 
@@ -604,7 +627,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         </div>
       </div>
       <div class="wc" style="margin-bottom:18px">
-        <h3 style="font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:1px;color:var(--g1);margin-bottom:12px">📲 Número Express</h3>
+        <h3 style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--g1);margin-bottom:12px">📲 Número Express</h3>
         <div class="fl" style="margin-bottom:9px"><label>Número</label><input id="exp-num" placeholder="9XX XXX XXX"></div>
         <button class="btn bj bsm" onclick="saveExp()">Guardar</button>
       </div>
@@ -617,11 +640,14 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <div class="sc"><div class="scv" id="sbl" style="color:var(--purple)">0</div><div class="scl">Saldo Kz</div></div>
       </div>
       <h2 class="sh">🎮 Histórico de Partidas</h2>
-      <div class="txp"><div class="txh"><span>Partida</span><span>Resultado</span></div><div id="ghb"></div></div>
+      <div class="txp">
+        <div class="txh"><span>Partida</span><span>Resultado</span></div>
+        <div id="ghb"></div>
+      </div>
     </div>
   </div>
 
-  <!-- GAME (fallback canvas JS) -->
+  <!-- GAME SCREEN -->
   <div id="s-game" class="screen z" style="flex-direction:column;padding:10px">
     <div style="max-width:900px;margin:0 auto;width:100%">
       <div id="player-cards" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;justify-content:center"></div>
@@ -633,7 +659,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <div class="gcd">
             <div class="btd"><div class="bdl">Aposta</div><div class="bdv" id="gbv">0 KZ</div></div>
             <div style="text-align:center;margin:8px 0"><div class="dice-face" id="dfc">⚀</div></div>
-            <div id="dnm" style="font-family:Bebas Neue,sans-serif;font-size:34px;color:var(--g1);text-align:center;margin-bottom:8px;letter-spacing:2px">—</div>
+            <div id="dnm" style="font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--g1);text-align:center;margin-bottom:8px;letter-spacing:2px">—</div>
             <button class="btn bg bfw" id="rb" onclick="doRoll()" style="font-size:13px" disabled>🎲 Lançar Dado</button>
           </div>
           <div class="chat-wrap">
@@ -655,7 +681,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
   </div>
 </div>
 
-<!-- GAME OVER -->
+<!-- GAME OVER OVERLAY -->
 <div class="goov hidden" id="goo">
   <div class="gocd" id="gocd">
     <span class="goic" id="goic">🏆</span>
@@ -681,20 +707,24 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 <div class="tst" id="tst"></div>
 
 <script>
+// Particle canvas
 (function(){
-  const c=document.getElementById("cvs"),x=c.getContext("2d");
-  let pts=[];
-  const resize=()=>{c.width=innerWidth;c.height=innerHeight;};
+  var c=document.getElementById("cvs"),x=c.getContext("2d"),pts=[];
+  function resize(){c.width=innerWidth;c.height=innerHeight;}
   resize();addEventListener("resize",resize);
-  for(let i=0;i<80;i++) pts.push({
-    x:Math.random()*innerWidth,y:Math.random()*innerHeight,
-    vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,
-    r:Math.random()*1.8+.3,
-    col:Math.random()<.5?`rgba(245,197,24,${(Math.random()*.15+.03).toFixed(2)})`:`rgba(93,68,209,${(Math.random()*.12+.02).toFixed(2)})`
-  });
+  for(var i=0;i<80;i++){
+    pts.push({
+      x:Math.random()*innerWidth,y:Math.random()*innerHeight,
+      vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,
+      r:Math.random()*1.8+.3,
+      col:Math.random()<.5?
+        "rgba(245,197,24,"+(Math.random()*.15+.03).toFixed(2)+")":
+        "rgba(93,68,209,"+(Math.random()*.12+.02).toFixed(2)+")"
+    });
+  }
   (function loop(){
     x.clearRect(0,0,c.width,c.height);
-    pts.forEach(p=>{
+    pts.forEach(function(p){
       p.x+=p.vx;p.y+=p.vy;
       if(p.x<0)p.x=c.width;if(p.x>c.width)p.x=0;
       if(p.y<0)p.y=c.height;if(p.y>c.height)p.y=0;
@@ -705,87 +735,104 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
   })();
 })();
 
-let U=null,RID=null,SSE=null,LT=null;
-let MM_BET=0,MM_PLAYERS=2;
-const fmt=n=>Number(n).toLocaleString("pt-AO");
-const fmtD=s=>new Date(s).toLocaleDateString("pt-AO",{day:"2-digit",month:"2-digit",year:"2-digit"});
+var U=null,RID=null,SSE=null;
+var MM_BET=0,MM_PLAYERS=2;
 
-async function api(url,method="GET",body=null){
-  const o={method,headers:{"Content-Type":"application/json"},credentials:"same-origin"};
+function fmt(n){return Number(n).toLocaleString("pt-AO");}
+function fmtD(s){return new Date(s).toLocaleDateString("pt-AO",{day:"2-digit",month:"2-digit",year:"2-digit"});}
+
+async function api(url,method,body){
+  method=method||"GET";
+  var o={method:method,headers:{"Content-Type":"application/json"},credentials:"same-origin"};
   if(body)o.body=JSON.stringify(body);
-  try{const r=await fetch(url,o);return await r.json();}
+  try{var r=await fetch(url,o);return await r.json();}
   catch(e){return{error:"Erro de ligação."};}
 }
 
-/* JACKPOT */
+// Jackpot polling
 (function(){
   async function upd(){
-    try{const d=await api("/api/jackpot");const el=document.getElementById("jk-val");if(el&&d.value)el.textContent=Math.floor(d.value).toLocaleString("pt-AO")+" KZ";}catch(e){}
+    try{
+      var d=await api("/api/jackpot");
+      var el=document.getElementById("jk-val");
+      if(el&&d.value)el.textContent=Math.floor(d.value).toLocaleString("pt-AO")+" KZ";
+    }catch(e){}
   }
   upd();setInterval(upd,5000);
-  // Keep-alive para o Render não adormecer
-  setInterval(()=>{fetch('/api/jackpot').catch(()=>{});},600000);
+  setInterval(function(){fetch('/api/jackpot').catch(function(){});},600000);
 })();
 
-/* SSE */
+// SSE connection
 function connectSSE(){
   if(SSE)SSE.close();
   SSE=new EventSource("/api/events",{withCredentials:true});
-  SSE.addEventListener("game_started",e=>{if(typeof onGameStarted==="function")onGameStarted(JSON.parse(e.data));});
-  SSE.addEventListener("game_update",e=>{if(typeof onGameUpdate==="function")onGameUpdate(JSON.parse(e.data));});
-  SSE.addEventListener("game_over",e=>{if(typeof onGameOver==="function")onGameOver(JSON.parse(e.data));});
-  SSE.addEventListener("player_joined",e=>{
-    const d=JSON.parse(e.data);
+  SSE.addEventListener("game_started",function(e){if(typeof onGameStarted==="function")onGameStarted(JSON.parse(e.data));});
+  SSE.addEventListener("game_update",function(e){if(typeof onGameUpdate==="function")onGameUpdate(JSON.parse(e.data));});
+  SSE.addEventListener("game_over",function(e){if(typeof onGameOver==="function")onGameOver(JSON.parse(e.data));});
+  SSE.addEventListener("player_joined",function(e){
+    var d=JSON.parse(e.data);
     toast("👥 "+d.name+" entrou! ("+d.players+"/"+d.max+")","tin");
     updateWaitSlots(d.players,d.max);
   });
-  SSE.addEventListener("chat_message",e=>{const d=JSON.parse(e.data);addChat(d.name,d.text,d.system||false);});
-  SSE.addEventListener("deposit_approved",e=>{const d=JSON.parse(e.data);toast("✅ Depósito de "+fmt(d.amount)+" Kz confirmado!","tok");if(U){U.balance=d.balance;updN();}});
-  SSE.addEventListener("withdrawal_done",e=>{const d=JSON.parse(e.data);toast("💸 "+fmt(d.net)+" Kz enviados!","tin");});
-  SSE.addEventListener("withdrawal_rejected",e=>{const d=JSON.parse(e.data);toast(d.msg||"Levantamento rejeitado.","ter");api("/api/me").then(r=>{if(r.user){U=r.user;updN();}});});
-  SSE.addEventListener("balance_update",e=>{const d=JSON.parse(e.data);if(U){U.balance=d.balance;updN();}if(d.msg)toast(d.msg,"tok");});
-  SSE.addEventListener("support_reply",e=>{const d=JSON.parse(e.data);toast("💬 Suporte: "+d.reply.substring(0,60),"tin");});
-  SSE.onerror=()=>setTimeout(connectSSE,4000);
+  SSE.addEventListener("chat_message",function(e){var d=JSON.parse(e.data);addChat(d.name,d.text,d.system||false);});
+  SSE.addEventListener("deposit_approved",function(e){
+    var d=JSON.parse(e.data);
+    toast("✅ Depósito de "+fmt(d.amount)+" Kz confirmado!","tok");
+    if(U){U.balance=d.balance;updN();}
+  });
+  SSE.addEventListener("withdrawal_done",function(e){var d=JSON.parse(e.data);toast("💸 "+fmt(d.net)+" Kz enviados!","tin");});
+  SSE.addEventListener("withdrawal_rejected",function(e){
+    var d=JSON.parse(e.data);
+    toast(d.msg||"Levantamento rejeitado.","ter");
+    api("/api/me").then(function(r){if(r.user){U=r.user;updN();}});
+  });
+  SSE.addEventListener("balance_update",function(e){
+    var d=JSON.parse(e.data);
+    if(U){U.balance=d.balance;updN();}
+    if(d.msg)toast(d.msg,"tok");
+  });
+  SSE.addEventListener("support_reply",function(e){var d=JSON.parse(e.data);toast("💬 Suporte: "+d.reply.substring(0,60),"tin");});
+  SSE.onerror=function(){setTimeout(connectSSE,4000);};
 }
 
-/* AUTH */
-let REG_PHONE="",OTP_TIMER=null,AGE_CONFIRMED=false,PHONE_VERIFIED=false;
+// AUTH
+var REG_PHONE="",OTP_TIMER=null,AGE_CONFIRMED=false,PHONE_VERIFIED=false;
 
 function atab(t){
-  document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("on",i===(t==="in"?0:1)));
+  document.querySelectorAll(".tab").forEach(function(el,i){el.classList.toggle("on",i===(t==="in"?0:1));});
   document.getElementById("fin").classList.toggle("hidden",t!=="in");
   document.getElementById("fup").classList.toggle("hidden",t!=="up");
   document.getElementById("frst").classList.add("hidden");
 }
 
 async function doLogin(){
-  const phone="+244"+document.getElementById("lp-phone").value.trim().replace(/\s/g,"");
-  const pw=document.getElementById("lp-pw").value;
-  const err=document.getElementById("lerr");err.textContent="";
+  var phone="+244"+document.getElementById("lp-phone").value.trim().replace(/\s/g,"");
+  var pw=document.getElementById("lp-pw").value;
+  var err=document.getElementById("lerr");err.textContent="";
   if(phone==="+244"||!pw){err.textContent="❌ Preencha todos os campos.";return;}
-  const btn=document.getElementById("btn-login");
+  var btn=document.getElementById("btn-login");
   btn.disabled=true;btn.textContent="A entrar...";
-  const d=await api("/api/login","POST",{phone,password:pw});
+  var d=await api("/api/login","POST",{phone:phone,password:pw});
   btn.disabled=false;btn.textContent="Entrar";
   if(d.error){err.textContent="❌ "+d.error;return;}
   U=d.user;connectSSE();showApp();
 }
 
 async function enviarOTP(){
-  const name=document.getElementById("rn").value.trim();
-  const rawPhone=document.getElementById("rphone").value.trim().replace(/\s/g,"");
-  const pw=document.getElementById("rp").value;
-  const err=document.getElementById("rerr");err.textContent="";
+  var name=document.getElementById("rn").value.trim();
+  var rawPhone=document.getElementById("rphone").value.trim().replace(/\s/g,"");
+  var pw=document.getElementById("rp").value;
+  var err=document.getElementById("rerr");err.textContent="";
   if(!name){err.textContent="❌ Insere o teu nome.";return;}
   if(!rawPhone){err.textContent="❌ Insere o número.";return;}
   if(!pw||pw.length<6){err.textContent="❌ Senha mínima 6 caracteres.";return;}
-  const phone="+244"+rawPhone;REG_PHONE=phone;
-  const btn=document.getElementById("btn-send-otp");
+  var phone="+244"+rawPhone;REG_PHONE=phone;
+  var btn=document.getElementById("btn-send-otp");
   btn.disabled=true;btn.textContent="A enviar SMS...";
-  const d=await api("/api/otp/send","POST",{phone,name,purpose:"register"});
+  var d=await api("/api/otp/send","POST",{phone:phone,name:name,purpose:"register"});
   btn.disabled=false;btn.textContent="📱 Enviar Código SMS";
   if(d.error){err.textContent="❌ "+d.error;return;}
-  const ob=document.getElementById("op-badge");if(ob)ob.textContent="📶 "+d.operadora;
+  var ob=document.getElementById("op-badge");if(ob)ob.textContent="📶 "+d.operadora;
   document.getElementById("reg-s1").classList.add("hidden");
   document.getElementById("reg-s2").classList.remove("hidden");
   document.getElementById("otp-msg").textContent=d.msg||"Código enviado para "+phone;
@@ -793,22 +840,26 @@ async function enviarOTP(){
 }
 
 function iniciarTimerOTP(){
-  clearInterval(OTP_TIMER);let secs=120;
+  clearInterval(OTP_TIMER);var secs=120;
   document.getElementById("resend-btn").style.display="none";
-  OTP_TIMER=setInterval(()=>{
+  OTP_TIMER=setInterval(function(){
     secs--;
-    const m=Math.floor(secs/60),s=secs%60;
-    const el=document.getElementById("otp-timer");
+    var m=Math.floor(secs/60),s=secs%60;
+    var el=document.getElementById("otp-timer");
     if(el)el.textContent=m+":"+(s<10?"0":"")+s;
-    if(secs<=0){clearInterval(OTP_TIMER);if(el){el.textContent="Expirado";el.style.color="var(--red)";}document.getElementById("resend-btn").style.display="inline";}
+    if(secs<=0){
+      clearInterval(OTP_TIMER);
+      if(el){el.textContent="Expirado";el.style.color="var(--red)";}
+      document.getElementById("resend-btn").style.display="inline";
+    }
   },1000);
 }
 
 async function verificarOTP(){
-  const code=document.getElementById("rotp").value.trim();
-  const err=document.getElementById("otp-err");err.textContent="";
+  var code=document.getElementById("rotp").value.trim();
+  var err=document.getElementById("otp-err");err.textContent="";
   if(!code||code.length!==6){err.textContent="❌ Código de 6 dígitos.";return;}
-  const d=await api("/api/otp/verify","POST",{phone:REG_PHONE,code,purpose:"register"});
+  var d=await api("/api/otp/verify","POST",{phone:REG_PHONE,code:code,purpose:"register"});
   if(d.error){err.textContent="❌ "+d.error;return;}
   clearInterval(OTP_TIMER);PHONE_VERIFIED=true;
   document.getElementById("reg-s2").classList.add("hidden");
@@ -828,15 +879,16 @@ function confirmarIdade(sim){
 }
 
 async function doReg(){
-  const terms=document.getElementById("terms-check").checked;
-  const err=document.getElementById("terms-err");err.textContent="";
+  var terms=document.getElementById("terms-check").checked;
+  var err=document.getElementById("terms-err");err.textContent="";
   if(!AGE_CONFIRMED){err.textContent="❌ Confirma que tens 18+ anos.";return;}
   if(!terms){err.textContent="❌ Aceita os Termos e Condições.";return;}
   if(!PHONE_VERIFIED){err.textContent="❌ Verifica o número primeiro.";return;}
-  const name=document.getElementById("rn").value.trim();
-  const pw=document.getElementById("rp").value;
-  const ref=document.getElementById("rref")?.value.trim()||"";
-  const d=await api("/api/register","POST",{name,phone:REG_PHONE,password:pw,ref_code:ref,age_confirmed:true,terms_accepted:true});
+  var name=document.getElementById("rn").value.trim();
+  var pw=document.getElementById("rp").value;
+  var rrefEl=document.getElementById("rref");
+  var ref=rrefEl?rrefEl.value.trim():"";
+  var d=await api("/api/register","POST",{name:name,phone:REG_PHONE,password:pw,ref_code:ref,age_confirmed:true,terms_accepted:true});
   if(d.error){err.textContent="❌ "+d.error;return;}
   U=d.user;connectSSE();showApp();
   toast("🎉 Conta criada! Deposita para começar.","tok");coinRain();
@@ -848,33 +900,40 @@ async function doLogout(){
   location.reload();
 }
 
-let RESET_PHONE="";
-function showReset(){document.getElementById("fin").classList.add("hidden");document.getElementById("fup").classList.add("hidden");document.getElementById("frst").classList.remove("hidden");}
-function hideReset(){document.getElementById("frst").classList.add("hidden");document.getElementById("fin").classList.remove("hidden");}
+var RESET_PHONE="";
+function showReset(){
+  document.getElementById("fin").classList.add("hidden");
+  document.getElementById("fup").classList.add("hidden");
+  document.getElementById("frst").classList.remove("hidden");
+}
+function hideReset(){
+  document.getElementById("frst").classList.add("hidden");
+  document.getElementById("fin").classList.remove("hidden");
+}
 async function doResetReq(){
-  const rawPhone=document.getElementById("rst-phone").value.trim().replace(/\s/g,"");
-  const phone="+244"+rawPhone;RESET_PHONE=phone;
-  const err=document.getElementById("rst-err"),ok=document.getElementById("rst-ok");
+  var rawPhone=document.getElementById("rst-phone").value.trim().replace(/\s/g,"");
+  var phone="+244"+rawPhone;RESET_PHONE=phone;
+  var err=document.getElementById("rst-err"),ok=document.getElementById("rst-ok");
   err.textContent="";ok.textContent="";
   if(!rawPhone){err.textContent="❌ Insere o número.";return;}
-  await api("/api/reset/request","POST",{phone});
+  await api("/api/reset/request","POST",{phone:phone});
   ok.textContent="✅ Código SMS enviado para "+phone;
   document.getElementById("rst2").classList.remove("hidden");
 }
 async function doResetConf(){
-  const code=document.getElementById("rst-code").value.trim();
-  const pw=document.getElementById("rst-pw").value;
-  const err=document.getElementById("rst2-err"),ok=document.getElementById("rst2-ok");
+  var code=document.getElementById("rst-code").value.trim();
+  var pw=document.getElementById("rst-pw").value;
+  var err=document.getElementById("rst2-err"),ok=document.getElementById("rst2-ok");
   err.textContent="";ok.textContent="";
   if(!code||!pw){err.textContent="❌ Preenche os dois campos.";return;}
   if(pw.length<6){err.textContent="❌ Senha mínima 6 caracteres.";return;}
-  const d=await api("/api/reset/confirm","POST",{phone:RESET_PHONE,code,password:pw});
+  var d=await api("/api/reset/confirm","POST",{phone:RESET_PHONE,code:code,password:pw});
   if(d.error){err.textContent="❌ "+d.error;return;}
   ok.textContent="✅ Senha alterada! Faz login.";
-  setTimeout(()=>{hideReset();atab("in");},2000);
+  setTimeout(function(){hideReset();atab("in");},2000);
 }
 
-/* NAV */
+// NAV
 function showApp(){
   document.getElementById("s-auth").classList.remove("on");
   document.getElementById("s-app").classList.add("on");
@@ -882,15 +941,16 @@ function showApp(){
 }
 
 function pg(name){
-  ["p-home","p-play","p-wait","p-wallet","p-profile"].forEach(id=>{
-    const el=document.getElementById(id);if(el)el.style.display="none";
+  var pages=["p-home","p-play","p-wait","p-wallet","p-profile"];
+  pages.forEach(function(id){
+    var el=document.getElementById(id);if(el)el.style.display="none";
   });
   document.getElementById("s-game").style.display="none";
-  document.querySelectorAll(".nb").forEach(b=>b.classList.remove("on"));
+  document.querySelectorAll(".nb").forEach(function(b){b.classList.remove("on");});
   if(name==="game"){document.getElementById("s-game").style.display="flex";return;}
-  const el=document.getElementById("p-"+name);
+  var el=document.getElementById("p-"+name);
   if(el)el.style.display="flex";
-  const nb=document.getElementById("nb-"+name);
+  var nb=document.getElementById("nb-"+name);
   if(nb)nb.classList.add("on");
   if(name==="wallet")loadWallet();
   if(name==="profile")loadProfile();
@@ -901,19 +961,19 @@ function updN(){
   if(!U)return;
   document.getElementById("nbcl").textContent=fmt(U.balance)+" KZ";
   document.getElementById("navt").textContent=U.name[0].toUpperCase();
-  const wins=U.wins||0;
-  let rank="🏅 Novato";
+  var wins=U.wins||0;
+  var rank="🏅 Novato";
   if(wins>=100)rank="👑 Lenda";
   else if(wins>=50)rank="💎 Elite";
   else if(wins>=20)rank="🥇 Mestre";
   else if(wins>=10)rank="🥈 Experiente";
   else if(wins>=3)rank="🥉 Iniciado";
-  const rk=document.getElementById("prk");if(rk)rk.textContent=rank;
+  var rk=document.getElementById("prk");if(rk)rk.textContent=rank;
 }
 
 async function loadPublicStats(){
   try{
-    const d=await api("/api/stats/public");
+    var d=await api("/api/stats/public");
     if(!d.users)return;
     document.getElementById("hs-u").textContent=d.online||d.users;
     document.getElementById("hs-g").textContent=d.games||0;
@@ -923,68 +983,67 @@ async function loadPublicStats(){
 }
 
 async function loadLeaderboard(){
-  const el=document.getElementById("lb");if(!el)return;
+  var el=document.getElementById("lb");if(!el)return;
   el.innerHTML='<div class="empty">A carregar...</div>';
-  const d=await api("/api/leaderboard");
-  const rows=d.leaderboard||[];
+  var d=await api("/api/leaderboard");
+  var rows=d.leaderboard||[];
   if(!rows.length){el.innerHTML='<div class="empty">Sem dados ainda. Sê o primeiro!</div>';return;}
-  const medals=["🥇","🥈","🥉"];
-  el.innerHTML=`<div class="lb-head"><span style="width:32px">Pos</span><span style="width:36px"></span><span style="flex:1">Jogador</span><span>Vitórias</span><span style="min-width:100px;text-align:right">Ganhos</span></div>`+
-  rows.map((p,i)=>`<div class="lbr"><div class="lb-rank r${i+1}">${medals[i]||i+1}</div><div class="lb-av">${p.name[0].toUpperCase()}</div><div class="lb-nm">${p.name}</div><div class="lb-w">${p.wins}V</div><div class="lb-e" style="min-width:100px;text-align:right">${fmt(p.total_earned)} KZ</div></div>`).join("");
+  var medals=["🥇","🥈","🥉"];
+  var html='<div class="lb-head"><span style="width:32px">Pos</span><span style="width:36px"></span><span style="flex:1">Jogador</span><span>Vitórias</span><span style="min-width:100px;text-align:right">Ganhos</span></div>';
+  rows.forEach(function(p,i){
+    html+='<div class="lbr"><div class="lb-rank r'+(i+1)+'">'+(medals[i]||i+1)+'</div><div class="lb-av">'+p.name[0].toUpperCase()+'</div><div class="lb-nm">'+p.name+'</div><div class="lb-w">'+p.wins+'V</div><div class="lb-e" style="min-width:100px;text-align:right">'+fmt(p.total_earned)+' KZ</div></div>';
+  });
+  el.innerHTML=html;
 }
 
-/* ── MATCHMAKING ────────────────────────────────────────────── */
+// MATCHMAKING
 function mmBet(el,v){
   MM_BET=v;
-  document.getElementById("bps-play").querySelectorAll(".bp").forEach(x=>x.classList.remove("on"));
+  document.getElementById("bps-play").querySelectorAll(".bp").forEach(function(x){x.classList.remove("on");});
   el.classList.add("on");
-  const prize=Math.floor(v*MM_PLAYERS*0.90);
-  document.getElementById("mm-prize-info").textContent=
-    "💰 Prémio estimado: "+fmt(prize)+" Kz · Vencedor leva 90% do pote";
+  var prize=Math.floor(v*MM_PLAYERS*0.90);
+  document.getElementById("mm-prize-info").textContent="💰 Prémio estimado: "+fmt(prize)+" Kz · Vencedor leva 90% do pote";
 }
 
 function mmPlayers(el,v){
   MM_PLAYERS=v;
-  document.getElementById("nps-play").querySelectorAll(".np").forEach(x=>x.classList.remove("on"));
+  document.getElementById("nps-play").querySelectorAll(".np").forEach(function(x){x.classList.remove("on");});
   el.classList.add("on");
   if(MM_BET>0){
-    const prize=Math.floor(MM_BET*v*0.90);
-    document.getElementById("mm-prize-info").textContent=
-      "💰 Prémio estimado: "+fmt(prize)+" Kz · Vencedor leva 90% do pote";
+    var prize=Math.floor(MM_BET*v*0.90);
+    document.getElementById("mm-prize-info").textContent="💰 Prémio estimado: "+fmt(prize)+" Kz · Vencedor leva 90% do pote";
   }
 }
 
 async function doMatchmaking(){
-  const err=document.getElementById("mm-err");err.textContent="";
+  var err=document.getElementById("mm-err");err.textContent="";
   if(!MM_BET){err.textContent="❌ Escolhe o valor da aposta.";return;}
-  const btn=document.getElementById("btn-mm");
+  var btn=document.getElementById("btn-mm");
   btn.disabled=true;btn.textContent="🔍 A procurar sala...";
-
-  // 1. Procura sala existente com o mesmo bet e max_players
-  const lobby=await api("/api/lobby");
-  let found=null;
+  var lobby=await api("/api/lobby");
+  var found=null;
   if(lobby.rooms){
-    found=lobby.rooms.find(r=>r.bet===MM_BET&&r.max===MM_PLAYERS&&r.players<r.max);
+    for(var i=0;i<lobby.rooms.length;i++){
+      var r=lobby.rooms[i];
+      if(r.bet===MM_BET&&r.max===MM_PLAYERS&&r.players<r.max){found=r;break;}
+    }
   }
-
   if(found){
-    // Entrar na sala existente
-    const d=await api("/api/room/join","POST",{room_id:found.id});
+    var d=await api("/api/room/join","POST",{room_id:found.id});
     btn.disabled=false;btn.textContent="🚀 Encontrar Partida";
     if(d.error){err.textContent="❌ "+d.error;return;}
     RID=found.id;
     if(d.state&&d.state.started&&typeof onGameStarted==="function"){
       onGameStarted(d.state);
-    } else {
-      showWait(found.id,MM_BET,MM_PLAYERS,d.state?.players||2);
+    }else{
+      showWait(found.id,MM_BET,MM_PLAYERS,(d.state&&d.state.players)||2);
     }
-  } else {
-    // Criar nova sala
-    const d=await api("/api/room/create","POST",{bet:MM_BET,max_players:MM_PLAYERS});
+  }else{
+    var d2=await api("/api/room/create","POST",{bet:MM_BET,max_players:MM_PLAYERS});
     btn.disabled=false;btn.textContent="🚀 Encontrar Partida";
-    if(d.error){err.textContent="❌ "+d.error;return;}
-    RID=d.room_id;
-    showWait(d.room_id,MM_BET,MM_PLAYERS,1);
+    if(d2.error){err.textContent="❌ "+d2.error;return;}
+    RID=d2.room_id;
+    showWait(d2.room_id,MM_BET,MM_PLAYERS,1);
   }
 }
 
@@ -994,16 +1053,15 @@ function showWait(rid,bet,maxp,filled){
   document.getElementById("wbet").textContent=fmt(bet)+" Kz";
   document.getElementById("wmaxp").textContent=maxp;
   updateWaitSlots(filled,maxp);
-  ["p-home","p-play","p-wallet","p-profile"].forEach(id=>{
-    const el=document.getElementById(id);if(el)el.style.display="none";
-  });
+  var pages=["p-home","p-play","p-wallet","p-profile"];
+  pages.forEach(function(id){var el=document.getElementById(id);if(el)el.style.display="none";});
   document.getElementById("p-wait").style.display="flex";
 }
 
 function updateWaitSlots(filled,max){
-  const el=document.getElementById("wslots");if(!el)return;
-  let html="";
-  for(let i=0;i<max;i++)html+=`<div class="ws ${i<filled?"on":""}">${i<filled?"✓":"?"}</div>`;
+  var el=document.getElementById("wslots");if(!el)return;
+  var html="";
+  for(var i=0;i<max;i++)html+='<div class="ws '+(i<filled?"on":"")+'">'+(i<filled?"✓":"?")+'</div>';
   el.innerHTML=html;
 }
 
@@ -1012,132 +1070,155 @@ async function cancelWait(){
   RID=null;pg("play");
 }
 
-/* GAME OVER */
 function closeGO(){document.getElementById("goo").classList.add("hidden");RID=null;pg("home");}
 
-/* CHAT */
-function addChat(name,text,sys=false){
-  const el=document.getElementById("chat-msgs");if(!el)return;
-  const d=document.createElement("div");
+// CHAT
+function addChat(name,text,sys){
+  sys=sys||false;
+  var el=document.getElementById("chat-msgs");if(!el)return;
+  var d=document.createElement("div");
   d.className="chat-msg"+(sys?" sys":"");
-  const isMe=name===U?.name;
-  d.innerHTML=`<span class="cm-name" style="color:${sys?"var(--jade)":isMe?"var(--g1)":"var(--t1)"}">${name}:</span><span class="cm-txt"> ${text}</span>`;
+  var isMe=name===(U&&U.name);
+  d.innerHTML='<span class="cm-name" style="color:'+(sys?"var(--jade)":isMe?"var(--g1)":"var(--t1)")+'">'+name+':</span><span class="cm-txt"> '+text+'</span>';
   el.appendChild(d);el.scrollTop=el.scrollHeight;
   while(el.children.length>50)el.removeChild(el.firstChild);
 }
 async function sendChat(){
-  const inp=document.getElementById("chat-inp");
-  const msg=inp.value.trim();
+  var inp=document.getElementById("chat-inp");
+  var msg=inp.value.trim();
   if(!msg||!RID)return;
   inp.value="";addChat(U.name,msg,false);
-  await api("/api/game/chat","POST",{room_id:RID,message:msg}).catch(()=>{});
+  await api("/api/game/chat","POST",{room_id:RID,message:msg});
 }
 
-/* WALLET */
-function sm(el){el.closest(".mths").querySelectorAll(".mth").forEach(x=>x.classList.remove("on"));el.classList.add("on");}
+// WALLET
+function sm(el){
+  el.closest(".mths").querySelectorAll(".mth").forEach(function(x){x.classList.remove("on");});
+  el.classList.add("on");
+}
 function wprev(){
-  const v=parseFloat(document.getElementById("wv").value);
-  const el=document.getElementById("wpr");
+  var v=parseFloat(document.getElementById("wv").value);
+  var el=document.getElementById("wpr");
   if(v>=1000)el.textContent="Receberás: "+fmt(Math.floor(v*.90))+" Kz";
   else el.textContent="";
 }
 async function loadWallet(){
-  const u=await api("/api/me");
+  var u=await api("/api/me");
   if(u.user){U=u.user;updN();document.getElementById("wbn").textContent=fmt(U.balance);}
-  const t=await api("/api/transactions");renderTx(t.transactions||[]);
-  const dp=await api("/api/deposit/list");renderDeps(dp.deposits||[]);
-  if(U?.express_number)document.getElementById("wnum").value=U.express_number;
+  var t=await api("/api/transactions");renderTx(t.transactions||[]);
+  var dp=await api("/api/deposit/list");renderDeps(dp.deposits||[]);
+  var expNum=document.getElementById("wnum");
+  if(U&&U.express_number&&expNum)expNum.value=U.express_number;
   loadDaily();loadReferral();loadTickets();
 }
 async function doDeposit(){
-  const v=parseFloat(document.getElementById("dv").value);
-  const ref=document.getElementById("dref").value.trim();
-  const payer=document.getElementById("dpayer").value.trim();
-  const err=document.getElementById("de"),ok=document.getElementById("dok");
+  var v=parseFloat(document.getElementById("dv").value);
+  var ref=document.getElementById("dref").value.trim();
+  var payer=document.getElementById("dpayer").value.trim();
+  var err=document.getElementById("de"),ok=document.getElementById("dok");
   err.textContent="";ok.textContent="";
   if(!v||v<500){err.textContent="❌ Mínimo 500 Kz";return;}
   if(!ref){err.textContent="❌ Insere a referência Express.";return;}
-  const d=await api("/api/deposit/request","POST",{amount:v,express_ref:ref,payer_name:payer});
+  var d=await api("/api/deposit/request","POST",{amount:v,express_ref:ref,payer_name:payer});
   if(d.error){err.textContent="❌ "+d.error;return;}
   ok.textContent="✅ Pedido enviado! Aguarda confirmação.";
-  document.getElementById("dv").value="";document.getElementById("dref").value="";document.getElementById("dpayer").value="";
+  document.getElementById("dv").value="";
+  document.getElementById("dref").value="";
+  document.getElementById("dpayer").value="";
   loadWallet();
 }
 async function doWithdraw(){
-  const num=document.getElementById("wnum").value.trim();
-  const acn=document.getElementById("wacname").value.trim();
-  const v=parseFloat(document.getElementById("wv").value);
-  const err=document.getElementById("we"),ok=document.getElementById("wok");
+  var num=document.getElementById("wnum").value.trim();
+  var acn=document.getElementById("wacname").value.trim();
+  var v=parseFloat(document.getElementById("wv").value);
+  var err=document.getElementById("we"),ok=document.getElementById("wok");
   err.textContent="";ok.textContent="";
   if(!num){err.textContent="❌ Insere o número Express.";return;}
   if(!acn){err.textContent="❌ Insere o nome da conta Express.";return;}
   if(!v||v<1000){err.textContent="❌ Mínimo 1.000 Kz";return;}
-  const d=await api("/api/withdraw/request","POST",{amount:v,express_number:num,account_name:acn});
+  var d=await api("/api/withdraw/request","POST",{amount:v,express_number:num,account_name:acn});
   if(d.error){err.textContent="❌ "+d.error;return;}
   ok.textContent="✅ "+d.msg;
-  document.getElementById("wv").value="";document.getElementById("wpr").textContent="";
-  loadWallet();toast("Levantamento de "+fmt(v)+" Kz solicitado!","tin");
+  document.getElementById("wv").value="";
+  document.getElementById("wpr").textContent="";
+  loadWallet();
+  toast("Levantamento de "+fmt(v)+" Kz solicitado!","tin");
 }
 function renderTx(txs){
-  const b=document.getElementById("txb");
+  var b=document.getElementById("txb");
   if(!txs.length){b.innerHTML='<div class="empty">Sem transações</div>';return;}
-  b.innerHTML=txs.slice(0,30).map(t=>{
-    const ic=t.type==="deposit"?"⬆️":t.type.includes("with")?"⬇️":t.amount>0?"🏆":"🎮";
-    const cl=t.type==="deposit"?"id":t.type.includes("with")?"iw":t.amount>0?"ig":"il";
-    const a=t.amount>=0?"pos":"neg";
-    const as=(t.amount>=0?"+":"")+fmt(t.amount);
-    return `<div class="txi"><div class="tic ${cl}">${ic}</div><div class="tin2"><div class="tds">${t.description||t.type}</div><div class="tdt">${fmtD(t.created_at)}</div></div><div class="tam ${a}">${as} KZ</div></div>`;
-  }).join("");
+  var html="";
+  txs.slice(0,30).forEach(function(t){
+    var ic=t.type==="deposit"?"⬆️":t.type.indexOf("with")!==-1?"⬇️":t.amount>0?"🏆":"🎮";
+    var cl=t.type==="deposit"?"id":t.type.indexOf("with")!==-1?"iw":t.amount>0?"ig":"il";
+    var a=t.amount>=0?"pos":"neg";
+    var as=(t.amount>=0?"+":"")+fmt(t.amount);
+    html+='<div class="txi"><div class="tic '+cl+'">'+ic+'</div><div class="tin2"><div class="tds">'+(t.description||t.type)+'</div><div class="tdt">'+fmtD(t.created_at)+'</div></div><div class="tam '+a+'">'+as+' KZ</div></div>';
+  });
+  b.innerHTML=html;
 }
 function renderDeps(deps){
-  const b=document.getElementById("dep-lst");
+  var b=document.getElementById("dep-lst");
   if(!deps.length){b.innerHTML='<div class="empty">Sem pedidos</div>';return;}
-  b.innerHTML=deps.slice(0,10).map(d=>{
-    const sc=d.status==="approved"?"dsa":d.status==="rejected"?"dsr":"dsp";
-    const sl=d.status==="approved"?"✅ Confirmado":d.status==="rejected"?"❌ Rejeitado":"⏳ Pendente";
-    return `<div class="txi"><div class="tic id">⬆️</div><div class="tin2"><div class="tds">Ref: ${d.express_ref}</div><div class="tdt">${fmt(d.amount)} Kz · ${fmtD(d.created_at)}</div></div><div><span class="dst ${sc}">${sl}</span></div></div>`;
-  }).join("");
+  var html="";
+  deps.slice(0,10).forEach(function(d){
+    var sc=d.status==="approved"?"dsa":d.status==="rejected"?"dsr":"dsp";
+    var sl=d.status==="approved"?"✅ Confirmado":d.status==="rejected"?"❌ Rejeitado":"⏳ Pendente";
+    html+='<div class="txi"><div class="tic id">⬆️</div><div class="tin2"><div class="tds">Ref: '+d.express_ref+'</div><div class="tdt">'+fmt(d.amount)+' Kz · '+fmtD(d.created_at)+'</div></div><div><span class="dst '+sc+'">'+sl+'</span></div></div>';
+  });
+  b.innerHTML=html;
 }
 
-/* PROFILE */
+// PROFILE
 async function loadProfile(){
-  const u=await api("/api/me");if(u.user){U=u.user;updN();}
+  var u=await api("/api/me");if(u.user){U=u.user;updN();}
   if(!U)return;
   document.getElementById("pav").textContent=U.name[0].toUpperCase();
   document.getElementById("pnm").textContent=U.name;
   document.getElementById("pem").textContent=U.phone||"";
-  if(U.express_number)document.getElementById("exp-num").value=U.express_number;
+  var expNum=document.getElementById("exp-num");
+  if(U.express_number&&expNum)expNum.value=U.express_number;
   document.getElementById("sg2").textContent=U.games_played||0;
   document.getElementById("sw").textContent=U.wins||0;
   document.getElementById("sl").textContent=U.losses||0;
-  const rt=U.games_played>0?Math.round(U.wins/U.games_played*100):0;
+  var rt=U.games_played>0?Math.round(U.wins/U.games_played*100):0;
   document.getElementById("sr").textContent=rt+"%";
   document.getElementById("se").textContent=fmt(U.total_earned||0);
   document.getElementById("sbl").textContent=fmt(U.balance||0);
-  const gr=await api("/api/games/history");
-  const b=document.getElementById("ghb");
-  const gs=gr.games||[];
+  var gr=await api("/api/games/history");
+  var b=document.getElementById("ghb");
+  var gs=gr.games||[];
   if(!gs.length){b.innerHTML='<div class="empty">Sem partidas ainda</div>';return;}
-  b.innerHTML=gs.map(g=>`<div class="txi"><div class="tic ${g.is_win?"ig":"il"}">${g.is_win?"🏆":"💀"}</div><div class="tin2"><div class="tds">Sala ${g.room_id||"—"} · ${fmt(g.bet)} Kz</div><div class="tdt">${fmtD(g.played_at)}</div></div><div class="tam ${g.is_win?"pos":"neg"}">${g.is_win?"+"+fmt(g.prize):"-"+fmt(g.bet)} KZ</div></div>`).join("");
+  var html="";
+  gs.forEach(function(g){
+    html+='<div class="txi"><div class="tic '+(g.is_win?"ig":"il")+'">'+(g.is_win?"🏆":"💀")+'</div><div class="tin2"><div class="tds">Sala '+(g.room_id||"—")+' · '+fmt(g.bet)+' Kz</div><div class="tdt">'+fmtD(g.played_at)+'</div></div><div class="tam '+(g.is_win?"pos":"neg")+'">'+(g.is_win?"+"+fmt(g.prize):"-"+fmt(g.bet))+' KZ</div></div>';
+  });
+  b.innerHTML=html;
 }
 async function saveExp(){
-  const num=document.getElementById("exp-num").value.trim();
+  var num=document.getElementById("exp-num").value.trim();
   if(!num){toast("❌ Número inválido.","ter");return;}
   await api("/api/set_express","POST",{number:num});
   if(U)U.express_number=num;
   toast("✅ Número Express guardado!","tok");
 }
 
-/* BÓNUS DIÁRIO */
-const BONUSES=[500,750,1000,1500,2000,2500,5000];
-const DAYS=["D1","D2","D3","D4","D5","D6","D7"];
+// DAILY BONUS
+var BONUSES=[500,750,1000,1500,2000,2500,5000];
+var DAYS=["D1","D2","D3","D4","D5","D6","D7"];
 async function loadDaily(){
-  const d=await api("/api/bonus/daily/status");
-  const el=document.getElementById("daily-status");
-  const btn=document.getElementById("btn-daily");
-  const sd=document.getElementById("streak-days");
+  var d=await api("/api/bonus/daily/status");
+  var el=document.getElementById("daily-status");
+  var btn=document.getElementById("btn-daily");
+  var sd=document.getElementById("streak-days");
   if(!el)return;
-  if(sd){sd.innerHTML=BONUSES.map((v,i)=>`<div class="sd ${i<(d.streak||0)?"done":""}"><div class="sd-day">${DAYS[i]}</div><div class="sd-val">${v>=1000?(v/1000)+"K":v}</div></div>`).join("");}
+  if(sd){
+    var html="";
+    BONUSES.forEach(function(v,i){
+      html+='<div class="sd '+(i<(d.streak||0)?"done":"")+'"><div class="sd-day">'+DAYS[i]+'</div><div class="sd-val">'+(v>=1000?(v/1000)+"K":v)+'</div></div>';
+    });
+    sd.innerHTML=html;
+  }
   if(d.claimed){
     el.innerHTML="✅ Recebido! Volta amanhã · Streak: <strong style='color:var(--g1)'>"+(d.streak||0)+"/7</strong>";
     if(btn){btn.disabled=true;btn.textContent="✓ Recebido hoje";}
@@ -1147,20 +1228,20 @@ async function loadDaily(){
   }
 }
 async function claimDaily(){
-  const d=await api("/api/bonus/daily/claim","POST",{});
+  var d=await api("/api/bonus/daily/claim","POST",{});
   if(d.error){toast("❌ "+d.error,"ter");return;}
   if(U){U.balance=d.balance;updN();document.getElementById("wbn").textContent=fmt(U.balance);}
   toast("🎁 +"+d.amount.toLocaleString("pt-AO")+" Kz! Dia "+d.streak+" 🔥","tok");
   coinRain();loadDaily();
 }
 
-/* PROMO */
+// PROMO CODE
 async function usePromo(){
-  const code=document.getElementById("promo-inp").value.trim().toUpperCase();
-  const err=document.getElementById("promo-err"),ok=document.getElementById("promo-ok");
+  var code=document.getElementById("promo-inp").value.trim().toUpperCase();
+  var err=document.getElementById("promo-err"),ok=document.getElementById("promo-ok");
   err.textContent="";ok.textContent="";
   if(!code){err.textContent="❌ Insere o código.";return;}
-  const d=await api("/api/promo/use","POST",{code});
+  var d=await api("/api/promo/use","POST",{code:code});
   if(d.error){err.textContent="❌ "+d.error;return;}
   ok.textContent="✅ "+d.msg;
   document.getElementById("promo-inp").value="";
@@ -1168,75 +1249,86 @@ async function usePromo(){
   coinRain();toast(d.msg,"tok");
 }
 
-/* REFERIDOS */
+// REFERRALS
 async function loadReferral(){
-  const d=await api("/api/referral/code");
-  const el=document.getElementById("ref-link");
-  const cnt=document.getElementById("ref-count");
+  var d=await api("/api/referral/code");
+  var el=document.getElementById("ref-link");
+  var cnt=document.getElementById("ref-count");
   if(!el)return;
   el.textContent=d.link||"";el.dataset.link=d.link||"";
-  const r=await api("/api/referral/list");
-  const refs=r.referrals||[];
+  var r=await api("/api/referral/list");
+  var refs=r.referrals||[];
   if(cnt)cnt.textContent=refs.length>0?"✅ "+refs.length+" amigo(s) referido(s) — +"+(refs.length*500).toLocaleString("pt-AO")+" Kz ganhos!":"Ainda não referiste ninguém.";
 }
 function copyRef(){
-  const el=document.getElementById("ref-link");
-  const link=el.dataset.link||el.textContent;
-  navigator.clipboard.writeText(link).catch(()=>{});
+  var el=document.getElementById("ref-link");
+  var link=el.dataset.link||el.textContent;
+  navigator.clipboard.writeText(link).catch(function(){});
   toast("📋 Link copiado!","tin");
 }
 function shareRef(){
-  const el=document.getElementById("ref-link");
-  const link=el.dataset.link||el.textContent;
-  const msg="Joga Ludo e ganha Kwanzas! Regista-te no LudoKz com o meu link e ganha 500 Kz de bónus: "+link;
+  var el=document.getElementById("ref-link");
+  var link=el.dataset.link||el.textContent;
+  var msg="Joga Ludo e ganha Kwanzas! Regista-te no LudoKz com o meu link e ganha 500 Kz de bónus: "+link;
   if(navigator.share){navigator.share({title:"LudoKz",text:msg,url:link});}
-  else{navigator.clipboard.writeText(msg).catch(()=>{});toast("Link copiado!","tin");}
+  else{navigator.clipboard.writeText(msg).catch(function(){});toast("Link copiado!","tin");}
 }
 
-/* SUPORTE */
+// SUPPORT
 async function sendSupport(){
-  const msg=document.getElementById("sup-msg").value.trim();
-  const ok=document.getElementById("sup-ok");ok.textContent="";
+  var msg=document.getElementById("sup-msg").value.trim();
+  var ok=document.getElementById("sup-ok");ok.textContent="";
   if(!msg||msg.length<5){toast("❌ Mensagem muito curta.","ter");return;}
-  const d=await api("/api/support/ticket","POST",{message:msg});
+  var d=await api("/api/support/ticket","POST",{message:msg});
   if(d.error){toast("❌ "+d.error,"ter");return;}
   ok.textContent="✅ Mensagem enviada!";
-  document.getElementById("sup-msg").value="";loadTickets();
+  document.getElementById("sup-msg").value="";
+  loadTickets();
 }
 async function loadTickets(){
-  const d=await api("/api/support/tickets");
-  const el=document.getElementById("tkts-list");if(!el)return;
-  const tkts=d.tickets||[];
+  var d=await api("/api/support/tickets");
+  var el=document.getElementById("tkts-list");if(!el)return;
+  var tkts=d.tickets||[];
   if(!tkts.length){el.innerHTML="";return;}
-  el.innerHTML='<div style="font-size:11px;font-weight:800;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px">Os teus pedidos</div>'+
-    tkts.map(t=>`<div class="tkt"><div style="color:var(--t2);font-weight:600">${t.message}</div>${t.reply?`<div style="color:var(--jade);margin-top:7px;font-weight:700">💬 Resposta: ${t.reply}</div>`:""}<div style="font-size:11px;color:var(--t3);margin-top:5px">${fmtD(t.created_at)} · <span style="color:${t.status==="closed"?"var(--jade)":"var(--orange)"}">${t.status==="closed"?"✅ Respondido":"⏳ Aguarda"}</span></div></div>`).join("");
+  var html='<div style="font-size:11px;font-weight:800;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px">Os teus pedidos</div>';
+  tkts.forEach(function(t){
+    html+='<div class="tkt"><div style="color:var(--t2);font-weight:600">'+t.message+'</div>'+(t.reply?'<div style="color:var(--jade);margin-top:7px;font-weight:700">💬 Resposta: '+t.reply+'</div>':'')+'<div style="font-size:11px;color:var(--t3);margin-top:5px">'+fmtD(t.created_at)+' · <span style="color:'+(t.status==="closed"?"var(--jade)":"var(--orange)")+'">'+((t.status==="closed")?"✅ Respondido":"⏳ Aguarda")+'</span></div></div>';
+  });
+  el.innerHTML=html;
 }
 
-/* EFFECTS */
+// EFFECTS
 function coinRain(){
-  for(let i=0;i<14;i++){
-    setTimeout(()=>{
-      const el=document.createElement("div");
-      el.className="coin-drop";
-      el.textContent=["💰","🎲","⭐","🏆","💎"][Math.floor(Math.random()*5)];
-      el.style.left=Math.random()*100+"vw";el.style.top="0";el.style.position="fixed";
-      document.body.appendChild(el);setTimeout(()=>el.remove(),1100);
-    },i*70);
+  var emojis=["💰","🎲","⭐","🏆","💎"];
+  for(var i=0;i<14;i++){
+    (function(idx){
+      setTimeout(function(){
+        var el=document.createElement("div");
+        el.className="coin-drop";
+        el.textContent=emojis[Math.floor(Math.random()*emojis.length)];
+        el.style.left=Math.random()*100+"vw";
+        el.style.top="0";
+        el.style.position="fixed";
+        document.body.appendChild(el);
+        setTimeout(function(){el.remove();},1100);
+      },idx*70);
+    })(i);
   }
 }
 function showFlash(emoji){
-  const el=document.createElement("div");
+  var el=document.createElement("div");
   el.className="flash-el";el.textContent=emoji;
-  document.body.appendChild(el);setTimeout(()=>el.remove(),1000);
+  document.body.appendChild(el);
+  setTimeout(function(){el.remove();},1000);
+}
+function toast(msg,cls){
+  cls=cls||"tin";
+  var el=document.getElementById("tst");
+  el.textContent=msg;el.className="tst show "+cls;
+  setTimeout(function(){el.classList.remove("show");},3600);
 }
 
-function toast(msg,cls="tin"){
-  const el=document.getElementById("tst");
-  el.textContent=msg;el.className=`tst show ${cls}`;
-  setTimeout(()=>el.classList.remove("show"),3600);
-}
-
-/* GAME FUNCTIONS (usadas pelo game_patch.js) */
+// GAME FUNCTIONS
 window.leaveGame=async function(){
   if(!confirm("Abandonar? Perdes a aposta."))return;
   if(RID){await api("/api/game/leave","POST",{room_id:RID});}
@@ -1245,21 +1337,21 @@ window.leaveGame=async function(){
 
 window.doRoll=async function(){
   if(!RID)return;
-  const rb=document.getElementById("rb");if(rb)rb.disabled=true;
-  const faceEl=document.getElementById("dfc");if(faceEl)faceEl.classList.add("rolling");
-  const d=await api("/api/game/roll","POST",{room_id:RID});
+  var rb=document.getElementById("rb");if(rb)rb.disabled=true;
+  var faceEl=document.getElementById("dfc");if(faceEl)faceEl.classList.add("rolling");
+  var d=await api("/api/game/roll","POST",{room_id:RID});
   if(faceEl)faceEl.classList.remove("rolling");
   if(d.error){toast("❌ "+d.error,"ter");return;}
   if(window.BOARD){
     window.BOARD.animateDice(d.dice,async function(){
       if(typeof window.renderState==="function")window.renderState(d);
-      const mv=await api("/api/game/movable","POST",{room_id:RID});
+      var mv=await api("/api/game/movable","POST",{room_id:RID});
       if(mv.movable&&mv.movable.length&&typeof window.highlightPcs==="function")window.highlightPcs(mv.movable);
     });
   }else{
-    const faces=["⚀","⚁","⚂","⚃","⚄","⚅"];
+    var faces=["⚀","⚁","⚂","⚃","⚄","⚅"];
     if(faceEl)faceEl.textContent=faces[d.dice-1];
-    const dnm=document.getElementById("dnm");if(dnm)dnm.textContent=d.dice;
+    var dnm=document.getElementById("dnm");if(dnm)dnm.textContent=d.dice;
     if(typeof window.renderState==="function")window.renderState(d);
   }
 };
@@ -1267,7 +1359,7 @@ window.doRoll=async function(){
 window.movePc=async function(idx){
   if(!RID)return;
   window.PREV_STATE=window.CUR_STATE?JSON.parse(JSON.stringify(window.CUR_STATE)):null;
-  const d=await api("/api/game/move","POST",{room_id:RID,piece:idx});
+  var d=await api("/api/game/move","POST",{room_id:RID,piece:idx});
   if(d.error){toast("❌ "+d.error,"ter");return;}
   if(window.PREV_STATE&&window.BOARD&&typeof window._triggerMoveAnimations==="function")
     window._triggerMoveAnimations(window.PREV_STATE,d);
@@ -1275,9 +1367,9 @@ window.movePc=async function(idx){
   if(typeof window.renderState==="function")window.renderState(d);
 };
 
-/* INIT */
-(async()=>{
-  const d=await api("/api/me");
+// INIT — check existing session
+(async function(){
+  var d=await api("/api/me");
   if(d.user){U=d.user;connectSSE();showApp();}
 })();
 </script>
