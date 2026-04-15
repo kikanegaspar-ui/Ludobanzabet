@@ -723,7 +723,6 @@ async function api(url,method="GET",body=null){
     try{const d=await api("/api/jackpot");const el=document.getElementById("jk-val");if(el&&d.value)el.textContent=Math.floor(d.value).toLocaleString("pt-AO")+" KZ";}catch(e){}
   }
   upd();setInterval(upd,5000);
-  // Keep-alive para o Render não adormecer
   setInterval(()=>{fetch('/api/jackpot').catch(()=>{});},600000);
 })();
 
@@ -954,37 +953,48 @@ function mmPlayers(el,v){
   }
 }
 
+/* ── BUG FIX: verifica bet + max_players + não cheia + não iniciada ── */
 async function doMatchmaking(){
   const err=document.getElementById("mm-err");err.textContent="";
   if(!MM_BET){err.textContent="❌ Escolhe o valor da aposta.";return;}
   const btn=document.getElementById("btn-mm");
   btn.disabled=true;btn.textContent="🔍 A procurar sala...";
 
-  // 1. Procura sala existente com o mesmo bet e max_players
   const lobby=await api("/api/lobby");
   let found=null;
   if(lobby.rooms){
-    found=lobby.rooms.find(r=>r.bet===MM_BET&&r.max===MM_PLAYERS&&r.players<r.max);
+    found=lobby.rooms.find(r=>
+      r.bet===MM_BET &&
+      r.max===MM_PLAYERS &&
+      r.players<r.max &&
+      !r.started
+    );
   }
 
   if(found){
-    // Entrar na sala existente
     const d=await api("/api/room/join","POST",{room_id:found.id});
     btn.disabled=false;btn.textContent="🚀 Encontrar Partida";
-    if(d.error){err.textContent="❌ "+d.error;return;}
+    if(d.error){
+      if(d.error==="Sala cheia."||d.error==="O jogo já começou."){
+        const d2=await api("/api/room/create","POST",{bet:MM_BET,max_players:MM_PLAYERS});
+        if(d2.error){err.textContent="❌ "+d2.error;return;}
+        RID=d2.room_id;showWait(d2.room_id,MM_BET,MM_PLAYERS,1);
+      }else{
+        err.textContent="❌ "+d.error;
+      }
+      return;
+    }
     RID=found.id;
     if(d.state&&d.state.started&&typeof onGameStarted==="function"){
       onGameStarted(d.state);
-    } else {
+    }else{
       showWait(found.id,MM_BET,MM_PLAYERS,d.state?.players||2);
     }
-  } else {
-    // Criar nova sala
+  }else{
     const d=await api("/api/room/create","POST",{bet:MM_BET,max_players:MM_PLAYERS});
     btn.disabled=false;btn.textContent="🚀 Encontrar Partida";
     if(d.error){err.textContent="❌ "+d.error;return;}
-    RID=d.room_id;
-    showWait(d.room_id,MM_BET,MM_PLAYERS,1);
+    RID=d.room_id;showWait(d.room_id,MM_BET,MM_PLAYERS,1);
   }
 }
 
@@ -1236,7 +1246,7 @@ function toast(msg,cls="tin"){
   setTimeout(()=>el.classList.remove("show"),3600);
 }
 
-/* GAME FUNCTIONS (usadas pelo game_patch.js) */
+/* GAME FUNCTIONS */
 window.leaveGame=async function(){
   if(!confirm("Abandonar? Perdes a aposta."))return;
   if(RID){await api("/api/game/leave","POST",{room_id:RID});}
