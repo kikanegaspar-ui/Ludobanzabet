@@ -18,18 +18,27 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{font-family:"Plus Jakarta Sans",sans-serif;background:radial-gradient(circle at top, rgba(255,214,85,.08), transparent 22%), linear-gradient(145deg,#02020a,#06112c 28%,#02040c 68%,#02020a);color:var(--t1);min-height:100vh;overflow-x:hidden;cursor:default}
-body::before{content:"";position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
-body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(circle at center, rgba(255,199,79,.16), transparent 22%),radial-gradient(circle at 50% 55%, rgba(255,255,255,.08), transparent 12%);}
-.wealth-background{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:radial-gradient(circle at top, rgba(255,204,64,.14), transparent 20%),radial-gradient(circle at top left, rgba(25,61,112,.28), transparent 24%),radial-gradient(circle at bottom right, rgba(2,6,18,.85), transparent 30%);}
-.wealth-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at center, rgba(255,186,0,.22), transparent 24%),radial-gradient(circle at center, rgba(255,255,255,.08), transparent 12%);}
+body{font-family:"Plus Jakarta Sans",sans-serif;background:linear-gradient(135deg,#000000 0%,#111827 100%);color:var(--t1);min-height:100vh;overflow-x:hidden;cursor:default}
+body::before{content:"";position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.45}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(circle at 30% 20%, rgba(255,215,0,.12), transparent 18%),radial-gradient(circle at 75% 18%, rgba(255,215,0,.08), transparent 14%),radial-gradient(circle at 50% 65%, rgba(255,255,255,.06), transparent 15%);}
+.wealth-background{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:linear-gradient(180deg, rgba(255,215,0,.06) 0%, transparent 18%), radial-gradient(circle at 18% 12%, rgba(255,215,0,.06), transparent 20%), radial-gradient(circle at 82% 18%, rgba(180,125,20,.08), transparent 18%), radial-gradient(circle at 55% 85%, rgba(2,4,10,.9), transparent 38%);}
+.wealth-background::before{content:"";position:absolute;top:10%;left:6%;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle, rgba(255,215,0,.32), rgba(255,215,0,0) 70%);filter:blur(18px);pointer-events:none;}
+.wealth-background::after{content:"";position:absolute;bottom:8%;right:9%;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle, rgba(255,215,0,.28), rgba(255,215,0,0) 72%);filter:blur(24px);pointer-events:none;}
+.wealth-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at center, rgba(255,215,0,.22), transparent 24%),radial-gradient(circle at center, rgba(255,255,255,.08), transparent 12%);}
 .wealth-particles{position:absolute;inset:0;pointer-events:none}
-.wealth-particles span{position:absolute;width:6px;height:6px;border-radius:50%;background:radial-gradient(circle, rgba(255,229,148,1) 0%, rgba(255,180,0,.95) 45%, rgba(255,180,0,0) 75%);box-shadow:0 0 14px rgba(255,186,64,.55);opacity:.85;animation-duration:calc(10s * var(--s));animation-timing-function:linear;animation-name:particle-fall;animation-iteration-count:infinite;transform:translate3d(0,0,0)}
-.wealth-particles span::before{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:0 0 18px rgba(255,214,89,.8);}
-.gold-coin{position:absolute;border-radius:50%;background:radial-gradient(circle, rgba(255,238,156,.98) 0%, rgba(255,189,46,.95) 50%, rgba(255,189,46,.15) 75%);border:2px solid rgba(255,214,89,.25);box-shadow:0 0 30px rgba(255,187,52,.28);pointer-events:none;}
-.gold-coin::before{content:"";position:absolute;inset:12%;border-radius:50%;border:1px solid rgba(255,255,255,.5);}
-.gold-coin::after{content:"$";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;color:rgba(255,243,195,.9);font-family:"Bebas Neue",sans-serif;text-shadow:0 0 14px rgba(255,209,84,.75);}
-@keyframes particle-fall{0%{transform:translate(var(--x),calc(var(--y) - 22vh)) scale(var(--s));opacity:0}10%{opacity:1}100%{transform:translate(var(--x),calc(var(--y) + 122vh)) scale(var(--s));opacity:0}}
+.wealth-particles span{position:absolute;width:6px;height:6px;border-radius:50%;background:radial-gradient(circle, rgba(255,229,148,1) 0%, rgba(255,180,0,.95) 45%, rgba(255,180,0,0) 75%);box-shadow:0 0 16px rgba(255,215,0,.45);opacity:.9;animation:particle-fall 14s linear infinite, particle-wobble 6s ease-in-out infinite;transform:translate3d(0,0,0)}
+.wealth-particles span::before{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:0 0 22px rgba(255,215,0,.9);}
+.gold-coin{position:absolute;border-radius:50%;background:radial-gradient(circle, rgba(255,237,160,.98) 0%, rgba(255,215,0,1) 45%, rgba(255,170,0,.95) 65%, rgba(255,170,0,.15) 85%);border:2px solid rgba(255,215,0,.24);box-shadow:0 0 36px rgba(255,215,0,.32), inset 0 0 10px rgba(255,238,140,.35);pointer-events:none;animation:coin-float 12s ease-in-out infinite, coin-glow 3.5s ease-in-out infinite alternate;}
+.gold-coin::before{content:"";position:absolute;inset:12%;border-radius:50%;border:1px solid rgba(255,255,255,.5);box-shadow:inset 0 0 18px rgba(255,255,255,.18);}
+.gold-coin::after{content:"$";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;color:rgba(255,243,195,.92);font-family:"Bebas Neue",sans-serif;text-shadow:0 0 18px rgba(255,215,0,.85);}
+.gold-coin:nth-of-type(1){animation-duration:11s ease-in-out infinite, coin-glow 4s ease-in-out infinite alternate;}
+.gold-coin:nth-of-type(2){animation-duration:13s ease-in-out infinite, coin-glow 3.2s ease-in-out infinite alternate;}
+.gold-coin:nth-of-type(1)::after{font-size:32px}
+.gold-coin:nth-of-type(2)::after{font-size:36px}
+@keyframes particle-fall{0%{transform:translate(var(--x),calc(var(--y) - 22vh)) scale(var(--s));opacity:0}10%{opacity:1}50%{opacity:.9}100%{transform:translate(var(--x),calc(var(--y) + 122vh)) scale(var(--s));opacity:0}}
+@keyframes particle-wobble{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+@keyframes coin-float{0%{transform:translateY(0) translateX(0) translateZ(0) rotate(0deg) scale(1)}25%{transform:translateY(-10px) translateX(2px) rotate(8deg) scale(1.02)}50%{transform:translateY(0px) translateX(-2px) rotate(0deg) scale(1)}75%{transform:translateY(8px) translateX(1px) rotate(-6deg) scale(1.01)}100%{transform:translateY(0) translateX(0) translateZ(0) rotate(0deg) scale(1)}}
+@keyframes coin-glow{0%{box-shadow:0 0 30px rgba(255,215,0,.3), inset 0 0 10px rgba(255,238,140,.35)}100%{box-shadow:0 0 48px rgba(255,215,0,.55), inset 0 0 16px rgba(255,255,167,.55)}}
 .aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .aurora-blob{position:absolute;border-radius:50%;filter:blur(80px);animation:drift linear infinite}
 @keyframes drift{0%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-20px) scale(1.05)}66%{transform:translate(-20px,15px) scale(.97)}100%{transform:translate(0,0) scale(1)}}
@@ -66,8 +75,9 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;back
 .fl select option{background:#141030}
 .errt{color:var(--red);font-size:12px;font-weight:700;min-height:18px;margin-top:4px;display:flex;align-items:center;gap:5px}
 .okt{color:var(--jade);font-size:12px;font-weight:700;min-height:18px;margin-top:4px}
-nav{width:100%;height:68px;background:rgba(0,0,0,.55);backdrop-filter:blur(18px) saturate(180%);border-bottom:1px solid rgba(255,214,89,.08);display:flex;align-items:center;padding:0 24px;gap:16px;position:sticky;top:0;z-index:200;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.18)}
+nav{position:sticky;top:0;left:50%;transform:translateX(-50%);width:100vw;box-sizing:border-box;height:68px;background:rgba(0,0,0,.55);backdrop-filter:blur(18px) saturate(180%);border-bottom:1px solid rgba(255,214,89,.08);display:block;z-index:200;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.18);padding:0;margin:0}
 nav::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 18% 50%, rgba(255,214,89,.08), transparent 12%),radial-gradient(circle at 82% 35%, rgba(255,214,89,.06), transparent 8%)}
+.nav-inner{width:100%;max-width:1200px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;height:100%;box-sizing:border-box}
 .logo{display:flex;flex-direction:column;cursor:pointer}
 .logo-main{font-family:"Bebas Neue",sans-serif;font-size:28px;letter-spacing:3px;background:linear-gradient(135deg,var(--g4),var(--g2),var(--g1));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1;filter:drop-shadow(0 0 12px rgba(245,197,24,.5))}
 .logo-sub{font-size:9px;font-weight:800;letter-spacing:3px;color:var(--jade);text-transform:uppercase;margin-top:-2px}
@@ -97,10 +107,11 @@ nav::before{content:"";position:absolute;inset:0;pointer-events:none;background:
 .auth-note{text-align:center;margin-top:13px;font-size:12px;color:var(--t3);font-weight:600}
 .reset-link{color:var(--g1);cursor:pointer;font-weight:800;font-size:12px;text-decoration:none}
 .reset-link:hover{text-decoration:underline}
-.jk-banner{position:relative;background:rgba(0,0,0,.55);border:1px solid rgba(255,214,89,.08);padding:12px 24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;backdrop-filter:blur(18px);overflow:hidden}
+.jk-banner{position:relative;left:50%;transform:translateX(-50%);width:100vw;box-sizing:border-box;background:rgba(0,0,0,.55);border:1px solid rgba(255,214,89,.08);display:block;backdrop-filter:blur(18px);overflow:hidden;margin:0;}
 .jk-banner::before,.jk-banner::after{content:"";position:absolute;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle, rgba(255,214,89,.95) 0%, rgba(255,170,0,.8) 60%, transparent 90%);box-shadow:0 0 16px rgba(255,214,89,.35)}
 .jk-banner::before{top:12px;left:18px}
 .jk-banner::after{bottom:12px;right:18px}
+.jk-inner{width:100%;max-width:1200px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;box-sizing:border-box}
 .jk-label{font-size:11px;font-weight:800;color:var(--t3);letter-spacing:2px;text-transform:uppercase}
 .jk-val{font-family:"Bebas Neue",sans-serif;font-size:28px;color:var(--g1);letter-spacing:2px;filter:drop-shadow(0 0 8px rgba(245,197,24,.5));animation:jkpulse 2s ease-in-out infinite}
 @keyframes jkpulse{0%,100%{filter:drop-shadow(0 0 8px rgba(245,197,24,.5))}50%{filter:drop-shadow(0 0 18px rgba(245,197,24,.8))}}
@@ -452,30 +463,34 @@ nav::before{content:"";position:absolute;inset:0;pointer-events:none;background:
 <!-- APP -->
 <div id="s-app" class="screen z" style="flex-direction:column">
   <nav>
-    <div class="logo" onclick="pg('home')">
-      <div class="logo-main">LudoKz</div>
-      <div class="logo-sub">Angola Gaming</div>
-    </div>
-    <div class="ndv"></div>
-    <div class="nmenu">
-      <button class="nb on" id="nb-home" onclick="pg('home')">🏠 Início</button>
-      <button class="nb" id="nb-wallet" onclick="pg('wallet')">💳 Carteira</button>
-      <button class="nb" id="nb-profile" onclick="pg('profile')">👤 Perfil</button>
-    </div>
-    <div class="nright">
-      <div class="chip" id="nbcl">0 KZ</div>
-      <div class="avt" id="navt" onclick="pg('profile')">?</div>
-      <button class="btn bgh bsm" onclick="doLogout()">Sair</button>
+    <div class="nav-inner">
+      <div class="logo" onclick="pg('home')">
+        <div class="logo-main">LudoKz</div>
+        <div class="logo-sub">Angola Gaming</div>
+      </div>
+      <div class="ndv"></div>
+      <div class="nmenu">
+        <button class="nb on" id="nb-home" onclick="pg('home')">🏠 Início</button>
+        <button class="nb" id="nb-wallet" onclick="pg('wallet')">💳 Carteira</button>
+        <button class="nb" id="nb-profile" onclick="pg('profile')">👤 Perfil</button>
+      </div>
+      <div class="nright">
+        <div class="chip" id="nbcl">0 KZ</div>
+        <div class="avt" id="navt" onclick="pg('profile')">?</div>
+        <button class="btn bgh bsm" onclick="doLogout()">Sair</button>
+      </div>
     </div>
   </nav>
 
   <!-- HOME -->
   <div id="p-home" class="screen on z" style="flex-direction:column">
     <div class="jk-banner">
-      <span class="jk-label">Jackpot do Dia</span>
-      <div class="jk-dot"></div>
-      <span class="jk-val" id="jk-val">245.000 KZ</span>
-      <span class="jk-label">ao vivo</span>
+      <div class="jk-inner">
+        <span class="jk-label">Jackpot do Dia</span>
+        <div class="jk-dot"></div>
+        <span class="jk-val" id="jk-val">245.000 KZ</span>
+        <span class="jk-label">ao vivo</span>
+      </div>
     </div>
     <div class="hero">
       <h1><span class="line1">Joga Ludo.</span><span class="line2">Ganha Kwanzas.</span></h1>
