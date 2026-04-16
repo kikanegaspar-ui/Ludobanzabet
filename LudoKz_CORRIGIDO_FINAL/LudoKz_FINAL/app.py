@@ -116,22 +116,7 @@ def safe_user(u):
 
 # ══════════════════════════════════════════════════════════════
 #  SISTEMA DE RESERVA TEMPORÁRIA
-#  Saldo bloqueado (não debitado) até o jogo iniciar.
-#  Se a sala expirar sem ficar cheia → saldo libertado automaticamente.
 # ══════════════════════════════════════════════════════════════
-def _block_balance(uid: int, amount: float) -> bool:
-    """Bloqueia saldo sem debitar — verifica que existe saldo suficiente."""
-    conn = get_pg(); cur = conn.cursor()
-    cur.execute("SELECT balance FROM users WHERE id=%s FOR UPDATE", (uid,))
-    row = cur.fetchone()
-    if not row or float(row["balance"]) < amount:
-        cur.close(); conn.close()
-        return False
-    # Regista a reserva numa coluna/tabela de reservas em memória
-    # (usamos o dicionário _reservations para simplicidade)
-    cur.close(); conn.close()
-    return True
-
 # Reservas em memória: {room_id: {user_id: amount}}
 _reservations: dict = {}
 _res_lk = threading.Lock()
@@ -153,13 +138,10 @@ def _collect_reservations(rid: str) -> bool:
     with _res_lk:
         res = _reservations.get(rid, {})
     for uid, amount in res.items():
-        if uid < 0:  # jogadores admin/bot — sem cobrança
+        if uid < 0:
             continue
         if not deduct_bet(uid, amount):
-            # Saldo insuficiente agora — reembolsa os já cobrados e falha
-            # (situação rara, mas segura)
             return False
-        r = _get_room(rid)
         tier = BET_TIERS.get(amount, str(amount))
         add_tx(uid, "bet", -amount, f"Aposta sala {tier}")
     with _res_lk:
@@ -174,6 +156,35 @@ def _release_reservation(rid: str, uid: int = None):
         else:
             _reservations.pop(rid, None)
 
+# ══════════════════════════════════════════════════════════════
+#  FIX 1 — Remove o utilizador de todas as salas não iniciadas
+#  Resolve: "Já estás nesta sala" em browsers/dispositivos diferentes
+# ══════════════════════════════════════════════════════════════
+def _remove_user_from_pending_rooms(uid: int):
+    """
+    Remove o utilizador de qualquer sala ainda não iniciada onde esteja inscrito.
+    Liberta a reserva sem debitar. Se a sala ficar vazia, é eliminada.
+    Chamado antes de criar ou entrar numa nova sala.
+    """
+    rids_to_clean = []
+    with _rooms_lk:
+        for rid, r in list(_rooms.items()):
+            if r.started:
+                continue  # jogo já a decorrer — não tocar
+            if any(p["user_id"] == uid for p in r.players):
+                rids_to_clean.append(rid)
+
+    for rid in rids_to_clean:
+        _release_reservation(rid, uid)
+        with _rooms_lk:
+            r = _rooms.get(rid)
+            if not r:
+                continue
+            r.players = [p for p in r.players if p["user_id"] != uid]
+            if not r.players:
+                _rooms.pop(rid, None)
+                _release_reservation(rid)
+
 def _expire_room(rid: str):
     """Chamado após timeout — cancela sala e liberta reservas (sem debitar)."""
     with _rooms_lk:
@@ -182,7 +193,6 @@ def _expire_room(rid: str):
             return
         _rooms.pop(rid, None)
     _release_reservation(rid)
-    # Notifica jogadores que a sala expirou
     if r:
         for p in r.players:
             push(p["user_id"], "balance_update", {
@@ -394,7 +404,9 @@ def api_lobby():
     return jsonify({"rooms": lobby})
 
 # ══════════════════════════════════════════════════════════════
-#  CRIAR SALA — sem debitar, apenas verifica saldo e reserva
+#  CRIAR SALA
+#  FIX 2 — Remove o utilizador de salas pendentes antes de criar uma nova.
+#  Resolve: utilizador preso numa sala antiga ao tentar criar outra.
 # ══════════════════════════════════════════════════════════════
 @app.route("/api/room/create", methods=["POST"])
 @login_req
@@ -409,28 +421,30 @@ def api_create():
     uid = session["uid"]
     u = get_user(uid)
 
-    # Verificar saldo mas NÃO debitar ainda
+    # FIX 2: limpa salas pendentes onde o utilizador já estava inscrito
+    _remove_user_from_pending_rooms(uid)
+
     if u["balance"] < bet:
         return jsonify({"error": "Saldo insuficiente."}), 400
 
     rid  = _make_rid()
     room = GameManager(rid, bet, max_p, uid, u["name"])
 
-    # Criar reserva (sem debitar)
     if not _reserve(rid, uid, bet):
         return jsonify({"error": "Saldo insuficiente."}), 400
 
     with _rooms_lk:
         _rooms[rid] = room
 
-    # Agendar expiração automática em 5 minutos
     _schedule_room_expire(rid)
 
     return jsonify({"ok": True, "room_id": rid,
                     "msg": f"Sala criada! Saldo reservado (não debitado). Tens 5 minutos."})
 
 # ══════════════════════════════════════════════════════════════
-#  ENTRAR NA SALA — sem debitar, apenas reserva
+#  ENTRAR NA SALA
+#  FIX 3 — Remove o utilizador de salas pendentes antes de entrar numa nova.
+#  Resolve: "Já estás nesta sala" ao entrar de browser/dispositivo diferente.
 # ══════════════════════════════════════════════════════════════
 @app.route("/api/room/join", methods=["POST"])
 @login_req
@@ -438,6 +452,10 @@ def api_join():
     d   = request.json or {}
     rid = d.get("room_id", "").strip()
     uid = session["uid"]
+
+    # FIX 3: limpa salas pendentes onde o utilizador já estava inscrito
+    # (incluindo esta mesma sala, caso seja uma re-entrada)
+    _remove_user_from_pending_rooms(uid)
 
     with _rooms_lk:
         r = _rooms.get(rid)
@@ -447,16 +465,12 @@ def api_join():
             return jsonify({"error": "O jogo já começou."}), 400
         if r.player_count() >= r.max_players:
             return jsonify({"error": "Sala cheia."}), 400
-        if any(p["user_id"] == uid for p in r.players):
-            return jsonify({"error": "Já estás nesta sala."}), 400
 
         u = get_user(uid)
 
-        # Verificar saldo mas NÃO debitar ainda
         if u["balance"] < r.bet:
             return jsonify({"error": "Saldo insuficiente."}), 400
 
-        # Criar reserva (sem debitar)
         if not _reserve(rid, uid, r.bet):
             return jsonify({"error": "Saldo insuficiente."}), 400
 
@@ -471,11 +485,10 @@ def api_join():
         "max":     r.max_players,
     })
 
-    # ── Sala cheia → debitar TODOS agora e iniciar o jogo ──
+    # Sala cheia → debitar TODOS e iniciar
     if r.player_count() >= r.max_players:
         ok2 = _collect_reservations(rid)
         if not ok2:
-            # Falha ao cobrar — reembolsar e cancelar
             _release_reservation(rid)
             with _rooms_lk:
                 _rooms.pop(rid, None)
@@ -553,9 +566,6 @@ def api_movable():
     return jsonify({"movable": r.get_movable(session["uid"]),
                     "dice": r.dice})
 
-# ══════════════════════════════════════════════════════════════
-#  SAIR DA SALA — liberta reserva sem debitar (se jogo não iniciou)
-# ══════════════════════════════════════════════════════════════
 @app.route("/api/game/leave", methods=["POST"])
 @login_req
 def api_leave():
@@ -565,14 +575,16 @@ def api_leave():
     if not r: return jsonify({"ok": True})
 
     if not r.started:
-        # Jogo ainda não iniciou → liberta reserva sem cobrar nada
         _release_reservation(rid, uid)
-        # Se era o único jogador, remove a sala
         remaining = [p for p in r.players if p["user_id"] != uid]
         if not remaining:
             with _rooms_lk:
                 _rooms.pop(rid, None)
             _release_reservation(rid)
+        else:
+            with _rooms_lk:
+                if rid in _rooms:
+                    _rooms[rid].players = remaining
         return jsonify({"ok": True, "msg": "Saíste da sala. Reserva libertada."})
 
     if r.over:
@@ -580,7 +592,6 @@ def api_leave():
             _rooms.pop(rid, None)
         return jsonify({"ok": True})
 
-    # Jogo em curso → jogador abandona, adversário ganha
     remaining = [p for p in r.players if p["user_id"] != uid]
     if remaining:
         r.over   = True
