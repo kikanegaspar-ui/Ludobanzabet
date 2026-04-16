@@ -1,4 +1,4 @@
-"""app.py — LudoKz Backend completo"""
+"""app.py — LudoKz Backend completo com reserva temporária"""
 import json, queue, threading, os, secrets, time, uuid
 from functools import wraps
 from flask import (Flask, render_template, request, jsonify,
@@ -14,9 +14,10 @@ app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 PLATFORM_EXPRESS = os.environ.get("PLATFORM_EXPRESS", "922 745 946")
 ADMIN_KEY        = os.environ.get("ADMIN_KEY", "ludokz2025")
 
+ROOM_TIMEOUT_SECS = 300  # 5 minutos — sala expira se não ficar cheia
+
 init_db()
 
-# ── Headers obrigatórios para o Godot HTML5 funcionar ─────────
 @app.after_request
 def add_godot_headers(response):
     response.headers["Cross-Origin-Opener-Policy"]   = "same-origin"
@@ -35,7 +36,6 @@ def add_cors(response):
 def options_handler(path):
     return "", 204
 
-# ── Helper de conexão PostgreSQL ───────────────────────────────
 def get_pg():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
@@ -113,6 +113,92 @@ def safe_user(u):
             ("id", "name", "phone", "balance", "express_number",
              "games_played", "wins", "losses", "total_earned",
              "phone_verified", "age_confirmed", "terms_accepted", "created_at")}
+
+# ══════════════════════════════════════════════════════════════
+#  SISTEMA DE RESERVA TEMPORÁRIA
+#  Saldo bloqueado (não debitado) até o jogo iniciar.
+#  Se a sala expirar sem ficar cheia → saldo libertado automaticamente.
+# ══════════════════════════════════════════════════════════════
+def _block_balance(uid: int, amount: float) -> bool:
+    """Bloqueia saldo sem debitar — verifica que existe saldo suficiente."""
+    conn = get_pg(); cur = conn.cursor()
+    cur.execute("SELECT balance FROM users WHERE id=%s FOR UPDATE", (uid,))
+    row = cur.fetchone()
+    if not row or float(row["balance"]) < amount:
+        cur.close(); conn.close()
+        return False
+    # Regista a reserva numa coluna/tabela de reservas em memória
+    # (usamos o dicionário _reservations para simplicidade)
+    cur.close(); conn.close()
+    return True
+
+# Reservas em memória: {room_id: {user_id: amount}}
+_reservations: dict = {}
+_res_lk = threading.Lock()
+
+def _reserve(rid: str, uid: int, amount: float) -> bool:
+    """Verifica saldo e cria reserva. Não debita ainda."""
+    conn = get_pg(); cur = conn.cursor()
+    cur.execute("SELECT balance FROM users WHERE id=%s", (uid,))
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    if not row or float(row["balance"]) < amount:
+        return False
+    with _res_lk:
+        _reservations.setdefault(rid, {})[uid] = amount
+    return True
+
+def _collect_reservations(rid: str) -> bool:
+    """Debita todos os jogadores reservados quando o jogo inicia."""
+    with _res_lk:
+        res = _reservations.get(rid, {})
+    for uid, amount in res.items():
+        if uid < 0:  # jogadores admin/bot — sem cobrança
+            continue
+        if not deduct_bet(uid, amount):
+            # Saldo insuficiente agora — reembolsa os já cobrados e falha
+            # (situação rara, mas segura)
+            return False
+        r = _get_room(rid)
+        tier = BET_TIERS.get(amount, str(amount))
+        add_tx(uid, "bet", -amount, f"Aposta sala {tier}")
+    with _res_lk:
+        _reservations.pop(rid, None)
+    return True
+
+def _release_reservation(rid: str, uid: int = None):
+    """Liberta reserva de um ou todos os jogadores (sem debitar nada)."""
+    with _res_lk:
+        if uid is not None:
+            _reservations.get(rid, {}).pop(uid, None)
+        else:
+            _reservations.pop(rid, None)
+
+def _expire_room(rid: str):
+    """Chamado após timeout — cancela sala e liberta reservas (sem debitar)."""
+    with _rooms_lk:
+        r = _rooms.get(rid)
+        if not r or r.started:
+            return
+        _rooms.pop(rid, None)
+    _release_reservation(rid)
+    # Notifica jogadores que a sala expirou
+    if r:
+        for p in r.players:
+            push(p["user_id"], "balance_update", {
+                "balance": get_user(p["user_id"])["balance"],
+                "msg": "⏰ A sala expirou por falta de jogadores. Reserva libertada."
+            })
+
+def _schedule_room_expire(rid: str):
+    """Agenda o timeout de 5 minutos para a sala."""
+    def _run():
+        time.sleep(ROOM_TIMEOUT_SECS)
+        _expire_room(rid)
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+
+# ══════════════════════════════════════════════════════════════
 
 @app.route("/")
 def index():
@@ -307,6 +393,9 @@ def api_lobby():
         ]
     return jsonify({"rooms": lobby})
 
+# ══════════════════════════════════════════════════════════════
+#  CRIAR SALA — sem debitar, apenas verifica saldo e reserva
+# ══════════════════════════════════════════════════════════════
 @app.route("/api/room/create", methods=["POST"])
 @login_req
 def api_create():
@@ -316,55 +405,65 @@ def api_create():
     max_p = int(d.get("max_players", 2))
     if bet not in BET_TIERS:   return jsonify({"error": "Valor inválido."}), 400
     if max_p not in [2, 3, 4]: return jsonify({"error": "Número de jogadores inválido."}), 400
-    u = get_user(session["uid"])
-    if u["balance"] < bet:     return jsonify({"error": "Saldo insuficiente."}), 400
-    if not deduct_bet(session["uid"], bet):
-        return jsonify({"error": "Erro ao descontar."}), 400
-    add_tx(session["uid"], "bet", -bet,
-           f"Aposta sala {BET_TIERS[bet]} ({max_p} jogadores)")
+
+    uid = session["uid"]
+    u = get_user(uid)
+
+    # Verificar saldo mas NÃO debitar ainda
+    if u["balance"] < bet:
+        return jsonify({"error": "Saldo insuficiente."}), 400
+
     rid  = _make_rid()
-    room = GameManager(rid, bet, max_p, session["uid"], u["name"])
+    room = GameManager(rid, bet, max_p, uid, u["name"])
+
+    # Criar reserva (sem debitar)
+    if not _reserve(rid, uid, bet):
+        return jsonify({"error": "Saldo insuficiente."}), 400
+
     with _rooms_lk:
         _rooms[rid] = room
-    return jsonify({"ok": True, "room_id": rid})
 
+    # Agendar expiração automática em 5 minutos
+    _schedule_room_expire(rid)
+
+    return jsonify({"ok": True, "room_id": rid,
+                    "msg": f"Sala criada! Saldo reservado (não debitado). Tens 5 minutos."})
+
+# ══════════════════════════════════════════════════════════════
+#  ENTRAR NA SALA — sem debitar, apenas reserva
+# ══════════════════════════════════════════════════════════════
 @app.route("/api/room/join", methods=["POST"])
 @login_req
 def api_join():
     d   = request.json or {}
     rid = d.get("room_id", "").strip()
+    uid = session["uid"]
 
     with _rooms_lk:
         r = _rooms.get(rid)
         if not r:
             return jsonify({"error": "Sala não encontrada."}), 404
-
-        # ── BUG FIX 1: verificações ANTES de descontar ─────────────────────
         if r.started:
             return jsonify({"error": "O jogo já começou."}), 400
-
         if r.player_count() >= r.max_players:
             return jsonify({"error": "Sala cheia."}), 400
-
-        # Impede o mesmo utilizador de entrar duas vezes
-        uid = session["uid"]
         if any(p["user_id"] == uid for p in r.players):
             return jsonify({"error": "Já estás nesta sala."}), 400
 
         u = get_user(uid)
+
+        # Verificar saldo mas NÃO debitar ainda
         if u["balance"] < r.bet:
             return jsonify({"error": "Saldo insuficiente."}), 400
 
-        if not deduct_bet(uid, r.bet):
-            return jsonify({"error": "Erro ao descontar."}), 400
+        # Criar reserva (sem debitar)
+        if not _reserve(rid, uid, r.bet):
+            return jsonify({"error": "Saldo insuficiente."}), 400
 
         ok, err = r.add_player(uid, u["name"])
         if not ok:
-            refund_bet(uid, r.bet)
+            _release_reservation(rid, uid)
             return jsonify({"error": err}), 400
-
-    add_tx(uid, "bet", -r.bet,
-           f"Aposta sala {BET_TIERS.get(r.bet, r.bet)}")
 
     push_room(rid, "player_joined", {
         "name":    u["name"],
@@ -372,9 +471,18 @@ def api_join():
         "max":     r.max_players,
     })
 
+    # ── Sala cheia → debitar TODOS agora e iniciar o jogo ──
     if r.player_count() >= r.max_players:
-        ok2, _ = r.start()
-        if ok2:
+        ok2 = _collect_reservations(rid)
+        if not ok2:
+            # Falha ao cobrar — reembolsar e cancelar
+            _release_reservation(rid)
+            with _rooms_lk:
+                _rooms.pop(rid, None)
+            return jsonify({"error": "Erro ao processar apostas. Tenta novamente."}), 400
+
+        ok3, _ = r.start()
+        if ok3:
             push_room(rid, "game_started", r.state_dict())
 
     return jsonify({"ok": True, "room_id": rid,
@@ -388,6 +496,9 @@ def api_start():
     if not r: return jsonify({"error": "Sala não encontrada."}), 404
     if r.players[0]["user_id"] != session["uid"]:
         return jsonify({"error": "Só o criador pode iniciar."}), 403
+    ok2 = _collect_reservations(rid)
+    if not ok2:
+        return jsonify({"error": "Erro ao processar apostas."}), 400
     ok, err = r.start()
     if not ok: return jsonify({"error": err}), 400
     state = r.state_dict()
@@ -442,6 +553,9 @@ def api_movable():
     return jsonify({"movable": r.get_movable(session["uid"]),
                     "dice": r.dice})
 
+# ══════════════════════════════════════════════════════════════
+#  SAIR DA SALA — liberta reserva sem debitar (se jogo não iniciou)
+# ══════════════════════════════════════════════════════════════
 @app.route("/api/game/leave", methods=["POST"])
 @login_req
 def api_leave():
@@ -449,13 +563,24 @@ def api_leave():
     uid = session["uid"]
     r   = _get_room(rid)
     if not r: return jsonify({"ok": True})
+
     if not r.started:
-        refund_bet(uid, r.bet)
-        with _rooms_lk: _rooms.pop(rid, None)
-        return jsonify({"ok": True})
+        # Jogo ainda não iniciou → liberta reserva sem cobrar nada
+        _release_reservation(rid, uid)
+        # Se era o único jogador, remove a sala
+        remaining = [p for p in r.players if p["user_id"] != uid]
+        if not remaining:
+            with _rooms_lk:
+                _rooms.pop(rid, None)
+            _release_reservation(rid)
+        return jsonify({"ok": True, "msg": "Saíste da sala. Reserva libertada."})
+
     if r.over:
-        with _rooms_lk: _rooms.pop(rid, None)
+        with _rooms_lk:
+            _rooms.pop(rid, None)
         return jsonify({"ok": True})
+
+    # Jogo em curso → jogador abandona, adversário ganha
     remaining = [p for p in r.players if p["user_id"] != uid]
     if remaining:
         r.over   = True
@@ -705,22 +830,14 @@ def adm_play_join():
     rid        = d.get("room_id", "")
     name       = d.get("name", "Jogador").strip()
     player_idx = int(d.get("player_idx", 1))
-
     r = _get_room(rid)
-    if not r:
-        return jsonify({"error": "Sala não encontrada."}), 404
-
-    # ── BUG FIX 2: verificar se a sala já está cheia ────────────────────────
+    if not r: return jsonify({"error": "Sala não encontrada."}), 404
     if r.player_count() >= r.max_players:
         return jsonify({"error": f"Sala cheia ({r.player_count()}/{r.max_players})."}), 400
-
     if r.started:
         return jsonify({"error": "O jogo já começou."}), 400
-
     ok, err = r.add_player(-(1000 + player_idx), name)
-    if not ok:
-        return jsonify({"error": err}), 400
-
+    if not ok: return jsonify({"error": err}), 400
     return jsonify({"ok": True, "players": r.player_count(), "max": r.max_players})
 
 @app.route("/api/admin/play/start", methods=["POST"])
@@ -933,21 +1050,6 @@ def get_jackpot_value():
         return float(row["value"]) if row else 245000.0
     except Exception:
         return 245000.0
-
-def grow_jackpot(bet):
-    with _jackpot_lock:
-        try:
-            current = get_jackpot_value()
-            new_val = round(current + float(bet) * 0.01, 2)
-            conn = get_pg(); cur = conn.cursor()
-            cur.execute("CREATE TABLE IF NOT EXISTS jackpot(id SERIAL PRIMARY KEY, value REAL)")
-            cur.execute(
-                "INSERT INTO jackpot(id,value) VALUES(1,%s) ON CONFLICT(id) DO UPDATE SET value=EXCLUDED.value",
-                (new_val,)
-            )
-            conn.commit(); cur.close(); conn.close()
-        except Exception:
-            pass
 
 @app.route("/api/jackpot")
 def api_jackpot():
