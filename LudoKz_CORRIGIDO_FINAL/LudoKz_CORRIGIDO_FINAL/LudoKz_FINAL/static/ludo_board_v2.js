@@ -1,674 +1,868 @@
 /**
- * ludo_board_v2.js — LudoKz DEFINITIVO
- *
- * CORRECÇÕES DEFINITIVAS:
- *  ✓ Cantos CORRECTOS: P1=azul inf-esq | P2=verde sup-dir | P3=verm inf-dir | P4=amar sup-esq
- *  ✓ Tabuleiro canvas completo (sem PNG externo necessário)
- *  ✓ Dado canvas com pontos reais (sem emoji — funciona sempre)
- *  ✓ Peças: token.x/token.y = índices de grelha; is_locked → base correcta
- *  ✓ Botão "Lançar Dado" activa: turno + phase===0
- *  ✓ Sons via Web Audio API (sem ficheiros externos)
- *  ✓ Animações de movimento, captura e vitória
- *  ✓ Compatível com SSE + API do servidor LudoKz
+ * ludo_board_v2.js — LudoKz FINAL
+ * Tabuleiro completo: imagem PNG + peças HTML + dado 3D + sons + animações
+ * Funciona com o servidor (SSE + API) para jogos online reais
  */
 
-'use strict';
-
 // ══════════════════════════════════════════════════════════════════
-//  CONSTANTES
+//  MAPA DE CORES  backend → UI
+//  Backend envia: players[i].color = "blue"|"green"|"red"|"yellow"
+//  P1=Azul(inf-esq) P2=Verde(sup-dir) P3=Verm(inf-dir) P4=Amar(sup-esq)
 // ══════════════════════════════════════════════════════════════════
-const COLOUR_NAME = { red:'Vermelho', green:'Verde', blue:'Azul', yellow:'Amarelo' };
-const COLOUR_CSS  = { red:'#ff0002', green:'#049645', blue:'#1295e7', yellow:'#f5c518' };
-
-// Posição lógica → [col, row] na grelha 15×15
-const LUDO_COORD_MAP = {
-  // Caminho principal 0-51
-  0:[6,13], 1:[6,12], 2:[6,11], 3:[6,10], 4:[6,9],
-  5:[5,8],  6:[4,8],  7:[3,8],  8:[2,8],  9:[1,8],  10:[0,8],
-  11:[0,7], 12:[0,6],
-  13:[1,6], 14:[2,6], 15:[3,6], 16:[4,6], 17:[5,6],
-  18:[6,5], 19:[6,4], 20:[6,3], 21:[6,2], 22:[6,1], 23:[6,0],
-  24:[7,0], 25:[8,0],
-  26:[8,1], 27:[8,2], 28:[8,3], 29:[8,4], 30:[8,5],
-  31:[9,6], 32:[10,6],33:[11,6],34:[12,6],35:[13,6],36:[14,6],
-  37:[14,7],38:[14,8],
-  39:[13,8],40:[12,8],41:[11,8],42:[10,8],43:[9,8],
-  44:[8,9], 45:[8,10],46:[8,11],47:[8,12],48:[8,13],49:[8,14],
-  50:[7,14],51:[6,14],
-  // Corredores de chegada
-  100:[7,13],101:[7,12],102:[7,11],103:[7,10],104:[7,9], 105:[7,7],
-  200:[7,1], 201:[7,2], 202:[7,3], 203:[7,4], 204:[7,5], 205:[7,7],
-  300:[13,7],301:[12,7],302:[11,7],303:[10,7],304:[9,7], 305:[7,7],
-  400:[1,7], 401:[2,7], 402:[3,7], 403:[4,7], 404:[5,7], 405:[7,7],
-  // Bases
-  // P1 azul   — inferior-esquerdo  (cols 0-5, rows 9-14)
-  500:[1.5,10.5],501:[3.5,10.5],502:[1.5,12.5],503:[3.5,12.5],
-  // P2 verde  — superior-direito   (cols 9-14, rows 0-5)
-  600:[10.5,1.5],601:[12.5,1.5],602:[10.5,3.5],603:[12.5,3.5],
-  // P3 verm   — inferior-direito   (cols 9-14, rows 9-14)
-  700:[10.5,10.5],701:[12.5,10.5],702:[10.5,12.5],703:[12.5,12.5],
-  // P4 amar   — superior-esquerdo  (cols 0-5, rows 0-5)
-  800:[1.5,1.5],  801:[3.5,1.5], 802:[1.5,3.5], 803:[3.5,3.5]
+const COLOUR_TO_PK = { blue:'P1', green:'P2', red:'P3', yellow:'P4' };
+const PK_COLOUR    = { P1:'blue', P2:'green', P3:'red', P4:'yellow' };
+const COLOUR_HEX   = { blue:'#1295e7', green:'#049645', red:'#ff0002', yellow:'#ffde15' };
+const COLOUR_NAME  = { blue:'Azul', green:'Verde', red:'Vermelho', yellow:'Amarelo' };
+const COLOUR_GRAD  = {
+  blue:   ['#90caf9','#0d47a1'],
+  green:  ['#81c784','#1b5e20'],
+  red:    ['#ef9a9a','#b71c1c'],
+  yellow: ['#fff176','#f57f17'],
 };
-
-const SAFE_POSITIONS = [0,8,13,21,26,34,39,47];
-
-const COLOUR_TO_PLAYER = { blue:'P1', green:'P2', red:'P3', yellow:'P4' };
-const BASE_POSITIONS   = {
-  P1:[500,501,502,503], P2:[600,601,602,603],
-  P3:[700,701,702,703], P4:[800,801,802,803]
-};
-const HOME_POSITIONS = { P1:105, P2:205, P3:305, P4:405 };
-
-// Pontos do dado [x_frac, y_frac] por face
-const DICE_DOTS = {
-  1:[[.5,.5]],
-  2:[[.28,.28],[.72,.72]],
-  3:[[.28,.28],[.5,.5],[.72,.72]],
-  4:[[.28,.28],[.72,.28],[.28,.72],[.72,.72]],
-  5:[[.28,.28],[.72,.28],[.5,.5],[.28,.72],[.72,.72]],
-  6:[[.28,.2],[.72,.2],[.28,.5],[.72,.5],[.28,.8],[.72,.8]]
-};
+const COLOUR_TEXT  = { blue:'#fff', green:'#fff', red:'#fff', yellow:'#222' };
 
 // ══════════════════════════════════════════════════════════════════
-//  SONS (Web Audio API)
+//  COORDENADAS  (grelha 15×15, passo = 100/15 ≈ 6.667%)
 // ══════════════════════════════════════════════════════════════════
-const SFX = (function() {
-  var _ctx = null;
-  function gc() {
-    if (!_ctx) { try { _ctx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} }
-    return _ctx;
+const CMAP = {
+  0:[6,13],1:[6,12],2:[6,11],3:[6,10],4:[6,9],5:[5,8],6:[4,8],7:[3,8],8:[2,8],9:[1,8],10:[0,8],
+  11:[0,7],12:[0,6],13:[1,6],14:[2,6],15:[3,6],16:[4,6],17:[5,6],18:[6,5],19:[6,4],20:[6,3],
+  21:[6,2],22:[6,1],23:[6,0],24:[7,0],25:[8,0],26:[8,1],27:[8,2],28:[8,3],29:[8,4],30:[8,5],
+  31:[9,6],32:[10,6],33:[11,6],34:[12,6],35:[13,6],36:[14,6],37:[14,7],38:[14,8],39:[13,8],
+  40:[12,8],41:[11,8],42:[10,8],43:[9,8],44:[8,9],45:[8,10],46:[8,11],47:[8,12],48:[8,13],
+  49:[8,14],50:[7,14],51:[6,14],
+  100:[7,13],101:[7,12],102:[7,11],103:[7,10],104:[7,9],105:[7,8],
+  200:[7,1], 201:[7,2], 202:[7,3], 203:[7,4], 204:[7,5], 205:[7,6],
+  300:[13,7],301:[12,7],302:[11,7],303:[10,7],304:[9,7], 305:[8,7],
+  400:[1,7], 401:[2,7], 402:[3,7], 403:[4,7], 404:[5,7], 405:[6,7],
+  500:[1.5,10.58],501:[3.57,10.58],502:[1.5,12.43],503:[3.57,12.43],
+  600:[10.5,1.58], 601:[12.54,1.58],602:[10.5,3.45], 603:[12.54,3.45],
+  700:[10.5,10.58],701:[12.57,10.58],702:[10.5,12.43],703:[12.57,12.43],
+  800:[1.5,1.58], 801:[3.57,1.58], 802:[1.5,3.45],  803:[3.55,3.45]
+};
+const STEP = 6.6667; // 100/15
+
+const BASE_POS  = { P1:[500,501,502,503], P2:[600,601,602,603], P3:[700,701,702,703], P4:[800,801,802,803] };
+const START_POS = { P1:0, P2:26, P3:39, P4:13 };
+const HOME_ENT  = {
+  P1:[100,101,102,103,104], P2:[200,201,202,203,204],
+  P3:[300,301,302,303,304], P4:[400,401,402,403,404]
+};
+const HOME_POS   = { P1:105, P2:205, P3:305, P4:405 };
+const TURN_PTS   = { P1:50,  P2:24,  P3:37,  P4:11  };
+const SAFE_SET   = new Set([0,8,13,21,26,34,39,47]);
+
+// ══════════════════════════════════════════════════════════════════
+//  SONS  (Web Audio API — sem ficheiros externos)
+// ══════════════════════════════════════════════════════════════════
+const SFX = (() => {
+  let ctx = null;
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    return ctx;
   }
   function beep(freq, dur, type, vol, delay) {
     try {
-      var c=gc(); if(!c) return;
-      var o=c.createOscillator(), g=c.createGain();
-      o.connect(g); g.connect(c.destination);
-      o.type=type||'sine'; o.frequency.value=freq;
-      var t=c.currentTime+(delay||0);
-      g.gain.setValueAtTime(vol||0.22,t);
-      g.gain.exponentialRampToValueAtTime(0.001,t+dur);
-      o.start(t); o.stop(t+dur);
-    } catch(e){}
+      const c   = getCtx();
+      const osc = c.createOscillator();
+      const gain= c.createGain();
+      osc.connect(gain); gain.connect(c.destination);
+      osc.type      = type || 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(vol || 0.3, c.currentTime + (delay||0));
+      gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + (delay||0) + dur);
+      osc.start(c.currentTime + (delay||0));
+      osc.stop (c.currentTime + (delay||0) + dur);
+    } catch(e) {}
   }
   return {
-    dice:    function(){ beep(300,.07,'square',.17); beep(450,.07,'square',.17,.09); beep(600,.12,'square',.17,.18); },
-    move:    function(){ beep(520,.06,'sine',.2); beep(660,.08,'sine',.2,.07); },
-    capture: function(){ beep(200,.14,'sawtooth',.28); beep(150,.18,'sawtooth',.28,.12); },
-    home:    function(){ beep(784,.1,'sine',.28); beep(988,.1,'sine',.28,.13); beep(1175,.2,'sine',.28,.27); },
-    win:     function(){ [523,659,784,1047].forEach(function(f,i){beep(f,.2,'sine',.28,i*.15);}); },
-    myTurn:  function(){ beep(880,.09,'sine',.16); beep(1100,.11,'sine',.16,.13); },
-    tick:    function(){ beep(660,.04,'sine',.14); }
+    dice:    () => { beep(300,0.08,'square',0.2); beep(450,0.08,'square',0.2,0.09); beep(600,0.12,'square',0.2,0.18); },
+    move:    () => { beep(520,0.06,'sine',0.25); beep(660,0.08,'sine',0.25,0.07); },
+    capture: () => { beep(200,0.15,'sawtooth',0.3); beep(150,0.2,'sawtooth',0.3,0.1); },
+    win:     () => { [523,659,784,1047].forEach((f,i)=>beep(f,0.2,'sine',0.3,i*0.15)); },
+    myTurn:  () => { beep(880,0.1,'sine',0.2); beep(1100,0.12,'sine',0.2,0.12); },
+    home:    () => { beep(784,0.1,'sine',0.3); beep(988,0.1,'sine',0.3,0.12); beep(1175,0.2,'sine',0.3,0.25); },
   };
 })();
 window.SFX = SFX;
 
+// Desbloqueia audio no primeiro toque
+document.addEventListener('click', () => { try { SFX.dice(); } catch(e){} }, { once: true });
+
 // ══════════════════════════════════════════════════════════════════
-//  DADO CANVAS (pontos reais, sem emoji)
+//  CSS DO JOGO  (injectado uma vez)
 // ══════════════════════════════════════════════════════════════════
-var _diceCanvas = null;
-var _diceCtx    = null;
-
-function _setupDiceCanvas() {
-  if (_diceCanvas) return;
-  var dfc = document.getElementById('dfc'); if (!dfc) return;
-
-  _diceCanvas = document.createElement('canvas');
-  _diceCanvas.width  = 74;
-  _diceCanvas.height = 74;
-  _diceCanvas.style.cssText = 'display:block;margin:4px auto;border-radius:13px;cursor:pointer;filter:drop-shadow(0 0 8px rgba(245,197,24,.5));';
-  _diceCanvas.title = 'Clica para lançar';
-  _diceCanvas.onclick = function(){ if (window.doRoll) window.doRoll(); };
-  _diceCtx = _diceCanvas.getContext('2d');
-
-  dfc.style.display = 'none';
-  dfc.parentNode.insertBefore(_diceCanvas, dfc);
-  _renderDice(0, false);
-}
-
-function _renderDice(value, rolling) {
-  if (!_diceCtx) return;
-  var c=_diceCtx, w=74, h=74;
-  c.clearRect(0,0,w,h);
-
-  // Fundo
-  var bg=c.createLinearGradient(0,0,w,h);
-  if (rolling){ bg.addColorStop(0,'#3a3060'); bg.addColorStop(1,'#1a1040'); }
-  else        { bg.addColorStop(0,'#2c2255'); bg.addColorStop(1,'#0f0d28'); }
-  _rrectPath(c,4,4,w-8,h-8,12);
-  c.fillStyle=bg; c.fill();
-
-  // Borda
-  c.strokeStyle=rolling?'rgba(245,197,24,.35)':'#f5c518';
-  c.lineWidth=2; c.stroke();
-
-  // Brilho topo
-  var shine=c.createLinearGradient(4,4,4,24);
-  shine.addColorStop(0,'rgba(255,255,255,.2)'); shine.addColorStop(1,'rgba(255,255,255,0)');
-  _rrectPath(c,5,5,w-10,20,9); c.fillStyle=shine; c.fill();
-
-  if (rolling) {
-    c.font='bold 28px "Plus Jakarta Sans",sans-serif';
-    c.fillStyle='rgba(245,197,24,.5)';
-    c.textAlign='center'; c.textBaseline='middle';
-    c.fillText('?',w/2,h/2);
-    return;
-  }
-  if (value>=1&&value<=6) {
-    var dots=DICE_DOTS[value];
-    dots.forEach(function(d){
-      c.beginPath(); c.arc(d[0]*w,d[1]*h,5.5,0,Math.PI*2);
-      c.fillStyle='#f5c518'; c.shadowColor='#f5c518'; c.shadowBlur=7;
-      c.fill(); c.shadowBlur=0;
-    });
-  } else {
-    // Estado inicial
-    c.fillStyle='rgba(245,197,24,.22)'; c.fillRect(w/2-13,h/2-2,26,4);
-  }
-}
-
-function _rrectPath(ctx,x,y,w,h,r){
-  ctx.beginPath();
-  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
-  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
-  ctx.lineTo(x+w,y+h-r);
-  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
-  ctx.lineTo(x+r,y+h);
-  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
-  ctx.lineTo(x,y+r);
-  ctx.quadraticCurveTo(x,y,x+r,y);
-  ctx.closePath();
-}
-
-function _animDiceRoll(value, cb) {
-  SFX.dice();
-  var frames=0, maxF=14;
-  function roll(){
-    if (frames<maxF){ _renderDice(Math.ceil(Math.random()*6),true); frames++; setTimeout(roll,65); }
-    else {
-      _renderDice(value,false);
-      var dfc=document.getElementById('dfc'), dnm=document.getElementById('dnm');
-      var faces=['⚀','⚁','⚂','⚃','⚄','⚅'];
-      if(dfc) dfc.textContent=faces[value-1];
-      if(dnm) dnm.textContent=value;
-      if(cb) cb();
+(function injectCSS() {
+  if (document.getElementById('ludokz-game-css')) return;
+  const s = document.createElement('style');
+  s.id = 'ludokz-game-css';
+  s.textContent = `
+    /* ── Tabuleiro ── */
+    #ludo-board-wrap {
+      position:relative;
+      border-radius:14px;
+      overflow:hidden;
+      box-shadow:0 0 0 2px rgba(245,197,24,.4),
+                 0 0 50px rgba(0,0,0,.8),
+                 0 0 100px rgba(245,197,24,.08);
+      flex-shrink:0;
+      animation:board-glow 3s ease-in-out infinite;
     }
-  }
-  roll();
+    @keyframes board-glow {
+      0%,100% { box-shadow:0 0 0 2px rgba(245,197,24,.35),0 0 50px rgba(0,0,0,.8); }
+      50%      { box-shadow:0 0 0 2px rgba(245,197,24,.7), 0 0 80px rgba(0,0,0,.8),0 0 40px rgba(245,197,24,.15); }
+    }
+    #ludo-board-wrap img {
+      display:block;width:100%;height:100%;
+      pointer-events:none;user-select:none;
+    }
+
+    /* ── Peças ── */
+    .lp {
+      position:absolute;
+      width:5%;height:5%;
+      border-radius:50%;
+      border:2.5px solid rgba(255,255,255,.95);
+      transform:translate(-50%,-50%);
+      transition:left .32s cubic-bezier(.34,1.56,.64,1),
+                 top  .32s cubic-bezier(.34,1.56,.64,1),
+                 box-shadow .2s;
+      z-index:10;
+      display:flex;align-items:center;justify-content:center;
+      font-size:10px;font-weight:800;
+      cursor:default;
+      font-family:'Bebas Neue',monospace;
+    }
+    .lp.sel {
+      cursor:pointer!important;
+      z-index:20;
+      animation:lp-pulse .5s ease-in-out infinite alternate;
+    }
+    @keyframes lp-pulse {
+      from { box-shadow:0 0 4px rgba(255,255,255,.4); transform:translate(-50%,-50%) scale(1); }
+      to   { box-shadow:0 0 18px #fff,0 0 8px gold;  transform:translate(-50%,-50%) scale(1.28); }
+    }
+    .lp.captured {
+      animation:lp-die .4s ease-out forwards;
+    }
+    @keyframes lp-die {
+      0%   { transform:translate(-50%,-50%) scale(1); opacity:1; }
+      50%  { transform:translate(-50%,-50%) scale(1.6); opacity:.6; }
+      100% { transform:translate(-50%,-50%) scale(0); opacity:0; }
+    }
+
+    /* ── Dado 3D ── */
+    .dice-scene-lk { perspective:500px; width:90px;height:90px; margin:6px auto; cursor:pointer; }
+    .dice-3d-lk {
+      position:relative;width:90px;height:90px;
+      transform-style:preserve-3d;
+      transition:transform .7s cubic-bezier(.34,1.2,.64,1);
+    }
+    @keyframes dice-roll-lk { 50%{ transform:rotateX(455deg) rotateY(455deg); } }
+    .dice-3d-lk.rolling { animation:dice-roll-lk 1s ease-in-out; }
+    .df {
+      position:absolute;width:86px;height:86px;
+      border-radius:14px;
+      border:3px solid #e8e4de;
+      background:linear-gradient(145deg,#dddbd8,#fff);
+    }
+    .df::before {
+      content:'';position:absolute;inset:0;border-radius:12px;
+      background:#f6f3f0;transform:translateZ(-1px);
+    }
+    .df::after {
+      content:'';position:absolute;
+      top:50%;left:50%;
+      width:16px;height:16px;margin:-8px 0 0 -8px;
+      border-radius:50%;background:#131210;
+    }
+    .df.f1  { transform:translateZ(45px); }
+    .df.f6  { transform:rotateX(180deg) translateZ(45px); }
+    .df.f2  { transform:rotateY(90deg)  translateZ(45px); }
+    .df.f5  { transform:rotateY(-90deg) translateZ(45px); }
+    .df.f3  { transform:rotateX(90deg)  translateZ(45px); }
+    .df.f4  { transform:rotateX(-90deg) translateZ(45px); }
+    /* face 1 — ponto vermelho central */
+    .df.f1::after  { width:22px;height:22px;margin:-11px 0 0 -11px;background:radial-gradient(circle at 35% 30%,#ff6b6b,#c41230);box-shadow:0 0 8px rgba(196,18,48,.5); }
+    /* face 2 */
+    .df.f2::after  { margin:-32px 0 0 -32px;box-shadow:48px 48px; }
+    /* face 3 */
+    .df.f3::after  { margin:-30px 0 0 -30px;box-shadow:28px 28px; }
+    /* face 4 */
+    .df.f4::after  { margin:-32px 0 0 -32px;box-shadow:0 48px,48px 0,48px 48px; }
+    /* face 5 */
+    .df.f5::after  { margin:-32px 0 0 -32px;box-shadow:48px 0,0 48px,48px 48px,0 0,24px 24px; }
+    /* face 6 */
+    .df.f6::after  { margin:-36px 0 0 -36px;box-shadow:32px 0,64px 0,0 32px,32px 32px,64px 32px,0 64px; }
+
+    /* ── Botão Lançar ── */
+    #rb {
+      width:100%;padding:13px;
+      background:linear-gradient(135deg,#ffdb4d,#f5c518,#e6a800);
+      border:none;border-radius:12px;
+      font-family:'Bebas Neue',sans-serif;
+      font-size:18px;letter-spacing:2px;color:#0a0800;
+      cursor:pointer;
+      box-shadow:0 6px 20px rgba(245,197,24,.45);
+      transition:all .2s cubic-bezier(.34,1.56,.64,1);
+      position:relative;overflow:hidden;
+    }
+    #rb::before {
+      content:'';position:absolute;inset:0;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);
+      background-size:200% 100%;
+      animation:rb-shine 2.5s infinite;
+    }
+    @keyframes rb-shine { 0%{background-position:-200% center} 100%{background-position:200% center} }
+    #rb:hover:not(:disabled) { transform:translateY(-3px) scale(1.03);box-shadow:0 12px 32px rgba(245,197,24,.65); }
+    #rb:active:not(:disabled){ transform:scale(.97); }
+    #rb:disabled { opacity:.35;cursor:not-allowed;background:linear-gradient(135deg,#555,#333);box-shadow:none; }
+    #rb:disabled::before { display:none; }
+    #rb.my-turn-glow { animation:rb-shine 2.5s infinite,turn-pulse 1.2s ease-in-out infinite; }
+    @keyframes turn-pulse {
+      0%,100%{box-shadow:0 6px 20px rgba(245,197,24,.45);}
+      50%    {box-shadow:0 6px 20px rgba(245,197,24,.45),0 0 0 8px rgba(245,197,24,0);}
+    }
+
+    /* ── Player cards ── */
+    .pc {
+      display:flex;align-items:center;gap:10px;
+      background:rgba(15,13,40,.8);
+      border:1.5px solid rgba(255,255,255,.08);
+      border-radius:14px;padding:10px 16px;
+      transition:all .3s;flex:1;min-width:140px;
+    }
+    .pc.mt {
+      border-color:rgba(245,197,24,.6);
+      background:rgba(245,197,24,.06);
+      box-shadow:0 0 24px rgba(245,197,24,.2);
+    }
+    .pdot { width:12px;height:12px;border-radius:50%;flex-shrink:0; }
+    .pnm2 { font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.5px; }
+    .pft  { font-size:10px;color:#4a4470;font-weight:700;margin-top:1px; }
+
+    /* ── Chat ── */
+    .chat-msgs::-webkit-scrollbar { width:3px; }
+    .chat-msgs::-webkit-scrollbar-thumb { background:#2d285a;border-radius:3px; }
+
+    /* ── Log ── */
+    .gli { padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);color:#9890c0;font-size:12px;font-weight:600;line-height:1.5; }
+    .gli:last-child { border:none; }
+    .gli.w  { color:#00e676; }
+    .gli.k  { color:#ff4757; }
+    .gli.r  { color:#f5c518; }
+
+    /* ── Partículas de fundo ── */
+    #lk-particles {
+      position:fixed;inset:0;pointer-events:none;z-index:1;
+      display:none;
+    }
+    #s-game:not([style*="display: none"]) ~ #lk-particles,
+    body.in-game #lk-particles { display:block; }
+
+    /* ── Dado resultado ── */
+    #gm-dice-num {
+      font-family:'Bebas Neue',sans-serif;font-size:38px;
+      color:#f5c518;letter-spacing:3px;text-align:center;
+      text-shadow:0 0 20px rgba(245,197,24,.6);
+      margin:2px 0 10px;
+      min-height:46px;
+    }
+
+    @keyframes num-pop {
+      0%   { transform:scale(.5); opacity:0; }
+      60%  { transform:scale(1.3); opacity:1; }
+      100% { transform:scale(1); opacity:1; }
+    }
+    .num-pop { animation:num-pop .35s cubic-bezier(.34,1.56,.64,1); }
+  `;
+  document.head.appendChild(s);
+})();
+
+// ══════════════════════════════════════════════════════════════════
+//  CANVAS DE PARTÍCULAS
+// ══════════════════════════════════════════════════════════════════
+const _pc = document.createElement('canvas');
+_pc.id = 'lk-particles';
+_pc.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:1;';
+document.body.appendChild(_pc);
+const _px = _pc.getContext('2d');
+let _parts = [];
+
+function _resizePC() { _pc.width = innerWidth; _pc.height = innerHeight; }
+_resizePC();
+addEventListener('resize', _resizePC);
+
+function _initParts(n) {
+  _parts = Array.from({length: n || 18}, () => {
+    const p = _newPart();
+    p.y = Math.random() * innerHeight;
+    return p;
+  });
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  CLASSE LudoBoard — CANVAS DO TABULEIRO
-// ══════════════════════════════════════════════════════════════════
-function LudoBoard(canvas, size) {
-  this.canvas = canvas;
-  this.ctx    = canvas.getContext('2d');
-  this.size   = size;
-  this.cell   = size / 15;
-  this.pieces = {};
-  this._buildBoardImage();
+function _newPart() {
+  return {
+    x: Math.random() * innerWidth,
+    y: -30,
+    vx: (Math.random()-.5)*1.2,
+    vy: .4 + Math.random()*1,
+    size: 10 + Math.random()*16,
+    rot: Math.random()*Math.PI*2,
+    rotS: (Math.random()-.5)*.05,
+    wb: Math.random()*Math.PI*2,
+    wbS: .02 + Math.random()*.04,
+    alpha: .6 + Math.random()*.4,
+    em: ['💰','🪙','⭐','💎','🎲'][Math.floor(Math.random()*5)],
+    life: 0,
+    maxLife: 250 + Math.random()*200,
+  };
 }
 
-LudoBoard.prototype._toScreen = function(col, row) {
-  var c=this.cell;
-  return { sx: col*c+c*0.5, sy: row*c+c*0.5 };
-};
-
-LudoBoard.prototype._posToScreen = function(pos) {
-  var coord=LUDO_COORD_MAP[pos];
-  if (coord) return this._toScreen(coord[0],coord[1]);
-  return { sx:this.size/2, sy:this.size/2 };
-};
-
-// Token do backend → pixel
-LudoBoard.prototype._tokenPixel = function(token, ti, colour) {
-  if (token.has_reached_home||token.finished) {
-    return this._posToScreen(HOME_POSITIONS[COLOUR_TO_PLAYER[colour]||'P1']);
-  }
-  if (token.is_locked||token.locked) {
-    return this._posToScreen(BASE_POSITIONS[COLOUR_TO_PLAYER[colour]||'P1'][ti%4]);
-  }
-  if (token.x!==undefined&&token.y!==undefined) return this._toScreen(token.x,token.y);
-  if (token.pos!==undefined) return this._posToScreen(token.pos);
-  return { sx:this.size/2, sy:this.size/2 };
-};
-
-LudoBoard.prototype._buildBoardImage = function() {
-  var off=document.createElement('canvas');
-  off.width=off.height=this.size;
-  this._drawBoardToCtx(off.getContext('2d'));
-  this._boardImg=off;
-};
-
-LudoBoard.prototype._drawBoardToCtx = function(ctx) {
-  var c=this.cell, sz=this.size, self=this;
-
-  // Fundo
-  ctx.fillStyle='#cfc4a0'; ctx.fillRect(0,0,sz,sz);
-
-  // ── Cantos CORRECTOS ──
-  // P1 azul   → startCol=0, startRow=9  (inferior-esquerdo)
-  // P2 verde  → startCol=9, startRow=0  (superior-direito)
-  // P3 verm   → startCol=9, startRow=9  (inferior-direito)
-  // P4 amar   → startCol=0, startRow=0  (superior-esquerdo)
-  self._drawBaseCorner(ctx, 0, 9, '#1295e7'); // P1 azul inf-esq
-  self._drawBaseCorner(ctx, 9, 0, '#049645'); // P2 verde sup-dir
-  self._drawBaseCorner(ctx, 9, 9, '#ff0002'); // P3 verm inf-dir
-  self._drawBaseCorner(ctx, 0, 0, '#e6c800'); // P4 amar sup-esq
-
-  // Células do caminho (brancas)
-  for (var pos=0; pos<=51; pos++) {
-    var coord=LUDO_COORD_MAP[pos]; if(!coord) continue;
-    ctx.fillStyle='#ffffff';
-    ctx.fillRect(Math.floor(coord[0])*c, Math.floor(coord[1])*c, c, c);
-  }
-
-  // Corredores coloridos
-  for(var r=9;r<=13;r++)  {ctx.fillStyle='#9fd4f5';ctx.fillRect(7*c,r*c,c,c);}  // P1
-  for(var r2=1;r2<=5;r2++){ctx.fillStyle='#9fe8b8';ctx.fillRect(7*c,r2*c,c,c);} // P2
-  for(var c2=9;c2<=13;c2++){ctx.fillStyle='#f5a0a0';ctx.fillRect(c2*c,7*c,c,c);}// P3
-  for(var c3=1;c3<=5;c3++){ctx.fillStyle='#f5e68a';ctx.fillRect(c3*c,7*c,c,c);} // P4
-
-  // Células de saída
-  ctx.fillStyle='#1295e7'; ctx.fillRect(6*c,13*c,c,c);  // P1 pos=0
-  ctx.fillStyle='#049645'; ctx.fillRect(8*c, 1*c,c,c);  // P2 pos=26
-  ctx.fillStyle='#ff0002'; ctx.fillRect(13*c,8*c,c,c);  // P3 pos=39
-  ctx.fillStyle='#e6c800'; ctx.fillRect(1*c, 6*c,c,c);  // P4 pos=13
-
-  // Estrelas posições seguras
-  SAFE_POSITIONS.forEach(function(p){
-    var co=LUDO_COORD_MAP[p]; if(!co)return;
-    ctx.fillStyle='#fffde7'; ctx.fillRect(Math.floor(co[0])*c,Math.floor(co[1])*c,c,c);
-    self._drawStarAt(ctx,co[0],co[1]);
+let _partsActive = false;
+(function _loopParts() {
+  requestAnimationFrame(_loopParts);
+  if (!_partsActive) { _px.clearRect(0,0,_pc.width,_pc.height); return; }
+  _px.clearRect(0,0,_pc.width,_pc.height);
+  _parts.forEach(p => {
+    p.wb += p.wbS; p.x += p.vx + Math.sin(p.wb)*.7;
+    p.y += p.vy; p.rot += p.rotS; p.life++;
+    if (p.y > innerHeight+40 || p.life > p.maxLife) Object.assign(p, _newPart());
+    _px.save();
+    _px.globalAlpha = p.alpha * Math.min(1,(p.maxLife-p.life)/50);
+    _px.translate(p.x, p.y); _px.rotate(p.rot);
+    _px.font = p.size+'px serif';
+    _px.textAlign = 'center'; _px.textBaseline = 'middle';
+    _px.fillText(p.em, 0, 0);
+    _px.restore();
   });
+})();
 
-  // Grelha
-  ctx.strokeStyle='rgba(0,0,0,0.1)'; ctx.lineWidth=0.5;
-  for(var col=6;col<=8;col++) for(var row=0;row<15;row++) ctx.strokeRect(col*c+.25,row*c+.25,c-.5,c-.5);
-  for(var row3=6;row3<=8;row3++) for(var col3=0;col3<15;col3++) ctx.strokeRect(col3*c+.25,row3*c+.25,c-.5,c-.5);
-
-  // Centro
-  self._drawCenter(ctx);
-};
-
-LudoBoard.prototype._drawBaseCorner = function(ctx, startCol, startRow, color) {
-  var c=this.cell, w=6*c, x=startCol*c, y=startRow*c, pad=c*.18;
-  ctx.fillStyle=color; ctx.fillRect(x,y,w,w);
-  ctx.fillStyle='rgba(255,255,255,0.91)';
-  this._rrect(ctx,x+pad,y+pad,w-pad*2,w-pad*2,c*.32); ctx.fill();
-  [[1.5,1.5],[3.5,1.5],[1.5,3.5],[3.5,3.5]].forEach(function(o){
-    var cx=(startCol+o[0])*c, cy=(startRow+o[1])*c, r=c*.42;
-    ctx.beginPath(); ctx.arc(cx,cy+2,r,0,Math.PI*2); ctx.fillStyle='rgba(0,0,0,0.13)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.46)'; ctx.fill();
-    ctx.strokeStyle=color; ctx.lineWidth=c*.08; ctx.stroke();
-  });
-  ctx.strokeStyle='rgba(0,0,0,0.17)'; ctx.lineWidth=1.5; ctx.strokeRect(x,y,w,w);
-};
-
-LudoBoard.prototype._drawCenter = function(ctx) {
-  var c=this.cell, cx=7.5*c, cy=7.5*c, r=2.5*c;
-  [
-    {pts:[[cx,cy],[cx-r,cy-r],[cx+r,cy-r]],color:'#049645'}, // topo  → verde (P2 sup-dir)
-    {pts:[[cx,cy],[cx+r,cy-r],[cx+r,cy+r]],color:'#ff0002'}, // dir   → verm (P3 inf-dir)
-    {pts:[[cx,cy],[cx+r,cy+r],[cx-r,cy+r]],color:'#1295e7'}, // base  → azul (P1 inf-esq)
-    {pts:[[cx,cy],[cx-r,cy+r],[cx-r,cy-r]],color:'#e6c800'}, // esq   → amar (P4 sup-esq)
-  ].forEach(function(t){
-    ctx.beginPath(); ctx.moveTo(t.pts[0][0],t.pts[0][1]); ctx.lineTo(t.pts[1][0],t.pts[1][1]); ctx.lineTo(t.pts[2][0],t.pts[2][1]); ctx.closePath();
-    ctx.fillStyle=t.color; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1; ctx.stroke();
-  });
-  ctx.beginPath(); ctx.arc(cx,cy,c*.65,0,Math.PI*2);
-  var g=ctx.createRadialGradient(cx,cy-c*.15,0,cx,cy,c*.65);
-  g.addColorStop(0,'#fff8e1'); g.addColorStop(1,'#f5c518');
-  ctx.fillStyle=g; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=c*.06; ctx.stroke();
-  ctx.save(); ctx.translate(cx,cy); this._star(ctx,0,0,c*.4,c*.18,6); ctx.fillStyle='rgba(255,255,255,0.78)'; ctx.fill(); ctx.restore();
-};
-
-LudoBoard.prototype._drawStarAt = function(ctx,col,row) {
-  var c=this.cell, cx=col*c+c*.5, cy=row*c+c*.5;
-  ctx.save(); ctx.translate(cx,cy); this._star(ctx,0,0,c*.33,c*.15,5); ctx.fillStyle='rgba(255,195,0,0.72)'; ctx.fill(); ctx.restore();
-};
-
-LudoBoard.prototype._star = function(ctx,cx,cy,outerR,innerR,pts) {
-  ctx.beginPath();
-  for(var i=0;i<pts*2;i++){
-    var r2=i%2===0?outerR:innerR, angle=(i*Math.PI)/pts-Math.PI/2;
-    if(i===0)ctx.moveTo(cx+r2*Math.cos(angle),cy+r2*Math.sin(angle));
-    else ctx.lineTo(cx+r2*Math.cos(angle),cy+r2*Math.sin(angle));
-  }
-  ctx.closePath();
-};
-
-LudoBoard.prototype._rrect = function(ctx,x,y,w,h,r){
-  ctx.beginPath();
-  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
-  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
-  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
-  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
-};
-
-LudoBoard.prototype._lighten = function(hex,amount) {
-  var n=parseInt(hex.replace('#',''),16);
-  return 'rgb('+Math.min(255,(n>>16)+amount)+','+Math.min(255,((n>>8)&0xff)+amount)+','+Math.min(255,(n&0xff)+amount)+')';
-};
-
-// ── RENDER ──
-LudoBoard.prototype.drawBoard = function() {
-  this.ctx.clearRect(0,0,this.size,this.size);
-  this.ctx.drawImage(this._boardImg,0,0);
-};
-
-LudoBoard.prototype.drawPiece = function(sx,sy,colour,label,isSelectable,pulseT,scale,opacity) {
-  var ctx=this.ctx, c=this.cell, r=c*.36*(scale||1), css=COLOUR_CSS[colour]||'#888';
-  ctx.save();
-  ctx.globalAlpha=opacity!==undefined?opacity:1;
-  ctx.translate(sx,sy);
-  ctx.shadowColor=css; ctx.shadowBlur=isSelectable?12+Math.sin((pulseT||0))*5:5; ctx.shadowOffsetY=2;
-  ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2);
-  var g=ctx.createRadialGradient(-r*.3,-r*.3,0,0,0,r);
-  g.addColorStop(0,this._lighten(css,55)); g.addColorStop(1,css);
-  ctx.fillStyle=g; ctx.fill();
-  if (isSelectable) {
-    var pulse=0.5+0.5*Math.sin((pulseT||0)*2.5);
-    ctx.strokeStyle='#fff'; ctx.lineWidth=c*.1*pulse;
-    ctx.globalAlpha=(0.45+pulse*.55)*(opacity!==undefined?opacity:1); ctx.stroke();
-  }
-  ctx.shadowBlur=0; ctx.shadowOffsetY=0;
-  ctx.beginPath(); ctx.arc(-r*.22,-r*.28,r*.38,0,Math.PI*2);
-  ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.globalAlpha=opacity!==undefined?opacity:1; ctx.fill();
-  ctx.fillStyle=colour==='yellow'?'#333':'#fff';
-  ctx.font='bold '+Math.round(r*.95)+'px "Plus Jakarta Sans",sans-serif';
-  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(label,0,1);
-  ctx.restore();
-};
-
-// ── ANIMAÇÕES ──
-LudoBoard.prototype.animateMove = function(colour,tokenId,fromPx,toPx,cb) {
-  var key=colour+'_'+tokenId;
-  if(!this.pieces[key]) this.pieces[key]={sx:fromPx.sx,sy:fromPx.sy,scale:1,opacity:1,animating:false};
-  var piece=this.pieces[key]; piece.animating=true; piece.sx=fromPx.sx; piece.sy=fromPx.sy;
-  var dur=380, start=performance.now(); SFX.move();
-  function step(now){
-    var t=Math.min((now-start)/dur,1), e=t<.5?2*t*t:-1+(4-2*t)*t;
-    piece.sx=fromPx.sx+(toPx.sx-fromPx.sx)*e; piece.sy=fromPx.sy+(toPx.sy-fromPx.sy)*e;
-    if(t<1)requestAnimationFrame(step);
-    else{piece.sx=toPx.sx;piece.sy=toPx.sy;piece.animating=false;cb&&cb();}
-  }
-  requestAnimationFrame(step);
-};
-
-LudoBoard.prototype.animateCaptureAt = function(colour,tokenId) {
-  var key=colour+'_'+tokenId, piece=this.pieces[key]; if(!piece)return;
-  SFX.capture(); piece.animating=true;
-  var dur=300, start=performance.now();
-  function step(now){
-    var t=Math.min((now-start)/dur,1);
-    piece.scale=1+Math.sin(t*Math.PI)*.55; piece.opacity=t<.5?1:1-(t-.5)*2;
-    if(t<1)requestAnimationFrame(step);
-    else{piece.scale=1;piece.opacity=1;piece.animating=false;}
-  }
-  requestAnimationFrame(step);
-};
-
-LudoBoard.prototype.animateDice = function(value,cb){ _animDiceRoll(value,cb); };
-LudoBoard.prototype.destroy = function(){};
-
-window.LudoBoard = LudoBoard;
-
-// ══════════════════════════════════════════════════════════════════
-//  INICIALIZAÇÃO
-// ══════════════════════════════════════════════════════════════════
-window.initCanvas = function() {
-  var canvas=document.getElementById('ludo-canvas'); if(!canvas)return;
-  if(window.BOARD&&window.BOARD.destroy){window.BOARD.destroy();window.BOARD=null;}
-  var size=Math.min(460,window.innerWidth-28);
-  canvas.width=size; canvas.height=size; canvas.style.width=size+'px'; canvas.style.height=size+'px';
-  window.BOARD=new LudoBoard(canvas,size);
-  if(window._canvasClickHandler) canvas.removeEventListener('click',window._canvasClickHandler);
-  window._canvasClickHandler=window.onCanvasClick;
-  canvas.addEventListener('click',window._canvasClickHandler);
-  _setupDiceCanvas();
-  window.startRenderLoop();
-};
-window.buildBoard = function(){ window.initCanvas(); };
-
-// ══════════════════════════════════════════════════════════════════
-//  LOOP DE RENDER
-// ══════════════════════════════════════════════════════════════════
-window.drawGameState = function(state) {
-  if(!window.BOARD||!state||!state.players)return;
-  window.BOARD.drawBoard();
-  for(var pi=0;pi<state.players.length;pi++){
-    var pl=state.players[pi], colour=pl.colour||pl.color||'blue';
-    if(!pl.tokens||!pl.tokens.length)continue;
-    for(var ti=0;ti<pl.tokens.length;ti++){
-      var token=pl.tokens[ti], tid=token.id!==undefined?token.id:ti;
-      var key=colour+'_'+tid, piece=window.BOARD.pieces[key];
-      var sx,sy,scale=1,opacity=1;
-      if(piece&&piece.animating){
-        sx=piece.sx;sy=piece.sy;scale=piece.scale!==undefined?piece.scale:1;opacity=piece.opacity!==undefined?piece.opacity:1;
-      } else {
-        var s=window.BOARD._tokenPixel(token,ti,colour); sx=s.sx;sy=s.sy;
-        if(piece){piece.sx=sx;piece.sy=sy;scale=piece.scale!==undefined?piece.scale:1;opacity=piece.opacity!==undefined?piece.opacity:1;}
-        else{window.BOARD.pieces[key]={sx:sx,sy:sy,scale:1,opacity:1,animating:false};}
-      }
-      var isSelectable=false;
-      if(window.SELECTABLE_PIECES&&window.U&&_isMyTurn(state)){
-        isSelectable=window.SELECTABLE_PIECES.indexOf(ti)!==-1&&pl.user_id===window.U.id;
-      }
-      window.BOARD.drawPiece(sx,sy,colour,tid+1,isSelectable,window.PULSE_T,scale,opacity);
-    }
-  }
-};
-
-// ══════════════════════════════════════════════════════════════════
-//  RENDER STATE — UI
-// ══════════════════════════════════════════════════════════════════
-window.renderState = function(state) {
-  window.CUR_STATE=state; window.CUR_MV=[];
-  if(!state||!state.players)return;
-
-  // Player cards
-  var pc=document.getElementById('player-cards');
-  if(pc){
-    var myT=_isMyTurn(state);
-    var mid='<div class="gmid"><div class="ttx">'+(myT?'Teu turno 🟢':'Aguarda 🔵')+'</div><div class="rtx">RND '+(state.round||0)+'</div></div>';
-    var cards='';
-    for(var i=0;i<state.players.length;i++){
-      var p=state.players[i],colour=p.colour||p.color||'blue';
-      var fin=p.fin!==undefined?p.fin:(p.tokens?p.tokens.filter(function(t){return t.has_reached_home||t.finished;}).length:0);
-      var isAct=(p.idx===state.turn||i===state.turn);
-      cards+='<div class="pc'+(isAct?' mt':'')+'"><div class="pdot" style="background:'+(COLOUR_CSS[colour]||'#888')+'"></div><div><div class="pnm2">'+p.name+(p.user_id===(window.U&&window.U.id)?' (Tu)':'')+'</div><div class="pft">'+(COLOUR_NAME[colour]||colour)+' · '+fin+'/4</div></div></div>';
-      if(i===Math.floor(state.players.length/2)-1)cards+=mid;
-    }
-    if(state.players.length<=2)cards+=mid;
-    pc.innerHTML=cards;
-  }
-
-  var gbv=document.getElementById('gbv');
-  if(gbv&&typeof fmt==='function')gbv.textContent=fmt(state.bet||0)+' KZ';
-
-  // Botão dado — CORRECTO: activa só quando meu turno E phase===0
-  var rb=document.getElementById('rb');
-  if(rb){
-    var canRoll=_isMyTurn(state)&&state.phase===0&&!state.over;
-    rb.disabled=!canRoll;
-    if(canRoll)rb.classList.add('my-turn-glow'); else rb.classList.remove('my-turn-glow');
-  }
-
-  // Dado visual
-  if(state.dice>0)_renderDice(state.dice,false);
-
-  // Log
-  if(state.log&&state.log.length){
-    var le=document.getElementById('glog');
-    if(le){
-      var lh='';
-      state.log.slice(-20).reverse().forEach(function(l){
-        var cls=(l.indexOf('VENCEU')!==-1||l.indexOf('🏆')!==-1)?' gli-w':l.indexOf('💀')!==-1?' gli-d':'';
-        lh+='<div class="gli'+cls+'">'+l+'</div>';
+// Burst de moedas num ponto
+function _burst(x, y, n) {
+  for (let i = 0; i < (n||16); i++) {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      const em = ['💰','🪙','⭐','💎','🎲','✨'][Math.floor(Math.random()*6)];
+      const angle = Math.random()*Math.PI*2;
+      const dist  = 50 + Math.random()*120;
+      el.textContent = em;
+      el.style.cssText = `position:fixed;left:${x}px;top:${y}px;font-size:${16+Math.random()*14}px;
+        pointer-events:none;z-index:999;transition:all .85s cubic-bezier(.2,1,.4,1);opacity:1;`;
+      document.body.appendChild(el);
+      requestAnimationFrame(() => {
+        el.style.transform = `translate(${Math.cos(angle)*dist}px,${Math.sin(angle)*dist-80}px) rotate(${Math.random()*720}deg) scale(0)`;
+        el.style.opacity='0';
       });
-      le.innerHTML=lh;
+      setTimeout(() => el.remove(), 900);
+    }, i * 30);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  TABULEIRO  — div + img + peças HTML
+// ══════════════════════════════════════════════════════════════════
+let _pieceEls = {}; // colour -> [el×4]
+
+function _buildBoard() {
+  const sg = document.getElementById('s-game');
+  if (!sg) return;
+
+  // Limpar peças antigas
+  Object.values(_pieceEls).flat().forEach(el => el?.remove());
+  _pieceEls = {};
+
+  // Encontrar ou criar wrapper do tabuleiro
+  let wrap = document.getElementById('ludo-board-wrap');
+  if (!wrap) {
+    // Substituir canvas por div
+    const canvas = document.getElementById('ludo-canvas');
+    wrap = document.createElement('div');
+    wrap.id = 'ludo-board-wrap';
+    const size = Math.min(460, innerWidth - 28);
+    wrap.style.cssText = `width:${size}px;height:${size}px;`;
+    if (canvas) {
+      canvas.style.display = 'none';
+      canvas.parentNode.insertBefore(wrap, canvas);
+    } else {
+      sg.querySelector('[style*="position:relative"]')?.appendChild(wrap);
+    }
+    const img = document.createElement('img');
+    img.src = '/static/ludo_board.png';
+    img.alt = 'Tabuleiro Ludo';
+    img.onerror = () => { wrap.style.background = '#1a3a1a'; img.style.display='none'; };
+    wrap.appendChild(img);
+  }
+
+  // Criar peças para cada cor
+  ['blue','green','red','yellow'].forEach(colour => {
+    _pieceEls[colour] = [];
+    for (let i = 0; i < 4; i++) {
+      const el = document.createElement('div');
+      el.className = 'lp';
+      el.dataset.colour = colour;
+      el.dataset.piece  = i;
+      el.textContent    = i + 1;
+      el.style.background = `radial-gradient(circle at 35% 30%,${COLOUR_GRAD[colour][0]},${COLOUR_GRAD[colour][1]})`;
+      el.style.color      = COLOUR_TEXT[colour];
+      el.style.boxShadow  = `0 3px 10px ${COLOUR_GRAD[colour][1]}99`;
+      wrap.appendChild(el);
+      _pieceEls[colour].push(el);
+    }
+  });
+
+  // Posições iniciais (bases)
+  const PK_TO_COLOUR = { P1:'blue', P2:'green', P3:'red', P4:'yellow' };
+  ['P1','P2','P3','P4'].forEach(pk => {
+    BASE_POS[pk].forEach((pos,i) => _placePiece(PK_TO_COLOUR[pk], i, pos));
+  });
+}
+
+function _placePiece(colour, pieceIdx, boardPos) {
+  const coord = CMAP[boardPos];
+  if (!coord) return;
+  const el = _pieceEls[colour]?.[pieceIdx];
+  if (!el) return;
+  el.style.left = (coord[0] * STEP + STEP/2) + '%';
+  el.style.top  = (coord[1] * STEP + STEP/2) + '%';
+}
+
+function _setSelectable(colour, indices) {
+  _clearSelectable();
+  indices.forEach(i => {
+    const el = _pieceEls[colour]?.[i];
+    if (!el) return;
+    el.classList.add('sel');
+    el.onclick = () => { SFX.move(); window.movePc(i); };
+  });
+}
+
+function _clearSelectable() {
+  Object.values(_pieceEls).flat().forEach(el => {
+    if (!el) return;
+    el.classList.remove('sel');
+    el.onclick = null;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  DADO 3D  (CSS preserve-3d)
+// ══════════════════════════════════════════════════════════════════
+function _buildDice() {
+  // Encontrar container do dado
+  let diceWrap = document.getElementById('lk-dice-wrap');
+  if (diceWrap) return; // já existe
+
+  // Onde inserir (depois do elemento .btd ou no .gcd)
+  const gcd = document.querySelector('#s-game .gcd');
+  if (!gcd) return;
+
+  diceWrap = document.createElement('div');
+  diceWrap.id = 'lk-dice-wrap';
+  diceWrap.innerHTML = `
+    <div class="dice-scene-lk" onclick="window.doRoll && window.doRoll()" title="Clica para lançar">
+      <div class="dice-3d-lk" id="lk-dice-3d">
+        <div class="df f1"></div>
+        <div class="df f6"></div>
+        <div class="df f2"></div>
+        <div class="df f5"></div>
+        <div class="df f3"></div>
+        <div class="df f4"></div>
+      </div>
+    </div>
+    <div id="gm-dice-num">—</div>
+  `;
+
+  // Substituir emoji dado existente
+  const dfc = document.getElementById('dfc');
+  const dnm = document.getElementById('dnm');
+  if (dfc) {
+    dfc.style.display = 'none';
+    dfc.parentNode.insertBefore(diceWrap, dfc);
+  } else {
+    const btd = gcd.querySelector('.btd');
+    if (btd) btd.insertAdjacentElement('afterend', diceWrap);
+    else gcd.prepend(diceWrap);
+  }
+  if (dnm) dnm.style.display = 'none';
+}
+
+const DICE_TRANSFORMS = {
+  1:'rotateX(0deg) rotateY(0deg)',
+  2:'rotateX(-90deg) rotateY(0deg)',
+  3:'rotateX(0deg) rotateY(90deg)',
+  4:'rotateX(0deg) rotateY(-90deg)',
+  5:'rotateX(90deg) rotateY(0deg)',
+  6:'rotateX(180deg) rotateY(0deg)',
+};
+
+function _animDice(value, cb) {
+  SFX.dice();
+  const inner = document.getElementById('lk-dice-3d');
+  const numEl = document.getElementById('gm-dice-num');
+  if (inner) {
+    inner.classList.add('rolling');
+    inner.style.transition = 'none';
+  }
+  setTimeout(() => {
+    if (inner) {
+      inner.classList.remove('rolling');
+      inner.style.transition = 'transform .65s cubic-bezier(.34,1.2,.64,1)';
+      inner.style.transform  = DICE_TRANSFORMS[value] || DICE_TRANSFORMS[1];
+    }
+    if (numEl) {
+      numEl.textContent = value;
+      numEl.classList.remove('num-pop');
+      void numEl.offsetWidth;
+      numEl.classList.add('num-pop');
+    }
+    // Emoji fallback
+    const dfc = document.getElementById('dfc');
+    const dnm = document.getElementById('dnm');
+    const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+    if (dfc) dfc.textContent = faces[value-1];
+    if (dnm) dnm.textContent = value;
+
+    if (value === 6) {
+      const dw = document.getElementById('lk-dice-wrap');
+      if (dw) { const r = dw.getBoundingClientRect(); _burst(r.left+r.width/2, r.top+r.height/2, 18); }
+      SFX.myTurn();
+    }
+    cb && setTimeout(cb, 350);
+  }, 1000);
+}
+
+// Expõe como window.BOARD para compatibilidade
+window.BOARD = { animateDice: _animDice };
+
+// ══════════════════════════════════════════════════════════════════
+//  RENDER STATE  — actualiza toda a UI
+// ══════════════════════════════════════════════════════════════════
+window.CUR_STATE  = null;
+window.PREV_STATE = null;
+window.SELECTABLE_PIECES = [];
+
+window.renderState = function(state) {
+  if (!state || !state.players) return;
+  window.CUR_STATE = state;
+
+  // ── Posicionar peças ──
+  state.players.forEach(pl => {
+    const colour = pl.color || pl.colour;
+    if (!colour || !_pieceEls[colour]) return;
+    (pl.pos || []).forEach((pos, i) => _placePiece(colour, i, pos));
+  });
+
+  _clearSelectable();
+
+  // ── Player cards ──
+  const pcardsEl = document.getElementById('player-cards');
+  if (pcardsEl && state.players) {
+    let html = '';
+    state.players.forEach((pl, idx) => {
+      const colour  = pl.color || pl.colour || 'blue';
+      const isActive = idx === state.turn;
+      const hex     = COLOUR_HEX[colour] || '#888';
+      const fin     = pl.fin ?? 0;
+      html += `<div class="pc ${isActive ? 'mt' : ''}">
+        <div class="pdot" style="background:${hex};box-shadow:0 0 6px ${hex}"></div>
+        <div>
+          <div class="pnm2" style="color:${isActive?'#f5c518':'#9890c0'}">${pl.name || COLOUR_NAME[colour]}</div>
+          <div class="pft">${COLOUR_NAME[colour]} · ${fin}/4</div>
+        </div>
+        ${isActive ? '<div style="font-size:16px;margin-left:auto">🎲</div>' : ''}
+      </div>`;
+    });
+    // Bloco central com turno
+    const curP  = state.players[state.turn];
+    const mid = `<div class="gmid" style="text-align:center;padding:0 6px">
+      <div class="ttx" style="font-size:11px;font-weight:800;color:#9890c0;text-transform:uppercase;letter-spacing:.5px">
+        ${_isMyTurn(state) ? 'Teu turno 🟢' : 'Aguarda 🔵'}
+      </div>
+      <div style="font-size:10px;color:#4a4470;font-family:'Bebas Neue',sans-serif;letter-spacing:1px">
+        RND ${state.round || 0}
+      </div>
+    </div>`;
+    // Inserir bloco central a meio
+    const half = Math.floor(state.players.length / 2);
+    const parts = html.match(/<div class="pc[^"]*"[\s\S]*?<\/div>/g) || [html];
+    pcardsEl.innerHTML = parts.slice(0,half).join('') + mid + parts.slice(half).join('');
+    pcardsEl.innerHTML = html; // simpler: just all cards
+  }
+
+  // ── Botão dado ──
+  const rb = document.getElementById('rb');
+  if (rb) {
+    const myT = _isMyTurn(state);
+    rb.disabled = !myT || state.phase !== 0 || !!state.over;
+    rb.classList.toggle('my-turn-glow', myT && !state.over && state.phase === 0);
+    if (myT && state.phase === 0 && !state.over) SFX.myTurn();
+  }
+
+  // ── Aposta ──
+  const gbv = document.getElementById('gbv');
+  if (gbv && state.bet != null) {
+    try { gbv.textContent = Number(state.bet).toLocaleString('pt-AO') + ' KZ'; } catch(e) {}
+  }
+
+  // ── Log ──
+  if (state.log?.length) {
+    const le = document.getElementById('glog');
+    if (le) {
+      le.innerHTML = state.log.slice(-20).reverse().map(l => {
+        const cls = /venceu|🏆|casa/i.test(l) ? 'w' : /captur|comeu|💀/i.test(l) ? 'k' : /tirou/i.test(l) ? 'r' : '';
+        return `<div class="gli ${cls}">${l}</div>`;
+      }).join('');
     }
   }
 
-  var co=document.getElementById('chat-online'); if(co)co.textContent=state.players.length+' online';
-  window.SELECTABLE_PIECES=[];
+  // ── Chat online ──
+  const co = document.getElementById('chat-online');
+  if (co && state.players) co.textContent = state.players.length + ' online';
 };
 
-window.highlightPcs = function(mv){ window.CUR_MV=mv||[]; window.SELECTABLE_PIECES=mv||[]; };
+function _isMyTurn(state) {
+  if (!state?.players || !window.U) return false;
+  const p = state.players[state.turn];
+  return p && (p.user_id === window.U.id || p.name === window.U.name) && state.phase === 0;
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  HIGHLIGHT DE PEÇAS MOVÍVEIS
+// ══════════════════════════════════════════════════════════════════
+window.highlightPcs = function(mv) {
+  window.SELECTABLE_PIECES = mv || [];
+  if (!window.CUR_STATE) return;
+  const curP = window.CUR_STATE.players?.[window.CUR_STATE.turn];
+  if (!curP) return;
+  const colour = curP.color || curP.colour;
+  if (colour) _setSelectable(colour, mv);
+};
 
 // ══════════════════════════════════════════════════════════════════
 //  EVENTOS SSE
 // ══════════════════════════════════════════════════════════════════
 window.onGameStarted = function(state) {
-  window.RID=state.room_id; window.CUR_STATE=state; window.PREV_STATE=null; window.SELECTABLE_PIECES=[];
-  if(typeof pg==='function')pg('game');
-  window.buildBoard(); window.renderState(state);
-  var chatEl=document.getElementById('chat-msgs'); if(chatEl)chatEl.innerHTML='';
-  if(typeof addChat==='function'){
-    addChat('Sistema','Jogo iniciado com '+state.players.length+' jogadores!',true);
-    state.players.forEach(function(p){ var c=p.colour||p.color||'blue'; addChat('Sistema',(COLOUR_NAME[c]||c)+': '+p.name,true); });
-  }
-  SFX.myTurn();
+  window.RID        = state.room_id || window.RID;
+  window.CUR_STATE  = state;
+  window.PREV_STATE = null;
+
+  // Navegar para ecrã de jogo
+  if (typeof pg === 'function') pg('game');
+
+  // Construir tabuleiro e dado
+  setTimeout(() => {
+    _buildBoard();
+    _buildDice();
+    window.renderState(state);
+
+    // Mensagens de início no chat
+    const chatEl = document.getElementById('chat-msgs');
+    if (chatEl) chatEl.innerHTML = '';
+    if (typeof addChat === 'function') {
+      addChat('Sistema', `Jogo iniciado com ${state.players.length} jogadores!`, true);
+      state.players.forEach(pl => {
+        const c = pl.color || pl.colour || 'blue';
+        addChat('Sistema', `${COLOUR_NAME[c]}: ${pl.name}`, true);
+      });
+    }
+
+    // Ativar partículas
+    _partsActive = true;
+    _initParts(20);
+  }, 50);
 };
 
 window.onGameUpdate = function(state) {
-  if(window.PREV_STATE&&window.BOARD)window._triggerMoveAnimations(window.PREV_STATE,state);
-  window.PREV_STATE=window.CUR_STATE; window.CUR_STATE=state; window.renderState(state);
+  if (window.CUR_STATE) window.PREV_STATE = JSON.parse(JSON.stringify(window.CUR_STATE));
+  window.CUR_STATE = state;
+  _animateMoveDiff(window.PREV_STATE, state);
+  window.renderState(state);
 };
 
 // ══════════════════════════════════════════════════════════════════
-//  ANIMAÇÕES DIFF
+//  ANIMAÇÃO DIFF  (detecta peças que mudaram e anima)
 // ══════════════════════════════════════════════════════════════════
-window._triggerMoveAnimations = function(prev,next) {
-  if(!prev||!prev.players||!next||!next.players||!window.BOARD)return;
-  for(var pi=0;pi<next.players.length;pi++){
-    var pl=next.players[pi], colour=pl.colour||pl.color||'blue'; if(!pl.tokens)continue;
-    var prevPl=null;
-    for(var xi=0;xi<prev.players.length;xi++){if(prev.players[xi].user_id===pl.user_id){prevPl=prev.players[xi];break;}}
-    if(!prevPl||!prevPl.tokens)continue;
-    for(var ti=0;ti<pl.tokens.length;ti++){
-      var tok=pl.tokens[ti], prevTok=prevPl.tokens[ti]; if(!prevTok)continue;
-      var tid=tok.id!==undefined?tok.id:ti;
-      var curPx=window.BOARD._tokenPixel(tok,ti,colour);
-      var prevPx=window.BOARD._tokenPixel(prevTok,ti,colour);
-      if(tok.is_locked&&!prevTok.is_locked){window.BOARD.animateCaptureAt(colour,tid);continue;}
-      if(tok.has_reached_home&&!prevTok.has_reached_home)SFX.home();
-      if(Math.abs(curPx.sx-prevPx.sx)>1||Math.abs(curPx.sy-prevPx.sy)>1){
-        window.BOARD.animateMove(colour,tid,prevPx,curPx,null);
+function _animateMoveDiff(prev, next) {
+  if (!prev?.players || !next?.players) return;
+  next.players.forEach((pl, idx) => {
+    const colour  = pl.color || pl.colour;
+    const prevPl  = prev.players[idx];
+    if (!prevPl) return;
+    (pl.pos || []).forEach((pos, i) => {
+      const prevPos = prevPl.pos?.[i];
+      if (prevPos === pos) return;
+      // Peça voltou à base = capturada
+      const basePositions = [500,501,502,503,600,601,602,603,700,701,702,703,800,801,802,803];
+      if (basePositions.includes(pos) && !basePositions.includes(prevPos)) {
+        // Animação de captura (flash e volta)
+        const el = _pieceEls[colour]?.[i];
+        if (el) {
+          el.classList.add('captured');
+          SFX.capture();
+          setTimeout(() => {
+            el.classList.remove('captured');
+            _placePiece(colour, i, pos);
+          }, 420);
+        }
+      } else {
+        // Movimento normal
+        if (pos === HOME_POS?.['P1'] || pos === HOME_POS?.['P2'] ||
+            pos === HOME_POS?.['P3'] || pos === HOME_POS?.['P4']) {
+          SFX.home();
+        } else {
+          SFX.move();
+        }
+        _placePiece(colour, i, pos);
       }
-    }
-  }
-};
-
-// ══════════════════════════════════════════════════════════════════
-//  AÇÕES
-// ══════════════════════════════════════════════════════════════════
-window.doRoll = async function() {
-  if(!window.RID)return;
-  var rb=document.getElementById('rb'); if(rb){rb.disabled=true;rb.classList.remove('my-turn-glow');}
-  _renderDice(0,true);
-  var d;
-  try {
-    d=typeof api==='function'
-      ?await api('/api/game/roll','POST',{room_id:window.RID})
-      :await fetch('/api/game/roll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room_id:window.RID}),credentials:'same-origin'}).then(function(r){return r.json();});
-  } catch(e){_renderDice(0,false);if(rb)rb.disabled=false;return;}
-  if(d.error){_renderDice(0,false);if(rb)rb.disabled=false;if(typeof toast==='function')toast('❌ '+d.error,'ter');return;}
-  _animDiceRoll(d.dice,async function(){
-    window.renderState(d);
-    try {
-      var mv=typeof api==='function'
-        ?await api('/api/game/movable','POST',{room_id:window.RID})
-        :await fetch('/api/game/movable',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room_id:window.RID}),credentials:'same-origin'}).then(function(r){return r.json();});
-      if(mv.movable&&mv.movable.length)window.highlightPcs(mv.movable);
-    } catch(e){}
+    });
   });
-};
-
-window.movePc = async function(idx) {
-  if(!window.RID)return;
-  window.PREV_STATE=window.CUR_STATE?JSON.parse(JSON.stringify(window.CUR_STATE)):null;
-  var d;
-  try {
-    d=typeof api==='function'
-      ?await api('/api/game/move','POST',{room_id:window.RID,piece:idx})
-      :await fetch('/api/game/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room_id:window.RID,piece:idx}),credentials:'same-origin'}).then(function(r){return r.json();});
-  } catch(e){return;}
-  if(d.error){if(typeof toast==='function')toast('❌ '+d.error,'ter');return;}
-  if(window.PREV_STATE&&window.BOARD)window._triggerMoveAnimations(window.PREV_STATE,d);
-  window.PREV_STATE=window.CUR_STATE; window.renderState(d);
-};
-
-window.leaveGame = async function() {
-  if(!confirm('Abandonar? Perdes a aposta.'))return;
-  if(window.RID){try{await fetch('/api/game/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room_id:window.RID}),credentials:'same-origin'});}catch(e){}}
-  window.RID=null; if(typeof pg==='function')pg('home');
-};
+}
 
 // ══════════════════════════════════════════════════════════════════
 //  GAME OVER
 // ══════════════════════════════════════════════════════════════════
 window.onGameOver = function(d) {
-  if(d.won)SFX.win();
-  if(d.won&&typeof coinRain==='function')coinRain();
-  if(d.won&&typeof showFlash==='function')showFlash('🏆');
-  var goo=document.getElementById('goo');   if(goo)goo.classList.remove('hidden');
-  var goic=document.getElementById('goic'); if(goic)goic.textContent=d.won?'🏆':'💀';
-  var gott=document.getElementById('gott'); if(gott)gott.textContent=d.won?'VITÓRIA!':'DERROTA';
-  var gosb=document.getElementById('gosb'); if(gosb)gosb.textContent=d.won?'Parabéns, venceste!':'Boa sorte da próxima!';
-  var gopr=document.getElementById('gopr');
-  if(gopr){var prize=d.won?(d.prize||0):0;gopr.textContent=(d.won?'+':'')+(typeof fmt==='function'?fmt(prize):prize)+' KZ';gopr.style.color=d.won?'var(--jade)':'var(--red)';}
-  var gocd=document.getElementById('gocd'); if(gocd)gocd.className='gocd'+(d.won?'':' lose');
-  if(d.balance!=null&&window.U){window.U.balance=d.balance;if(typeof updN==='function')updN();}
-};
+  _partsActive = false;
 
-// ══════════════════════════════════════════════════════════════════
-//  CLIQUE NO CANVAS
-// ══════════════════════════════════════════════════════════════════
-window.onCanvasClick = function(e) {
-  if(!window.CUR_STATE||!window.BOARD)return;
-  if(!window.SELECTABLE_PIECES||!window.SELECTABLE_PIECES.length)return;
-  if(window.CUR_STATE.phase!==1)return;
-  var rect=e.target.getBoundingClientRect();
-  var mx=(e.clientX-rect.left)*(e.target.width/rect.width);
-  var my=(e.clientY-rect.top)*(e.target.height/rect.height);
-  var myPlayer=null;
-  for(var i=0;i<window.CUR_STATE.players.length;i++){
-    if(window.CUR_STATE.players[i].user_id===(window.U&&window.U.id)){myPlayer=window.CUR_STATE.players[i];break;}
+  const goo  = document.getElementById('goo');
+  const goic = document.getElementById('goic');
+  const gott = document.getElementById('gott');
+  const gosb = document.getElementById('gosb');
+  const gopr = document.getElementById('gopr');
+  const gocd = document.getElementById('gocd');
+
+  if (!goo) return;
+
+  if (d.won) {
+    SFX.win();
+    if (typeof coinRain  === 'function') coinRain();
+    if (typeof showFlash === 'function') showFlash('🏆');
+    // Burst épico
+    for (let i = 0; i < 6; i++) {
+      setTimeout(() => _burst(
+        innerWidth  * (.2 + Math.random()*.6),
+        innerHeight * .3,
+        28
+      ), i * 250);
+    }
+    if (goic) goic.textContent = '🏆';
+    if (gott) { gott.textContent = 'VITÓRIA!'; gott.style.color = '#f5c518'; }
+    if (gosb) gosb.textContent = 'Parabéns, venceste!';
+    if (gopr) { gopr.textContent = '+' + Number(d.prize||0).toLocaleString('pt-AO') + ' KZ'; gopr.style.color = '#00e676'; }
+    gocd?.classList.remove('lose');
+  } else {
+    if (goic) goic.textContent = '💀';
+    if (gott) { gott.textContent = 'DERROTA'; gott.style.color = '#ff4757'; }
+    if (gosb) gosb.textContent = 'Boa sorte da próxima!';
+    if (gopr) { gopr.textContent = '—'; gopr.style.color = '#ff4757'; }
+    gocd?.classList.add('lose');
   }
-  if(!myPlayer||!myPlayer.tokens)return;
-  var colour=myPlayer.colour||myPlayer.color||'blue', hitR=window.BOARD.cell*.47, clicked=false;
-  for(var ti=0;ti<myPlayer.tokens.length;ti++){
-    if(clicked)break; if(window.SELECTABLE_PIECES.indexOf(ti)===-1)continue;
-    var token=myPlayer.tokens[ti], tid=token.id!==undefined?token.id:ti;
-    var piece=window.BOARD.pieces[colour+'_'+tid];
-    var px=piece?piece.sx:window.BOARD.size/2, py=piece?piece.sy:window.BOARD.size/2;
-    if(Math.sqrt((mx-px)*(mx-px)+(my-py)*(my-py))<=hitR){clicked=true;SFX.tick();window.movePc(ti);}
+  goo.classList.remove('hidden');
+
+  if (d.balance != null && window.U) {
+    window.U.balance = d.balance;
+    if (typeof updN === 'function') updN();
   }
 };
 
 // ══════════════════════════════════════════════════════════════════
-//  HELPERS + LOOP
+//  DOROLL  (substitui o do index.html — mais robusto)
 // ══════════════════════════════════════════════════════════════════
-function _isMyTurn(state) {
-  if(!state||!state.players||!window.U)return false;
-  var p=state.players[state.turn%(state.players.length||1)];
-  return p&&p.user_id===window.U.id;
-}
+window.doRoll = async function() {
+  if (!window.RID) return;
+  const rb = document.getElementById('rb');
+  if (rb) { rb.disabled = true; rb.classList.remove('my-turn-glow'); }
 
-window.startRenderLoop = function() {
-  cancelAnimationFrame(window.CANVAS_ANIM_FRAME);
-  window.PULSE_T=0;
-  function loop(){ window.PULSE_T=(window.PULSE_T||0)+0.05; if(window.CUR_STATE&&window.BOARD)window.drawGameState(window.CUR_STATE); window.CANVAS_ANIM_FRAME=requestAnimationFrame(loop); }
-  window.CANVAS_ANIM_FRAME=requestAnimationFrame(loop);
+  let d;
+  try {
+    const r = await fetch('/api/game/roll', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({room_id: window.RID}),
+      credentials:'same-origin'
+    });
+    d = await r.json();
+  } catch(e) {
+    if (rb) rb.disabled = false;
+    return;
+  }
+
+  if (d.error) {
+    if (typeof toast === 'function') toast('❌ ' + d.error, 'ter');
+    if (rb) rb.disabled = false;
+    return;
+  }
+
+  _animDice(d.dice, async () => {
+    window.renderState(d);
+    try {
+      const mv = await fetch('/api/game/movable', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({room_id: window.RID}),
+        credentials:'same-origin'
+      }).then(r=>r.json());
+      if (mv.movable?.length) window.highlightPcs(mv.movable);
+    } catch(e) {}
+  });
 };
 
-setInterval(function(){
-  var rb=document.getElementById('rb'); if(!rb||!window.CUR_STATE)return;
-  var canRoll=_isMyTurn(window.CUR_STATE)&&window.CUR_STATE.phase===0&&!window.CUR_STATE.over;
-  rb.disabled=!canRoll;
-  if(canRoll)rb.classList.add('my-turn-glow'); else rb.classList.remove('my-turn-glow');
-},500);
+// ══════════════════════════════════════════════════════════════════
+//  MOVEPC
+// ══════════════════════════════════════════════════════════════════
+window.movePc = async function(idx) {
+  if (!window.RID) return;
+  _clearSelectable();
+  window.PREV_STATE = window.CUR_STATE ? JSON.parse(JSON.stringify(window.CUR_STATE)) : null;
 
-console.log('[LudoKz] ludo_board_v2.js DEFINITIVO carregado ✓');
+  let d;
+  try {
+    const r = await fetch('/api/game/move', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({room_id: window.RID, piece: idx}),
+      credentials:'same-origin'
+    });
+    d = await r.json();
+  } catch(e) { return; }
+
+  if (d.error) { if (typeof toast === 'function') toast('❌ ' + d.error, 'ter'); return; }
+
+  if (window.PREV_STATE) _animateMoveDiff(window.PREV_STATE, d);
+  window.CUR_STATE = d;
+  window.renderState(d);
+};
+
+// ══════════════════════════════════════════════════════════════════
+//  LEAVE GAME
+// ══════════════════════════════════════════════════════════════════
+window.leaveGame = async function() {
+  if (!confirm('Abandonar? Perdes a aposta.')) return;
+  _partsActive = false;
+  if (window.RID) {
+    await fetch('/api/game/leave', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({room_id: window.RID}), credentials:'same-origin'
+    }).catch(()=>{});
+  }
+  window.RID = null;
+  if (typeof pg === 'function') pg('home');
+};
+
+// ══════════════════════════════════════════════════════════════════
+//  buildBoard / initCanvas  (compatibilidade com index.html)
+// ══════════════════════════════════════════════════════════════════
+window.buildBoard  = _buildBoard;
+window.initCanvas  = _buildBoard;
+window.startRenderLoop = function() {}; // não necessário com divs
+
+// Pulsa o botão dado quando é a minha vez
+setInterval(() => {
+  const rb = document.getElementById('rb');
+  if (!rb || !window.CUR_STATE) return;
+  const myT = _isMyTurn(window.CUR_STATE);
+  rb.classList.toggle('my-turn-glow', myT && !window.CUR_STATE.over && window.CUR_STATE.phase === 0);
+}, 600);
+
+console.log('[LudoKz] ludo_board_v2.js FINAL carregado ✓');
