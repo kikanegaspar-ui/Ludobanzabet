@@ -182,18 +182,28 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .dsp{background:rgba(255,159,10,.1);color:var(--orange);border:1px solid rgba(255,159,10,.2)}
 .dsa{background:rgba(0,230,118,.1);color:var(--jade);border:1px solid rgba(0,230,118,.2)}
 .dsr{background:rgba(255,45,85,.1);color:var(--red);border:1px solid rgba(255,45,85,.2)}
-.daily-card{background:linear-gradient(135deg,rgba(245,197,24,.1),rgba(255,159,10,.06));border:1.5px solid rgba(245,197,24,.22);border-radius:18px;padding:22px;margin-bottom:16px;transition:transform .08s}
-.daily-card h3{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--g1);margin-bottom:12px;letter-spacing:1px}
-.streak-days{display:flex;gap:6px;margin:12px 0;flex-wrap:wrap}
-.sd{flex:1;min-width:38px;text-align:center;padding:7px 4px;border-radius:10px;border:1px solid var(--rim);background:transparent;transition:all .3s}
-.sd.done{border-color:var(--g1);background:rgba(245,197,24,.1)}
-.sd-day{font-size:9px;color:var(--t3);font-weight:800;letter-spacing:.5px;text-transform:uppercase}
-.sd-val{font-family:"Bebas Neue",sans-serif;font-size:13px;color:var(--t2);margin-top:2px}
-.sd.done .sd-val{color:var(--g1)}
+
+/* ── BÓNUS CARD (substitui daily-card) ── */
+.bonus-card{background:linear-gradient(135deg,rgba(191,90,242,.10),rgba(10,132,255,.06));border:1.5px solid rgba(191,90,242,.28);border-radius:18px;padding:22px;margin-bottom:16px;transition:transform .08s}
+.bonus-card h3{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--purple);margin-bottom:4px;letter-spacing:1px}
+.bonus-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.bonus-item{flex:1;min-width:140px;background:rgba(0,0,0,.25);border:1.5px solid rgba(191,90,242,.18);border-radius:14px;padding:14px;text-align:center}
+.bonus-item-icon{font-size:26px;margin-bottom:6px}
+.bonus-item-val{font-family:"Bebas Neue",sans-serif;font-size:22px;color:var(--g1);letter-spacing:1px}
+.bonus-item-lbl{font-size:11px;color:var(--t3);font-weight:700;letter-spacing:.5px;margin-top:3px;line-height:1.5}
+.bonus-item-status{font-size:11px;font-weight:800;margin-top:7px}
+.bonus-item-status.claimed{color:var(--jade)}
+.bonus-item-status.locked{color:var(--t3)}
+.bonus-item-status.ready{color:var(--g1)}
+
 .ref-card{background:linear-gradient(135deg,rgba(0,230,118,.08),rgba(0,200,83,.04));border:1.5px solid rgba(0,230,118,.18);border-radius:18px;padding:22px;margin-bottom:16px;transition:transform .08s}
 .ref-card h3{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--jade);margin-bottom:12px;letter-spacing:1px}
 .ref-link{background:rgba(0,0,0,.3);border:1px solid rgba(0,230,118,.2);border-radius:11px;padding:12px 15px;font-family:monospace;font-size:12px;color:var(--jade);word-break:break-all;cursor:pointer;margin-bottom:12px;transition:background .2s}
 .ref-link:hover{background:rgba(0,230,118,.05)}
+.ref-progress{background:rgba(0,0,0,.2);border:1px solid rgba(0,230,118,.15);border-radius:11px;padding:12px 15px;margin-bottom:12px}
+.ref-progress-bar-wrap{height:8px;background:rgba(255,255,255,.06);border-radius:4px;margin-top:8px;overflow:hidden}
+.ref-progress-bar{height:100%;background:linear-gradient(90deg,var(--jade),var(--jade2));border-radius:4px;transition:width .5s ease}
+
 .sup-card{background:var(--c1);border:1px solid rgba(10,132,255,.2);border-radius:18px;padding:22px;margin-bottom:22px}
 .sup-card h3{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--blue);margin-bottom:12px;letter-spacing:1px}
 .tkt{background:rgba(0,0,0,.2);border:1px solid var(--rim);border-radius:11px;padding:12px;margin-bottom:8px;font-size:13px}
@@ -327,7 +337,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
             <div id="op-badge" style="font-size:11px;color:var(--jade);margin-top:4px;font-weight:700"></div>
           </div>
           <div class="fl"><label>Senha</label><input id="rp" type="password" placeholder="Mínimo 6 caracteres"></div>
-          <div class="fl"><label>Código de Referido <span style="color:var(--jade);font-size:10px">+500 Kz bónus</span></label><input id="rref" placeholder="Opcional"></div>
+          <div class="fl"><label>Código de Referido <span style="color:var(--jade);font-size:10px">Até 500 Kz bónus</span></label><input id="rref" placeholder="Opcional"></div>
           <div class="errt" id="rerr"></div>
           <button class="btn bg bfw" id="btn-send-otp" onclick="enviarOTP()" style="font-size:14px">📱 Enviar Código SMS</button>
         </div>
@@ -369,7 +379,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
             <div style="background:rgba(255,255,255,.03);border:1px solid var(--rim);border-radius:11px;padding:14px;max-height:160px;overflow-y:auto;font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:14px">
               <strong style="color:var(--g1);font-size:13px">TERMOS E CONDIÇÕES — LUDOKZ</strong><br><br>
               <strong>1. Elegibilidade</strong><br>Só podem jogar pessoas com 18 ou mais anos.<br><br>
-              <strong>2. Apostas e Pagamentos</strong><br>Todas as apostas são em Kwanzas Angolanos (Kz). O LudoKz retém 10% de comissão sobre ganhos.<br><br>
+              <strong>2. Apostas e Pagamentos</strong><br>Todas as apostas são em Kwanzas Angolanos (Kz). O LudoKz retém 10% de comissão sobre ganhos. Limite de depósito diário: 100.000 Kz. Limite de saque diário: 50.000 Kz.<br><br>
               <strong>3. Jogo Responsável</strong><br>O LudoKz promove o jogo responsável.<br><br>
               <strong>4. Política de Privacidade</strong><br>Os teus dados são usados exclusivamente para gerir a tua conta.<br><br>
               <strong>5. Proibições</strong><br>É proibido criar múltiplas contas ou usar bots. Infractores serão banidos.
@@ -509,14 +519,58 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <div class="bll">Saldo Disponível</div>
         <div class="bln" id="wbn">0</div>
         <div class="blc">Kwanzas (Kz)</div>
+        <div style="display:flex;gap:16px;justify-content:center;margin-top:14px;flex-wrap:wrap">
+          <div style="font-size:12px;color:var(--t3);font-weight:700">📥 Dep. diário: <span style="color:var(--g1)">máx 100.000 Kz</span></div>
+          <div style="font-size:12px;color:var(--t3);font-weight:700">📤 Saque diário: <span style="color:var(--g1)">máx 50.000 Kz</span></div>
+        </div>
       </div>
-      <div class="daily-card">
-        <h3>🎁 Bónus Diário</h3>
-        <div id="daily-status" style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.8;margin-bottom:10px">A carregar...</div>
-        <div class="streak-days" id="streak-days"></div>
-        <button class="btn bg bfw" id="btn-daily" onclick="claimDaily()" style="font-size:13px;margin-top:6px">🎁 Receber Bónus</button>
-        <p class="pnote">Entra todos os dias e sobe o streak! Dia 7 = 5.000 Kz</p>
+
+      <!-- BÓNUS (substitui daily-card) -->
+      <div class="bonus-card">
+        <h3>🎁 Bónus</h3>
+        <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6;margin-bottom:4px">Recompensas para novos jogadores e jogadores activos.</p>
+        <div class="bonus-row" id="bonus-row">
+          <!-- Bónus Boas-Vindas -->
+          <div class="bonus-item" id="bw-item">
+            <div class="bonus-item-icon">🎉</div>
+            <div class="bonus-item-val">1.000 KZ</div>
+            <div class="bonus-item-lbl">Bónus Boas-Vindas<br>Recebido ao criar conta</div>
+            <div class="bonus-item-status" id="bw-status">A carregar...</div>
+          </div>
+          <!-- Bónus 10 Partidas -->
+          <div class="bonus-item" id="b10-item">
+            <div class="bonus-item-icon">🏅</div>
+            <div class="bonus-item-val">2.000 KZ</div>
+            <div class="bonus-item-lbl">Bónus 10 Partidas<br>Joga 10 partidas e saca!</div>
+            <div class="bonus-item-status" id="b10-status">A carregar...</div>
+          </div>
+        </div>
+        <div style="margin-top:14px" id="b10-claim-wrap"></div>
+        <p class="pnote" style="margin-top:10px">⚠️ O bónus de boas-vindas exige pelo menos 1 partida jogada para ser sacado. O bónus de 10 partidas não tem restrições de saque além do limite diário.</p>
       </div>
+
+      <!-- REFERIDOS -->
+      <div class="ref-card">
+        <h3>👥 Referidos</h3>
+        <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6;margin-bottom:12px">Convida amigos — a cada <strong style="color:var(--jade)">5 amigos registados</strong> ganhas <strong style="color:var(--jade)">500 Kz</strong>!</p>
+        <div class="ref-progress" id="ref-progress-box">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;color:var(--t2);font-weight:700">Progresso actual</span>
+            <span style="font-family:Bebas Neue,sans-serif;font-size:16px;color:var(--g1)" id="ref-progress-label">0 / 5</span>
+          </div>
+          <div class="ref-progress-bar-wrap">
+            <div class="ref-progress-bar" id="ref-progress-bar" style="width:0%"></div>
+          </div>
+          <div style="font-size:11px;color:var(--t3);margin-top:6px;font-weight:600" id="ref-progress-sub">Convida mais amigos para receber o bónus!</div>
+        </div>
+        <div class="ref-link" id="ref-link" onclick="copyRef()">A carregar link...</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn bj bsm" onclick="copyRef()">📋 Copiar</button>
+          <button class="btn bgh bsm" onclick="shareRef()">📲 WhatsApp</button>
+        </div>
+        <div id="ref-count" style="font-size:12px;color:var(--t3);margin-top:10px;font-weight:600"></div>
+      </div>
+
       <div class="wc" style="margin-bottom:16px">
         <h3>🎟️ Código Promo</h3>
         <div class="promo-row">
@@ -526,6 +580,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <div class="errt" id="promo-err"></div>
         <div class="okt" id="promo-ok"></div>
       </div>
+
       <div class="exb">
         <h4>📲 Depositar — Express Card</h4>
         <ul class="exl"><li>Transfere para o número da plataforma:</li></ul>
@@ -533,6 +588,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <ul class="exl">
           <li>Escreve o teu nome na descrição</li>
           <li>Copia a referência e submete abaixo</li>
+          <li>Limite diário: <strong style="color:var(--g1)">100.000 Kz</strong></li>
         </ul>
       </div>
       <div class="wg">
@@ -542,34 +598,25 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
             <div class="mth on" onclick="sm(this)">Express Card</div>
             <div class="mth" onclick="sm(this)">Unitel Money</div>
           </div>
-          <div class="fl"><label>Valor (Kz)</label><input type="number" id="dv" placeholder="5000" min="500"></div>
+          <div class="fl"><label>Valor (Kz)</label><input type="number" id="dv" placeholder="5000" min="500" max="100000"></div>
           <div class="fl"><label>Referência</label><input id="dref" placeholder="TXN20250312345"></div>
           <div class="fl"><label>Teu Nome</label><input id="dpayer" placeholder="João Silva"></div>
           <div class="errt" id="de"></div><div class="okt" id="dok"></div>
           <button class="btn bj bfw" onclick="doDeposit()" style="font-size:13px">Enviar Pedido</button>
-          <p class="pnote">Mínimo 500 Kz · Confirmação manual</p>
+          <p class="pnote">Mínimo 500 Kz · Máximo 100.000 Kz/dia · Confirmação manual</p>
         </div>
         <div class="wc">
           <h3>⬇️ Levantar</h3>
-          <div class="alrt"><strong>Taxa 10%</strong> · Mínimo 1.000 Kz</div>
+          <div class="alrt"><strong>Taxa 10%</strong> · Mínimo 1.000 Kz · <strong>Máximo 50.000 Kz/dia</strong></div>
           <div class="fl"><label>Nº Express Card</label><input id="wnum" placeholder="9XX XXX XXX"></div>
           <div class="fl"><label>Nome da Conta</label><input id="wacname" placeholder="Nome exacto da conta"></div>
-          <div class="fl"><label>Valor (Kz)</label><input type="number" id="wv" placeholder="1000" min="1000" oninput="wprev()"></div>
+          <div class="fl"><label>Valor (Kz)</label><input type="number" id="wv" placeholder="1000" min="1000" max="50000" oninput="wprev()"></div>
           <div class="okt" id="wpr"></div>
           <div class="errt" id="we"></div><div class="okt" id="wok"></div>
           <button class="btn bpu bfw" onclick="doWithdraw()" style="font-size:13px">Solicitar Levantamento</button>
         </div>
       </div>
-      <div class="ref-card">
-        <h3>👥 Referidos</h3>
-        <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6;margin-bottom:12px">Convida amigos — ganha <strong style="color:var(--jade)">500 Kz</strong> por cada um!</p>
-        <div class="ref-link" id="ref-link" onclick="copyRef()">A carregar link...</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn bj bsm" onclick="copyRef()">📋 Copiar</button>
-          <button class="btn bgh bsm" onclick="shareRef()">📲 WhatsApp</button>
-        </div>
-        <div id="ref-count" style="font-size:12px;color:var(--t3);margin-top:10px;font-weight:600"></div>
-      </div>
+
       <div class="sup-card">
         <h3>💬 Suporte</h3>
         <div class="fl" style="margin-bottom:9px"><label>Mensagem</label><textarea id="sup-msg" rows="3" placeholder="Descreve o teu problema..."></textarea></div>
@@ -675,25 +722,19 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 <div class="tst" id="tst"></div>
 
 <script>
-/* canvas gerido pelo módulo de dinamismo */
-
-/* ══════════════════════════════════════════════
-   COIN RAIN v2 — SISTEMA PROFISSIONAL
-══════════════════════════════════════════════ */
+/* ══ COIN RAIN v2 ══ */
 const COIN_TYPES=[
   {color:'#ffd700',rim:'#b8860b',label:'KZ',size:22},
-  {color:'#ffc107',rim:'#c67c00',label:'★', size:18},
-  {color:'#00e676',rim:'#00a152',label:'✓', size:16},
-  {color:'#bf5af2',rim:'#7a2fb0',label:'♦', size:14},
-  {color:'#ff9f0a',rim:'#c46200',label:'▲', size:13},
+  {color:'#ffc107',rim:'#c67c00',label:'★',size:18},
+  {color:'#00e676',rim:'#00a152',label:'✓',size:16},
+  {color:'#bf5af2',rim:'#7a2fb0',label:'♦',size:14},
+  {color:'#ff9f0a',rim:'#c46200',label:'▲',size:13},
 ];
-
 class CoinDrop{
   constructor(x,burstMode){
     const type=COIN_TYPES[Math.floor(Math.random()*COIN_TYPES.length)];
     this.el=document.createElement('canvas');
-    this.size=type.size;
-    const dim=(this.size+10)*2;
+    this.size=type.size;const dim=(this.size+10)*2;
     this.el.width=dim;this.el.height=dim;
     this.el.style.cssText='position:fixed;pointer-events:none;z-index:9998;';
     document.body.appendChild(this.el);
@@ -702,30 +743,23 @@ class CoinDrop{
     this.y=burstMode?window.innerHeight*0.45:-40;
     this.vx=burstMode?(Math.random()-.5)*14:(Math.random()-.5)*2.5;
     this.vy=burstMode?-(Math.random()*16+8):Math.random()*3+2;
-    this.gravity=0.46;
-    this.scaleX=1;this.scaleDir=Math.random()<.5?1:-1;
+    this.gravity=0.46;this.scaleX=1;this.scaleDir=Math.random()<.5?1:-1;
     this.scaleSpeed=0.04+Math.random()*0.03;
-    this.rotation=Math.random()*Math.PI*2;
-    this.rotSpeed=(Math.random()-.5)*0.11;
+    this.rotation=Math.random()*Math.PI*2;this.rotSpeed=(Math.random()-.5)*0.11;
     this.color=type.color;this.rim=type.rim;this.label=type.label;
-    this.alpha=1;this.life=1;
-    this.decay=0.007+Math.random()*0.005;
-    this.burstMode=burstMode||false;
-    this.bounced=false;
-    this.glowPulse=Math.random()*Math.PI*2;
-    this.trail=[];
+    this.alpha=1;this.life=1;this.decay=0.007+Math.random()*0.005;
+    this.burstMode=burstMode||false;this.bounced=false;
+    this.glowPulse=Math.random()*Math.PI*2;this.trail=[];
   }
   update(){
     this.trail.push({x:this.x,y:this.y});
     if(this.trail.length>5)this.trail.shift();
-    this.x+=this.vx;
-    this.y+=this.vy;
+    this.x+=this.vx;this.y+=this.vy;
     if(this.burstMode)this.vy+=this.gravity;
     this.scaleX+=this.scaleDir*this.scaleSpeed;
     if(this.scaleX>1){this.scaleX=1;this.scaleDir=-1;}
     if(this.scaleX<-1){this.scaleX=-1;this.scaleDir=1;}
-    this.rotation+=this.rotSpeed;
-    this.glowPulse+=0.09;
+    this.rotation+=this.rotSpeed;this.glowPulse+=0.09;
     if(this.burstMode&&!this.bounced&&this.y>window.innerHeight*0.82){
       this.vy*=-0.45;this.vx*=0.65;this.bounced=true;
     }
@@ -733,60 +767,42 @@ class CoinDrop{
     if((this.burstMode&&this.bounced)||(!this.burstMode&&this.y>window.innerHeight*0.72))this.life-=this.decay;
     this.alpha=Math.max(0,this.life);
     const off=this.size+10;
-    this.el.style.left=(this.x-off)+'px';
-    this.el.style.top=(this.y-off)+'px';
-    this.el.style.opacity=this.alpha;
-    this._draw();
+    this.el.style.left=(this.x-off)+'px';this.el.style.top=(this.y-off)+'px';
+    this.el.style.opacity=this.alpha;this._draw();
   }
   _draw(){
     const c=this.ctx,s=this.size,cx=s+10,cy=s+10;
     c.clearRect(0,0,this.el.width,this.el.height);
     this.trail.forEach((pt,i)=>{
-      const a=(i/this.trail.length)*0.2;
-      c.save();c.globalAlpha=a;
+      const a=(i/this.trail.length)*0.2;c.save();c.globalAlpha=a;
       const dx=pt.x-this.x,dy=pt.y-this.y;
       c.beginPath();c.arc(cx+dx,cy+dy,s*0.35,0,Math.PI*2);
       c.fillStyle=this.color;c.fill();c.restore();
     });
-    c.save();
-    c.translate(cx,cy);
-    c.rotate(this.rotation);
-    c.scale(this.scaleX,1);
+    c.save();c.translate(cx,cy);c.rotate(this.rotation);c.scale(this.scaleX,1);
     const gv=(Math.sin(this.glowPulse)+1)*0.5;
     c.shadowColor=this.color;c.shadowBlur=8+gv*16;
-    c.beginPath();c.ellipse(0,0,s,s,0,0,Math.PI*2);
-    c.fillStyle=this.color;c.fill();
-    c.beginPath();c.ellipse(0,0,s,s,0,0,Math.PI*2);
-    c.strokeStyle=this.rim;c.lineWidth=2.5;c.stroke();
+    c.beginPath();c.ellipse(0,0,s,s,0,0,Math.PI*2);c.fillStyle=this.color;c.fill();
+    c.beginPath();c.ellipse(0,0,s,s,0,0,Math.PI*2);c.strokeStyle=this.rim;c.lineWidth=2.5;c.stroke();
     const gr=c.createRadialGradient(-s*.32,-s*.32,0,0,0,s);
-    gr.addColorStop(0,'rgba(255,255,255,0.62)');
-    gr.addColorStop(0.38,'rgba(255,255,255,0.1)');
-    gr.addColorStop(1,'rgba(0,0,0,0)');
-    c.shadowBlur=0;
-    c.beginPath();c.ellipse(0,0,s,s,0,0,Math.PI*2);
-    c.fillStyle=gr;c.fill();
+    gr.addColorStop(0,'rgba(255,255,255,0.62)');gr.addColorStop(0.38,'rgba(255,255,255,0.1)');gr.addColorStop(1,'rgba(0,0,0,0)');
+    c.shadowBlur=0;c.beginPath();c.ellipse(0,0,s,s,0,0,Math.PI*2);c.fillStyle=gr;c.fill();
     if(Math.abs(this.scaleX)>0.28){
-      c.fillStyle=this.rim;
-      c.font=`bold ${Math.round(s*.56)}px sans-serif`;
-      c.textAlign='center';c.textBaseline='middle';
-      c.fillText(this.label,0,1);
+      c.fillStyle=this.rim;c.font=`bold ${Math.round(s*.56)}px sans-serif`;
+      c.textAlign='center';c.textBaseline='middle';c.fillText(this.label,0,1);
     }
     c.restore();
   }
   isDead(){return this.life<=0;}
   remove(){if(this.el.parentNode)this.el.parentNode.removeChild(this.el);}
 }
-
 class GlintParticle{
   constructor(x,y){
     this.el=document.createElement('div');
     this.el.style.cssText='position:fixed;pointer-events:none;z-index:9999;border-radius:50%;';
     document.body.appendChild(this.el);
-    this.x=x;this.y=y;
-    this.vx=(Math.random()-.5)*7;
-    this.vy=-(Math.random()*5+1);
-    this.size=Math.random()*5+2;
-    this.life=1;
+    this.x=x;this.y=y;this.vx=(Math.random()-.5)*7;this.vy=-(Math.random()*5+1);
+    this.size=Math.random()*5+2;this.life=1;
     this.color=['#ffd700','#ffdb4d','#fff8b0','#00e676','#bf5af2','#ff9f0a'][Math.floor(Math.random()*6)];
   }
   update(){
@@ -801,43 +817,29 @@ class GlintParticle{
   isDead(){return this.life<=0;}
   remove(){if(this.el.parentNode)this.el.parentNode.removeChild(this.el);}
 }
-
 let _COINS=[],_GLINTS=[],_COIN_LOOP=null;
-
 function _startCoinLoop(){
   if(_COIN_LOOP)return;
   function loop(){
-    _COINS.forEach(c=>c.update());
-    _GLINTS.forEach(g=>g.update());
+    _COINS.forEach(c=>c.update());_GLINTS.forEach(g=>g.update());
     _COINS=_COINS.filter(c=>{if(c.isDead()){c.remove();return false;}return true;});
     _GLINTS=_GLINTS.filter(g=>{if(g.isDead()){g.remove();return false;}return true;});
-    if(_COINS.length||_GLINTS.length){_COIN_LOOP=requestAnimationFrame(loop);}
-    else{_COIN_LOOP=null;}
+    if(_COINS.length||_GLINTS.length){_COIN_LOOP=requestAnimationFrame(loop);}else{_COIN_LOOP=null;}
   }
   _COIN_LOOP=requestAnimationFrame(loop);
 }
-
 function coinRain(){
   const count=14;
-  for(let i=0;i<count;i++){
-    setTimeout(()=>{
-      if(_COINS.length<30){_COINS.push(new CoinDrop(undefined,false));}
-      _startCoinLoop();
-    },i*70);
-  }
+  for(let i=0;i<count;i++){setTimeout(()=>{if(_COINS.length<30){_COINS.push(new CoinDrop(undefined,false));}_startCoinLoop();},i*70);}
 }
-
 function coinBurst(x,y){
-  const cx=x||window.innerWidth/2;
-  const cy=y||window.innerHeight*0.45;
+  const cx=x||window.innerWidth/2,cy=y||window.innerHeight*0.45;
   for(let i=0;i<20;i++)_COINS.push(new CoinDrop(cx,true));
   for(let i=0;i<14;i++)_GLINTS.push(new GlintParticle(cx,cy));
   _startCoinLoop();
 }
 
-/* ══════════════════════════════════════════════
-   APP
-══════════════════════════════════════════════ */
+/* ══ APP ══ */
 let U=null,RID=null,SSE=null,LT=null;
 let MM_BET=0,MM_PLAYERS=2;
 const fmt=n=>Number(n).toLocaleString("pt-AO");
@@ -881,14 +883,12 @@ function connectSSE(){
 
 /* AUTH */
 let REG_PHONE="",OTP_TIMER=null,AGE_CONFIRMED=false,PHONE_VERIFIED=false;
-
 function atab(t){
   document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("on",i===(t==="in"?0:1)));
   document.getElementById("fin").classList.toggle("hidden",t!=="in");
   document.getElementById("fup").classList.toggle("hidden",t!=="up");
   document.getElementById("frst").classList.add("hidden");
 }
-
 async function doLogin(){
   const phone="+244"+document.getElementById("lp-phone").value.trim().replace(/\s/g,"");
   const pw=document.getElementById("lp-pw").value;
@@ -899,10 +899,8 @@ async function doLogin(){
   const d=await api("/api/login","POST",{phone,password:pw});
   btn.disabled=false;btn.textContent="Entrar";
   if(d.error){err.textContent="❌ "+d.error;return;}
-  U=d.user;connectSSE();showApp();
-  coinRain();
+  U=d.user;connectSSE();showApp();coinRain();
 }
-
 async function enviarOTP(){
   const name=document.getElementById("rn").value.trim();
   const rawPhone=document.getElementById("rphone").value.trim().replace(/\s/g,"");
@@ -923,19 +921,16 @@ async function enviarOTP(){
   document.getElementById("otp-msg").textContent=d.msg||"Código enviado para "+phone;
   iniciarTimerOTP();
 }
-
 function iniciarTimerOTP(){
   clearInterval(OTP_TIMER);let secs=120;
   document.getElementById("resend-btn").style.display="none";
   OTP_TIMER=setInterval(()=>{
-    secs--;
-    const m=Math.floor(secs/60),s=secs%60;
+    secs--;const m=Math.floor(secs/60),s=secs%60;
     const el=document.getElementById("otp-timer");
     if(el)el.textContent=m+":"+(s<10?"0":"")+s;
     if(secs<=0){clearInterval(OTP_TIMER);if(el){el.textContent="Expirado";el.style.color="var(--red)";}document.getElementById("resend-btn").style.display="inline";}
   },1000);
 }
-
 async function verificarOTP(){
   const code=document.getElementById("rotp").value.trim();
   const err=document.getElementById("otp-err");err.textContent="";
@@ -946,19 +941,16 @@ async function verificarOTP(){
   document.getElementById("reg-s2").classList.add("hidden");
   document.getElementById("reg-s3").classList.remove("hidden");
 }
-
 function voltarStep1(){
   clearInterval(OTP_TIMER);
   document.getElementById("reg-s2").classList.add("hidden");
   document.getElementById("reg-s1").classList.remove("hidden");
 }
-
 function confirmarIdade(sim){
   if(!sim){toast("❌ Tens de ter 18+ anos para jogar.","ter");atab("in");return;}
   AGE_CONFIRMED=true;
   document.getElementById("terms-section").classList.remove("hidden");
 }
-
 async function doReg(){
   const terms=document.getElementById("terms-check").checked;
   const err=document.getElementById("terms-err");err.textContent="";
@@ -971,10 +963,9 @@ async function doReg(){
   const d=await api("/api/register","POST",{name,phone:REG_PHONE,password:pw,ref_code:ref,age_confirmed:true,terms_accepted:true});
   if(d.error){err.textContent="❌ "+d.error;return;}
   U=d.user;connectSSE();showApp();
-  toast("🎉 Conta criada! Deposita para começar.","tok");
+  toast("🎉 Bem-vindo! Recebeste 1.000 Kz de bónus de boas-vindas!","tok");
   coinBurst();
 }
-
 async function doLogout(){
   await api("/api/logout","POST");
   if(SSE)SSE.close();
@@ -1013,7 +1004,6 @@ function showApp(){
   document.getElementById("s-app").classList.add("on");
   updN();pg("home");
 }
-
 function pg(name){
   ["p-home","p-play","p-wait","p-wallet","p-profile"].forEach(id=>{
     const el=document.getElementById(id);if(el)el.style.display="none";
@@ -1029,7 +1019,6 @@ function pg(name){
   if(name==="profile")loadProfile();
   if(name==="home"){updN();loadLeaderboard();loadPublicStats();}
 }
-
 function updN(){
   if(!U)return;
   document.getElementById("nbcl").textContent=fmt(U.balance)+" KZ";
@@ -1043,7 +1032,6 @@ function updN(){
   else if(wins>=3)rank="🥉 Iniciado";
   const rk=document.getElementById("prk");if(rk)rk.textContent=rank;
 }
-
 async function loadPublicStats(){
   try{
     const d=await api("/api/stats/public");
@@ -1054,7 +1042,6 @@ async function loadPublicStats(){
     document.getElementById("hs-p").textContent=fmt(d.paid||0)+" KZ";
   }catch(e){}
 }
-
 async function loadLeaderboard(){
   const el=document.getElementById("lb");if(!el)return;
   el.innerHTML='<div class="empty">A carregar...</div>';
@@ -1083,7 +1070,6 @@ function mmPlayers(el,v){
     document.getElementById("mm-prize-info").textContent="💰 Prémio estimado: "+fmt(prize)+" Kz · Vencedor leva 90% do pote";
   }
 }
-
 async function doMatchmaking(){
   const err=document.getElementById("mm-err");err.textContent="";
   if(!MM_BET){err.textContent="❌ Escolhe o valor da aposta.";return;}
@@ -1113,7 +1099,6 @@ async function doMatchmaking(){
     RID=d.room_id;showWait(d.room_id,MM_BET,MM_PLAYERS,1);
   }
 }
-
 function showWait(rid,bet,maxp,filled){
   filled=filled||1;
   document.getElementById("wrid").textContent=rid;
@@ -1169,7 +1154,9 @@ async function loadWallet(){
   const t=await api("/api/transactions");renderTx(t.transactions||[]);
   const dp=await api("/api/deposit/list");renderDeps(dp.deposits||[]);
   if(U?.express_number)document.getElementById("wnum").value=U.express_number;
-  loadDaily();loadReferral();loadTickets();
+  loadBonuses();
+  loadReferral();
+  loadTickets();
 }
 async function doDeposit(){
   const v=parseFloat(document.getElementById("dv").value);
@@ -1178,6 +1165,7 @@ async function doDeposit(){
   const err=document.getElementById("de"),ok=document.getElementById("dok");
   err.textContent="";ok.textContent="";
   if(!v||v<500){err.textContent="❌ Mínimo 500 Kz";return;}
+  if(v>100000){err.textContent="❌ Máximo 100.000 Kz por dia";return;}
   if(!ref){err.textContent="❌ Insere a referência Express.";return;}
   const d=await api("/api/deposit/request","POST",{amount:v,express_ref:ref,payer_name:payer});
   if(d.error){err.textContent="❌ "+d.error;return;}
@@ -1194,6 +1182,7 @@ async function doWithdraw(){
   if(!num){err.textContent="❌ Insere o número Express.";return;}
   if(!acn){err.textContent="❌ Insere o nome da conta Express.";return;}
   if(!v||v<1000){err.textContent="❌ Mínimo 1.000 Kz";return;}
+  if(v>50000){err.textContent="❌ Máximo 50.000 Kz por dia";return;}
   const d=await api("/api/withdraw/request","POST",{amount:v,express_number:num,account_name:acn});
   if(d.error){err.textContent="❌ "+d.error;return;}
   ok.textContent="✅ "+d.msg;
@@ -1219,6 +1208,133 @@ function renderDeps(deps){
     const sl=d.status==="approved"?"✅ Confirmado":d.status==="rejected"?"❌ Rejeitado":"⏳ Pendente";
     return `<div class="txi"><div class="tic id">⬆️</div><div class="tin2"><div class="tds">Ref: ${d.express_ref}</div><div class="tdt">${fmt(d.amount)} Kz · ${fmtD(d.created_at)}</div></div><div><span class="dst ${sc}">${sl}</span></div></div>`;
   }).join("");
+}
+
+/* ══ BÓNUS (boas-vindas + 10 partidas) ══ */
+async function loadBonuses(){
+  const games=U?.games_played||0;
+
+  // Bónus boas-vindas
+  const bwStatus=document.getElementById("bw-status");
+  if(bwStatus){
+    if(U?.welcome_bonus_claimed){
+      bwStatus.textContent="✅ Já recebido";
+      bwStatus.className="bonus-item-status claimed";
+    }else if(games>=1){
+      bwStatus.textContent="🎁 Disponível para saque!";
+      bwStatus.className="bonus-item-status ready";
+    }else{
+      bwStatus.textContent="🔒 Joga 1 partida para desbloquear";
+      bwStatus.className="bonus-item-status locked";
+    }
+  }
+
+  // Bónus 10 partidas
+  const b10Status=document.getElementById("b10-status");
+  const b10Wrap=document.getElementById("b10-claim-wrap");
+  if(b10Status){
+    if(U?.ten_games_bonus_claimed){
+      b10Status.textContent="✅ Já recebido";
+      b10Status.className="bonus-item-status claimed";
+      if(b10Wrap)b10Wrap.innerHTML="";
+    }else if(games>=10){
+      b10Status.textContent="🎁 Pronto a receber!";
+      b10Status.className="bonus-item-status ready";
+      if(b10Wrap)b10Wrap.innerHTML=`<button class="btn bg bfw" onclick="claimTenGamesBonus()" style="font-size:13px">🏅 Receber 2.000 Kz (10 Partidas)</button>`;
+    }else{
+      const rem=10-games;
+      b10Status.textContent=`🔒 Faltam ${rem} partida${rem===1?"":"s"}`;
+      b10Status.className="bonus-item-status locked";
+      if(b10Wrap)b10Wrap.innerHTML=`<div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${(games/10)*100}%;background:linear-gradient(90deg,var(--g1),var(--orange));border-radius:3px;transition:width .5s"></div></div><div style="font-size:11px;color:var(--t3);margin-top:5px;font-weight:600">${games}/10 partidas jogadas</div>`;
+    }
+  }
+}
+
+async function claimTenGamesBonus(){
+  const d=await api("/api/bonus/ten_games/claim","POST",{});
+  if(d.error){toast("❌ "+d.error,"ter");return;}
+  if(U){U.balance=d.balance;U.ten_games_bonus_claimed=true;updN();document.getElementById("wbn").textContent=fmt(U.balance);}
+  toast("🏅 +2.000 Kz! Bónus de 10 partidas recebido!","tok");
+  coinBurst();loadBonuses();
+}
+
+/* REFERIDOS */
+async function loadReferral(){
+  const d=await api("/api/referral/code");
+  const el=document.getElementById("ref-link");
+  if(!el)return;
+  el.textContent=d.link||"";el.dataset.link=d.link||"";
+
+  const r=await api("/api/referral/list");
+  const refs=r.referrals||[];
+  const total=refs.length;
+  const earned=Math.floor(total/5)*500;
+  const inGroup=total%5;
+  const nextAt=5-inGroup;
+
+  // Progresso
+  const pLabel=document.getElementById("ref-progress-label");
+  const pBar=document.getElementById("ref-progress-bar");
+  const pSub=document.getElementById("ref-progress-sub");
+  if(pLabel)pLabel.textContent=inGroup+" / 5";
+  if(pBar)pBar.style.width=(inGroup/5*100)+"%";
+  if(pSub){
+    if(inGroup===0&&total>0)pSub.textContent="✅ Parabéns! Grupo de 5 completado — +500 Kz creditados!";
+    else if(nextAt===1)pSub.textContent="Falta 1 amigo para receberes 500 Kz!";
+    else pSub.textContent=`Faltam ${nextAt} amigos para receberes 500 Kz.`;
+  }
+
+  const cnt=document.getElementById("ref-count");
+  if(cnt){
+    if(total>0)cnt.textContent=`👥 ${total} amigo(s) registado(s) · 💰 ${fmt(earned)} Kz ganhos no total`;
+    else cnt.textContent="Ainda não referiste ninguém. Partilha o teu link!";
+  }
+}
+function copyRef(){
+  const el=document.getElementById("ref-link");
+  const link=el.dataset.link||el.textContent;
+  navigator.clipboard.writeText(link).catch(()=>{});
+  toast("📋 Link copiado!","tin");
+}
+function shareRef(){
+  const el=document.getElementById("ref-link");
+  const link=el.dataset.link||el.textContent;
+  const msg="Joga Ludo e ganha Kwanzas! Regista-te no LudoKz com o meu link: "+link;
+  if(navigator.share){navigator.share({title:"LudoKz",text:msg,url:link});}
+  else{navigator.clipboard.writeText(msg).catch(()=>{});toast("Link copiado!","tin");}
+}
+
+/* PROMO */
+async function usePromo(){
+  const code=document.getElementById("promo-inp").value.trim().toUpperCase();
+  const err=document.getElementById("promo-err"),ok=document.getElementById("promo-ok");
+  err.textContent="";ok.textContent="";
+  if(!code){err.textContent="❌ Insere o código.";return;}
+  const d=await api("/api/promo/use","POST",{code});
+  if(d.error){err.textContent="❌ "+d.error;return;}
+  ok.textContent="✅ "+d.msg;
+  document.getElementById("promo-inp").value="";
+  if(U){U.balance+=d.amount;updN();document.getElementById("wbn").textContent=fmt(U.balance);}
+  coinBurst();toast(d.msg,"tok");
+}
+
+/* SUPORTE */
+async function sendSupport(){
+  const msg=document.getElementById("sup-msg").value.trim();
+  const ok=document.getElementById("sup-ok");ok.textContent="";
+  if(!msg||msg.length<5){toast("❌ Mensagem muito curta.","ter");return;}
+  const d=await api("/api/support/ticket","POST",{message:msg});
+  if(d.error){toast("❌ "+d.error,"ter");return;}
+  ok.textContent="✅ Mensagem enviada!";
+  document.getElementById("sup-msg").value="";loadTickets();
+}
+async function loadTickets(){
+  const d=await api("/api/support/tickets");
+  const el=document.getElementById("tkts-list");if(!el)return;
+  const tkts=d.tickets||[];
+  if(!tkts.length){el.innerHTML="";return;}
+  el.innerHTML='<div style="font-size:11px;font-weight:800;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px">Os teus pedidos</div>'+
+    tkts.map(t=>`<div class="tkt"><div style="color:var(--t2);font-weight:600">${t.message}</div>${t.reply?`<div style="color:var(--jade);margin-top:7px;font-weight:700">💬 Resposta: ${t.reply}</div>`:""}<div style="font-size:11px;color:var(--t3);margin-top:5px">${fmtD(t.created_at)} · <span style="color:${t.status==="closed"?"var(--jade)":"var(--orange)"}">${t.status==="closed"?"✅ Respondido":"⏳ Aguarda"}</span></div></div>`).join("");
 }
 
 /* PROFILE */
@@ -1250,97 +1366,11 @@ async function saveExp(){
   toast("✅ Número Express guardado!","tok");
 }
 
-/* BÓNUS DIÁRIO */
-const BONUSES=[500,750,1000,1500,2000,2500,5000];
-const DAYS=["D1","D2","D3","D4","D5","D6","D7"];
-async function loadDaily(){
-  const d=await api("/api/bonus/daily/status");
-  const el=document.getElementById("daily-status");
-  const btn=document.getElementById("btn-daily");
-  const sd=document.getElementById("streak-days");
-  if(!el)return;
-  if(sd){sd.innerHTML=BONUSES.map((v,i)=>`<div class="sd ${i<(d.streak||0)?"done":""}"><div class="sd-day">${DAYS[i]}</div><div class="sd-val">${v>=1000?(v/1000)+"K":v}</div></div>`).join("");}
-  if(d.claimed){
-    el.innerHTML="✅ Recebido! Volta amanhã · Streak: <strong style='color:var(--g1)'>"+(d.streak||0)+"/7</strong>";
-    if(btn){btn.disabled=true;btn.textContent="✓ Recebido hoje";}
-  }else{
-    el.innerHTML="💰 Hoje recebes: <strong style='color:var(--g1)'>"+(d.next||500).toLocaleString("pt-AO")+" Kz</strong> · Streak: "+(d.streak||0)+"/7";
-    if(btn){btn.disabled=false;btn.textContent="🎁 Receber Bónus";}
-  }
-}
-async function claimDaily(){
-  const d=await api("/api/bonus/daily/claim","POST",{});
-  if(d.error){toast("❌ "+d.error,"ter");return;}
-  if(U){U.balance=d.balance;updN();document.getElementById("wbn").textContent=fmt(U.balance);}
-  toast("🎁 +"+d.amount.toLocaleString("pt-AO")+" Kz! Dia "+d.streak+" 🔥","tok");
-  coinBurst();loadDaily();
-}
-
-/* PROMO */
-async function usePromo(){
-  const code=document.getElementById("promo-inp").value.trim().toUpperCase();
-  const err=document.getElementById("promo-err"),ok=document.getElementById("promo-ok");
-  err.textContent="";ok.textContent="";
-  if(!code){err.textContent="❌ Insere o código.";return;}
-  const d=await api("/api/promo/use","POST",{code});
-  if(d.error){err.textContent="❌ "+d.error;return;}
-  ok.textContent="✅ "+d.msg;
-  document.getElementById("promo-inp").value="";
-  if(U){U.balance+=d.amount;updN();document.getElementById("wbn").textContent=fmt(U.balance);}
-  coinBurst();toast(d.msg,"tok");
-}
-
-/* REFERIDOS */
-async function loadReferral(){
-  const d=await api("/api/referral/code");
-  const el=document.getElementById("ref-link");
-  const cnt=document.getElementById("ref-count");
-  if(!el)return;
-  el.textContent=d.link||"";el.dataset.link=d.link||"";
-  const r=await api("/api/referral/list");
-  const refs=r.referrals||[];
-  if(cnt)cnt.textContent=refs.length>0?"✅ "+refs.length+" amigo(s) referido(s) — +"+(refs.length*500).toLocaleString("pt-AO")+" Kz ganhos!":"Ainda não referiste ninguém.";
-}
-function copyRef(){
-  const el=document.getElementById("ref-link");
-  const link=el.dataset.link||el.textContent;
-  navigator.clipboard.writeText(link).catch(()=>{});
-  toast("📋 Link copiado!","tin");
-}
-function shareRef(){
-  const el=document.getElementById("ref-link");
-  const link=el.dataset.link||el.textContent;
-  const msg="Joga Ludo e ganha Kwanzas! Regista-te no LudoKz com o meu link e ganha 500 Kz de bónus: "+link;
-  if(navigator.share){navigator.share({title:"LudoKz",text:msg,url:link});}
-  else{navigator.clipboard.writeText(msg).catch(()=>{});toast("Link copiado!","tin");}
-}
-
-/* SUPORTE */
-async function sendSupport(){
-  const msg=document.getElementById("sup-msg").value.trim();
-  const ok=document.getElementById("sup-ok");ok.textContent="";
-  if(!msg||msg.length<5){toast("❌ Mensagem muito curta.","ter");return;}
-  const d=await api("/api/support/ticket","POST",{message:msg});
-  if(d.error){toast("❌ "+d.error,"ter");return;}
-  ok.textContent="✅ Mensagem enviada!";
-  document.getElementById("sup-msg").value="";loadTickets();
-}
-async function loadTickets(){
-  const d=await api("/api/support/tickets");
-  const el=document.getElementById("tkts-list");if(!el)return;
-  const tkts=d.tickets||[];
-  if(!tkts.length){el.innerHTML="";return;}
-  el.innerHTML='<div style="font-size:11px;font-weight:800;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px">Os teus pedidos</div>'+
-    tkts.map(t=>`<div class="tkt"><div style="color:var(--t2);font-weight:600">${t.message}</div>${t.reply?`<div style="color:var(--jade);margin-top:7px;font-weight:700">💬 Resposta: ${t.reply}</div>`:""}<div style="font-size:11px;color:var(--t3);margin-top:5px">${fmtD(t.created_at)} · <span style="color:${t.status==="closed"?"var(--jade)":"var(--orange)"}">${t.status==="closed"?"✅ Respondido":"⏳ Aguarda"}</span></div></div>`).join("");
-}
-
 /* EFEITOS */
 function showFlash(emoji){
-  const el=document.createElement("div");
-  el.className="flash-el";el.textContent=emoji;
+  const el=document.createElement("div");el.className="flash-el";el.textContent=emoji;
   document.body.appendChild(el);setTimeout(()=>el.remove(),1000);
 }
-
 function toast(msg,cls="tin"){
   const el=document.getElementById("tst");
   el.textContent=msg;el.className=`tst show ${cls}`;
@@ -1353,7 +1383,6 @@ window.leaveGame=async function(){
   if(RID){await api("/api/game/leave","POST",{room_id:RID});}
   RID=null;pg("home");
 };
-
 window.doRoll=async function(){
   if(!RID)return;
   const rb=document.getElementById("rb");if(rb)rb.disabled=true;
@@ -1374,7 +1403,6 @@ window.doRoll=async function(){
     if(typeof window.renderState==="function")window.renderState(d);
   }
 };
-
 window.movePc=async function(idx){
   if(!RID)return;
   window.PREV_STATE=window.CUR_STATE?JSON.parse(JSON.stringify(window.CUR_STATE)):null;
@@ -1385,7 +1413,6 @@ window.movePc=async function(idx){
   window.PREV_STATE=window.CUR_STATE;
   if(typeof window.renderState==="function")window.renderState(d);
 };
-
 window.coinBurst=coinBurst;
 window.coinRain=coinRain;
 
@@ -1396,26 +1423,16 @@ window.coinRain=coinRain;
 })();
 </script>
 
-<!-- ══════════════════════════════════════════════════════════════════
-     LUDOKZ — DINAMISMO ULTRA v3
-     Aurora reactiva ao rato · Grid de partículas com linhas gold
-     Moedas 3D com física · Jackpot crescente ao vivo
-     Ripple + glint em botões · Hero coins flutuantes
-     Leaderboard deslizante · Nav glow ao scroll
-     Chip pulsa ao mudar · Waiting slots animados
-     Vitória: explosão tripla · Dado hover 3D
-     Cards tilt 3D · Botões shine · Click glints globais
-══════════════════════════════════════════════════════════════════ -->
+<!-- DINAMISMO ULTRA v3 -->
 <script>
 (function LUDOKZ_DINAMISMO(){
   'use strict';
 
-  /* ─── 1. AURORA REACTIVA AO RATO (throttled) ─────────── */
-  let mx=window.innerWidth/2, my=window.innerHeight/2;
-  let _mThrottle=false;
-  document.addEventListener('mousemove', e=>{
-    mx=e.clientX; my=e.clientY;
-    if(_mThrottle)return; _mThrottle=true;
+  /* 1. AURORA REACTIVA */
+  let mx=window.innerWidth/2,my=window.innerHeight/2,_mThrottle=false;
+  document.addEventListener('mousemove',e=>{
+    mx=e.clientX;my=e.clientY;
+    if(_mThrottle)return;_mThrottle=true;
     requestAnimationFrame(()=>{
       _mThrottle=false;
       document.querySelectorAll('.aurora-blob').forEach((b,i)=>{
@@ -1425,44 +1442,34 @@ window.coinRain=coinRain;
     });
   });
 
-  /* ─── 2. CANVAS LEVE: PARTÍCULAS + AURORA CSS ──────────── */
+  /* 2. CANVAS PARTÍCULAS */
   (function lightCanvas(){
-    const c=document.getElementById('cvs');
-    if(!c)return;
-    const x=c.getContext('2d');
-    let W,H;
+    const c=document.getElementById('cvs');if(!c)return;
+    const x=c.getContext('2d');let W,H;
     const resize=()=>{W=c.width=innerWidth;H=c.height=innerHeight;};
-    resize(); addEventListener('resize',resize);
-    // Apenas 40 partículas, sem linhas de conexão O(n²)
+    resize();addEventListener('resize',resize);
     const pts=Array.from({length:40},()=>({
-      x:Math.random()*innerWidth, y:Math.random()*innerHeight,
-      vx:(Math.random()-.5)*.35, vy:(Math.random()-.5)*.35,
+      x:Math.random()*innerWidth,y:Math.random()*innerHeight,
+      vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,
       r:Math.random()*1.6+.3,
       col:Math.random()<.55?`rgba(245,197,24,${(Math.random()*.14+.04).toFixed(2)})`:`rgba(93,68,209,${(Math.random()*.1+.03).toFixed(2)})`
     }));
-    // Conexões só entre partículas próximas ao cursor (máx 8 pares)
     let frame=0;
     (function loop(){
-      x.clearRect(0,0,W,H);
-      frame++;
+      x.clearRect(0,0,W,H);frame++;
       pts.forEach(p=>{
-        p.x+=p.vx; p.y+=p.vy;
-        if(p.x<0)p.x=W; if(p.x>W)p.x=0;
-        if(p.y<0)p.y=H; if(p.y>H)p.y=0;
-        x.beginPath(); x.arc(p.x,p.y,p.r,0,Math.PI*2);
-        x.fillStyle=p.col; x.fill();
+        p.x+=p.vx;p.y+=p.vy;
+        if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+        x.beginPath();x.arc(p.x,p.y,p.r,0,Math.PI*2);x.fillStyle=p.col;x.fill();
       });
-      // Linhas ao cursor — só a cada 2 frames, máx 6
       if(frame%2===0){
         let drawn=0;
         for(let i=0;i<pts.length&&drawn<6;i++){
-          const dx=pts[i].x-mx, dy=pts[i].y-my;
-          const d=Math.sqrt(dx*dx+dy*dy);
+          const dx=pts[i].x-mx,dy=pts[i].y-my,d=Math.sqrt(dx*dx+dy*dy);
           if(d<160){
             const a=(1-d/160)*.09;
-            x.beginPath(); x.moveTo(pts[i].x,pts[i].y); x.lineTo(mx,my);
-            x.strokeStyle=`rgba(245,197,24,${a})`; x.lineWidth=.6; x.stroke();
-            drawn++;
+            x.beginPath();x.moveTo(pts[i].x,pts[i].y);x.lineTo(mx,my);
+            x.strokeStyle=`rgba(245,197,24,${a})`;x.lineWidth=.6;x.stroke();drawn++;
           }
         }
       }
@@ -1470,127 +1477,95 @@ window.coinRain=coinRain;
     })();
   })();
 
-  /* ─── 3. JACKPOT CRESCENTE AO VIVO ───────────────────────── */
+  /* 3. JACKPOT CRESCENTE */
   (function liveJackpot(){
-    let base=245000, inc=0;
-    const el=document.getElementById('jk-val');
-    if(!el)return;
-    setInterval(()=>{
-      inc+=Math.floor(Math.random()*220+50);
-      const v=base+inc;
-      el.textContent=v.toLocaleString('pt-AO')+' KZ';
-    },2200);
+    let base=245000,inc=0;
+    const el=document.getElementById('jk-val');if(!el)return;
+    setInterval(()=>{inc+=Math.floor(Math.random()*220+50);el.textContent=(base+inc).toLocaleString('pt-AO')+' KZ';},2200);
   })();
 
-  /* ─── 4. ESTILOS DINÂMICOS ──────────────────────────────── */
+  /* 4. ESTILOS */
   if(!document.getElementById('dyn-kz-style')){
-    const s=document.createElement('style');
-    s.id='dyn-kz-style';
+    const s=document.createElement('style');s.id='dyn-kz-style';
     s.textContent=`
       @keyframes ripple-kz{to{transform:scale(42);opacity:0}}
       @keyframes glint-kz{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--gx),var(--gy)) scale(0);opacity:0}}
       @keyframes float-coin{0%{transform:translateY(0) rotate(0deg) scale(1);opacity:.9}50%{opacity:1;transform:translateY(-60px) rotate(180deg) scale(1.1)}100%{transform:translateY(-130px) rotate(360deg) scale(0.8);opacity:0}}
-      @keyframes hero-pt{0%{opacity:0;transform:scale(0)}50%{opacity:1}100%{opacity:0;transform:scale(0)}}
       @keyframes waiting-pop{0%{transform:scale(0) rotate(-20deg);opacity:0}70%{transform:scale(1.2) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:1}}
-      @keyframes pulse-chip{0%{box-shadow:0 0 0 0 rgba(245,197,24,.6),0 0 12px rgba(245,197,24,.3)}60%{box-shadow:0 0 0 14px rgba(245,197,24,0),0 0 20px rgba(245,197,24,.5)}100%{box-shadow:0 0 0 0 rgba(245,197,24,0)}}
+      @keyframes pulse-chip{0%{box-shadow:0 0 0 0 rgba(245,197,24,.6)}60%{box-shadow:0 0 0 14px rgba(245,197,24,0)}100%{box-shadow:0 0 0 0 rgba(245,197,24,0)}}
       @keyframes bg-shine{0%{left:-60px;opacity:0}20%{opacity:.6}80%{opacity:.3}100%{left:calc(100% + 60px);opacity:0}}
       @keyframes lb-slide{from{transform:translateX(-50px) scale(.96);opacity:0}to{transform:translateX(0) scale(1);opacity:1}}
-      @keyframes card-entry{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
       @keyframes dice-hover-kz{0%,100%{transform:rotateY(0deg) rotateX(0deg) scale(1)}33%{transform:rotateY(25deg) rotateX(-10deg) scale(1.1)}66%{transform:rotateY(-15deg) rotateX(8deg) scale(1.05)}}
-      @keyframes spin-badge{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-      .lbr{transition:background .15s, transform .2s, opacity .35s !important}
-      .lbr:hover{transform:translateX(6px) !important}
+      .lbr{transition:background .15s,transform .2s,opacity .35s!important}
+      .lbr:hover{transform:translateX(6px)!important}
       .shine-kz{position:absolute;top:0;width:50px;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);pointer-events:none;z-index:5;animation:bg-shine 3s ease-in-out infinite}
     `;
     document.head.appendChild(s);
   }
 
-  /* ─── 5. GLINT PARTICLES ──────────────────────────────── */
+  /* 5. GLINT */
   function spawnGlint(cx,cy,count=6){
     const colors=['#ffd700','#ffdb4d','#00e676','#bf5af2','#ff9f0a','#fff','#0a84ff'];
     for(let i=0;i<count;i++){
       const el=document.createElement('div');
-      const angle=Math.random()*Math.PI*2;
-      const dist=20+Math.random()*80;
-      const gx=Math.cos(angle)*dist+'px', gy=Math.sin(angle)*dist+'px';
-      const col=colors[Math.floor(Math.random()*colors.length)];
-      const sz=Math.random()*6+2;
-      const dur=400+Math.random()*300;
+      const angle=Math.random()*Math.PI*2,dist=20+Math.random()*80;
+      const gx=Math.cos(angle)*dist+'px',gy=Math.sin(angle)*dist+'px';
+      const col=colors[Math.floor(Math.random()*colors.length)],sz=Math.random()*6+2,dur=400+Math.random()*300;
       el.style.cssText=`position:fixed;pointer-events:none;z-index:9999;border-radius:50%;
-        left:${cx-sz/2}px;top:${cy-sz/2}px;
-        width:${sz}px;height:${sz}px;background:${col};
-        --gx:${gx};--gy:${gy};
-        box-shadow:0 0 ${sz*2}px ${col};
+        left:${cx-sz/2}px;top:${cy-sz/2}px;width:${sz}px;height:${sz}px;background:${col};
+        --gx:${gx};--gy:${gy};box-shadow:0 0 ${sz*2}px ${col};
         animation:glint-kz ${dur}ms ease-out forwards;`;
-      document.body.appendChild(el);
-      setTimeout(()=>el.remove(),dur+50);
+      document.body.appendChild(el);setTimeout(()=>el.remove(),dur+50);
     }
   }
 
-  /* ─── 6. RIPPLE EM BOTÕES ────────────────────────────── */
+  /* 6. RIPPLE */
   function addRipple(e){
-    const btn=e.currentTarget;
-    const rect=btn.getBoundingClientRect();
+    const btn=e.currentTarget,rect=btn.getBoundingClientRect();
     const r=document.createElement('span');
     r.style.cssText=`position:absolute;border-radius:50%;pointer-events:none;
       background:rgba(255,255,255,.3);width:8px;height:8px;
       left:${e.clientX-rect.left-4}px;top:${e.clientY-rect.top-4}px;
-      transform:scale(0);opacity:1;z-index:10;
-      animation:ripple-kz .6s ease-out forwards;`;
-    btn.appendChild(r);
-    setTimeout(()=>r.remove(),650);
-    spawnGlint(e.clientX,e.clientY,2);
+      transform:scale(0);opacity:1;z-index:10;animation:ripple-kz .6s ease-out forwards;`;
+    btn.appendChild(r);setTimeout(()=>r.remove(),650);spawnGlint(e.clientX,e.clientY,2);
   }
-
   function attachRipples(root=document){
     root.querySelectorAll('.btn:not([data-rpl])').forEach(b=>{
-      b.setAttribute('data-rpl','1');
-      b.style.overflow='hidden';
-      b.addEventListener('click',addRipple);
+      b.setAttribute('data-rpl','1');b.style.overflow='hidden';b.addEventListener('click',addRipple);
     });
   }
   attachRipples();
-  new MutationObserver(m=>{
-    m.forEach(mr=>mr.addedNodes.forEach(n=>{if(n.querySelectorAll)attachRipples(n);}));
-  }).observe(document.body,{childList:true,subtree:true});
+  new MutationObserver(m=>{m.forEach(mr=>mr.addedNodes.forEach(n=>{if(n.querySelectorAll)attachRipples(n);}));}).observe(document.body,{childList:true,subtree:true});
 
-  /* ─── 7. SHINE EM BOTÕES PRIMÁRIOS ──────────────────── */
+  /* 7. SHINE */
   function attachShine(root=document){
     root.querySelectorAll('.btn.bg:not([data-sh]),.btn.bj:not([data-sh]),.btn.bpu:not([data-sh])').forEach(btn=>{
       btn.setAttribute('data-sh','1');
-      const sh=document.createElement('span');
-      sh.className='shine-kz';
-      sh.style.animationDelay=(Math.random()*4)+'s';
-      btn.appendChild(sh);
+      const sh=document.createElement('span');sh.className='shine-kz';
+      sh.style.animationDelay=(Math.random()*4)+'s';btn.appendChild(sh);
     });
   }
   setTimeout(()=>attachShine(),300);
-  new MutationObserver(m=>{
-    m.forEach(mr=>mr.addedNodes.forEach(n=>{if(n.querySelectorAll)attachShine(n);}));
-  }).observe(document.body,{childList:true,subtree:true});
+  new MutationObserver(m=>{m.forEach(mr=>mr.addedNodes.forEach(n=>{if(n.querySelectorAll)attachShine(n);}));}).observe(document.body,{childList:true,subtree:true});
 
-  /* ─── 8. HERO: MOEDAS FLUTUANTES ────────────────────── */
+  /* 8. HERO COINS */
   (function heroCoins(){
-    const hero=document.querySelector('.hero');
-    if(!hero)return;
+    const hero=document.querySelector('.hero');if(!hero)return;
     const coins=['🪙','💰','⭐','✨','💎','🏆','🎯'];
     function spawn(){
       if(hero.offsetParent===null)return;
       const el=document.createElement('div');
       el.textContent=coins[Math.floor(Math.random()*coins.length)];
-      const sz=16+Math.random()*20;
-      const dur=2200+Math.random()*2000;
+      const sz=16+Math.random()*20,dur=2200+Math.random()*2000;
       el.style.cssText=`position:absolute;pointer-events:none;font-size:${sz}px;
         left:${5+Math.random()*90}%;bottom:${Math.random()*30}%;opacity:0;z-index:1;
         animation:float-coin ${dur}ms ease-out forwards;filter:drop-shadow(0 0 6px rgba(245,197,24,.6));`;
-      hero.appendChild(el);
-      setTimeout(()=>el.remove(),dur+100);
+      hero.appendChild(el);setTimeout(()=>el.remove(),dur+100);
     }
-    setInterval(spawn,1100);
-    for(let i=0;i<3;i++)setTimeout(spawn,i*400);
+    setInterval(spawn,1100);for(let i=0;i<3;i++)setTimeout(spawn,i*400);
   })();
 
-  /* ─── 9. CLICK "JOGAR AGORA": BURST ─────────────────── */
+  /* 9. BURST em botões primários */
   document.addEventListener('click',e=>{
     const btn=e.target.closest('.btn');
     if(btn&&(btn.textContent.includes('Jogar Agora')||btn.textContent.includes('Encontrar Partida'))){
@@ -1598,24 +1573,22 @@ window.coinRain=coinRain;
     }
   });
 
-  /* ─── 10. LEADERBOARD: ENTRADAS DESLIZANTES ──────────── */
+  /* 10. LEADERBOARD DESLIZANTE */
   const _origLoadLB=window.loadLeaderboard;
   window.loadLeaderboard=async function(){
     if(_origLoadLB)await _origLoadLB.call(this,...arguments);
     setTimeout(()=>{
       document.querySelectorAll('.lbr').forEach((row,i)=>{
-        row.style.opacity='0';
-        row.style.transform='translateX(-50px)';
+        row.style.opacity='0';row.style.transform='translateX(-50px)';
         setTimeout(()=>{
-          row.style.transition='transform .45s cubic-bezier(.34,1.56,.64,1), opacity .4s ease';
-          row.style.transform='translateX(0)';
-          row.style.opacity='1';
+          row.style.transition='transform .45s cubic-bezier(.34,1.56,.64,1),opacity .4s ease';
+          row.style.transform='translateX(0)';row.style.opacity='1';
         },i*90+80);
       });
     },200);
   };
 
-  /* ─── 11. NAV GOLD GLOW AO SCROLL ───────────────────── */
+  /* 11. NAV GLOW */
   const nav=document.querySelector('nav');
   if(nav){
     window.addEventListener('scroll',()=>{
@@ -1623,43 +1596,35 @@ window.coinRain=coinRain;
         nav.style.borderBottom='1px solid rgba(245,197,24,0.25)';
         nav.style.boxShadow='0 4px 40px rgba(245,197,24,.14),0 1px 0 rgba(245,197,24,.08)';
         nav.style.background='rgba(2,2,8,.97)';
-      }else{
-        nav.style.borderBottom='';
-        nav.style.boxShadow='';
-        nav.style.background='';
-      }
+      }else{nav.style.borderBottom='';nav.style.boxShadow='';nav.style.background='';}
     });
   }
 
-  /* ─── 12. CHIP SALDO: PULSA AO MUDAR ────────────────── */
+  /* 12. CHIP PULSA */
   const chip=document.getElementById('nbcl');
   if(chip){
     let lastVal=chip.textContent;
     chip.addEventListener('click',()=>{if(window.coinRain)window.coinRain();spawnGlint(chip.getBoundingClientRect().left+50,chip.getBoundingClientRect().top+20,10);});
     new MutationObserver(()=>{
       if(chip.textContent!==lastVal){
-        lastVal=chip.textContent;
-        chip.style.animation='none';
-        void chip.offsetWidth;
-        chip.style.animation='pulse-chip .9s ease-out';
+        lastVal=chip.textContent;chip.style.animation='none';void chip.offsetWidth;chip.style.animation='pulse-chip .9s ease-out';
       }
     }).observe(chip,{childList:true,characterData:true,subtree:true});
   }
 
-  /* ─── 13. WAITING SLOTS ANIMADOS ────────────────────── */
+  /* 13. WAITING SLOTS */
   const _origUpdateWS=window.updateWaitSlots;
   window.updateWaitSlots=function(filled,max){
     if(_origUpdateWS)_origUpdateWS.call(this,filled,max);
     setTimeout(()=>{
       document.querySelectorAll('.ws').forEach((ws,i)=>{
-        ws.style.animation='none';
-        void ws.offsetWidth;
+        ws.style.animation='none';void ws.offsetWidth;
         setTimeout(()=>{ws.style.animation=`waiting-pop .5s cubic-bezier(.34,1.56,.64,1) ${i*80}ms both`;},10);
       });
     },40);
   };
 
-  /* ─── 14. VITÓRIA: EXPLOSÃO TRIPLA ───────────────────── */
+  /* 14. VITÓRIA EXPLOSÃO */
   const _origOnGO=window.onGameOver;
   window.onGameOver=function(d){
     if(_origOnGO)_origOnGO.call(this,d);
@@ -1675,71 +1640,52 @@ window.coinRain=coinRain;
     }
   };
 
-  /* ─── 15. DADO HOVER 3D ──────────────────────────────── */
+  /* 15. DADO 3D */
   const diceEl=document.querySelector('.dice-face');
   if(diceEl){
-    diceEl.addEventListener('mouseenter',()=>{
-      diceEl.style.animation='dice-hover-kz .7s ease-in-out infinite';
-      diceEl.style.cursor='pointer';
-    });
-    diceEl.addEventListener('mouseleave',()=>{ diceEl.style.animation=''; });
-    diceEl.addEventListener('click',()=>spawnGlint(
-      diceEl.getBoundingClientRect().left+30,
-      diceEl.getBoundingClientRect().top+30,8
-    ));
+    diceEl.addEventListener('mouseenter',()=>{diceEl.style.animation='dice-hover-kz .7s ease-in-out infinite';diceEl.style.cursor='pointer';});
+    diceEl.addEventListener('mouseleave',()=>{diceEl.style.animation='';});
+    diceEl.addEventListener('click',()=>spawnGlint(diceEl.getBoundingClientRect().left+30,diceEl.getBoundingClientRect().top+30,8));
   }
 
-  /* ─── 16. CARDS 3D TILT AO HOVER ────────────────────── */
-  const TILT_SEL='.mm-card,.auth-card,.wait-box,.bal-card,.daily-card,.ref-card,.phd';
+  /* 16. CARDS 3D TILT */
+  const TILT_SEL='.mm-card,.auth-card,.wait-box,.bal-card,.bonus-card,.ref-card,.phd';
   let _tiltThrottle=false;
   document.addEventListener('mousemove',e=>{
-    if(_tiltThrottle)return; _tiltThrottle=true;
+    if(_tiltThrottle)return;_tiltThrottle=true;
     requestAnimationFrame(()=>{
       _tiltThrottle=false;
       document.querySelectorAll(TILT_SEL).forEach(card=>{
-        const r=card.getBoundingClientRect();
-        const pad=60;
-        if(e.clientX<r.left-pad||e.clientX>r.right+pad||e.clientY<r.top-pad||e.clientY>r.bottom+pad){
-          card.style.transform=''; return;
-        }
-        const cx=r.left+r.width/2, cy=r.top+r.height/2;
-        const dx=(e.clientX-cx)/r.width, dy=(e.clientY-cy)/r.height;
+        const r=card.getBoundingClientRect(),pad=60;
+        if(e.clientX<r.left-pad||e.clientX>r.right+pad||e.clientY<r.top-pad||e.clientY>r.bottom+pad){card.style.transform='';return;}
+        const cx=r.left+r.width/2,cy=r.top+r.height/2;
+        const dx=(e.clientX-cx)/r.width,dy=(e.clientY-cy)/r.height;
         card.style.transform=`perspective(800px) rotateX(${-dy*7}deg) rotateY(${dx*7}deg) translateZ(5px)`;
         card.style.transition='transform .08s';
       });
     });
   });
-  document.addEventListener('mouseleave',()=>{
-    document.querySelectorAll(TILT_SEL).forEach(c=>{c.style.transform='';});
-  });
+  document.addEventListener('mouseleave',()=>{document.querySelectorAll(TILT_SEL).forEach(c=>{c.style.transform='';});});
 
-  /* ─── 17. GLINT GLOBAL AO CLICK ─────────────────────── */
-  document.addEventListener('click',e=>{
-    if(!e.target.closest('input,textarea,select,nav')){
-      spawnGlint(e.clientX,e.clientY,3);
-    }
-  });
+  /* 17. GLINT GLOBAL */
+  document.addEventListener('click',e=>{if(!e.target.closest('input,textarea,select,nav'))spawnGlint(e.clientX,e.clientY,3);});
 
-  /* ─── 18. HERO BORDER PARTICLES ─────────────────────── */
+  /* 18. HERO BORDER PARTICLES */
   (function heroBorderParticles(){
-    const hero=document.querySelector('.hero');
-    if(!hero)return;
+    const hero=document.querySelector('.hero');if(!hero)return;
     const cols=['#ffd700','#bf5af2','#00e676','#ff9f0a'];
     function spawn(){
       if(hero.offsetParent===null)return;
       const el=document.createElement('div');
-      const side=Math.random();
-      let left,top;
+      const side=Math.random();let left,top;
       if(side<.25){left=Math.random()*100+'%';top='5%';}
       else if(side<.5){left='95%';top=Math.random()*100+'%';}
       else if(side<.75){left=Math.random()*100+'%';top='95%';}
       else{left='5%';top=Math.random()*100+'%';}
-      const col=cols[Math.floor(Math.random()*cols.length)];
-      const sz=2+Math.random()*3;
+      const col=cols[Math.floor(Math.random()*cols.length)],sz=2+Math.random()*3;
       el.style.cssText=`position:absolute;pointer-events:none;z-index:3;
         left:${left};top:${top};width:${sz}px;height:${sz}px;border-radius:50%;
-        background:${col};box-shadow:0 0 8px ${col};opacity:0;
-        transition:opacity .4s;`;
+        background:${col};box-shadow:0 0 8px ${col};opacity:0;transition:opacity .4s;`;
       hero.appendChild(el);
       setTimeout(()=>{el.style.opacity='1';},30);
       setTimeout(()=>{el.style.opacity='0';},900);
@@ -1748,7 +1694,7 @@ window.coinRain=coinRain;
     setInterval(spawn,320);
   })();
 
-  /* ─── 19. TOAST COM GLINT ─────────────────────────────── */
+  /* 19. TOAST COM GLINT */
   const _origToast=window.toast;
   window.toast=function(msg,cls){
     if(_origToast)_origToast.call(this,msg,cls);
@@ -1759,16 +1705,12 @@ window.coinRain=coinRain;
     }
   };
 
-  /* ─── 20. JACKPOT BANNER: CLICK ANIMATION ──────────── */
+  /* 20. JACKPOT CLICK */
   const jkBanner=document.querySelector('.jk-banner');
   if(jkBanner){
-    jkBanner.addEventListener('click',e=>{
-      spawnGlint(e.clientX,e.clientY,12);
-      if(window.coinRain)window.coinRain();
-    });
+    jkBanner.addEventListener('click',e=>{spawnGlint(e.clientX,e.clientY,12);if(window.coinRain)window.coinRain();});
     jkBanner.style.cursor='pointer';
   }
-
 })();
 </script>
 
