@@ -1,13 +1,15 @@
 /**
- * ludo_board_v2.js — LudoKz FINAL
- * Tabuleiro completo: imagem PNG + peças HTML + dado 3D + sons + animações
- * Funciona com o servidor (SSE + API) para jogos online reais
+ * ludo_board_v2.js — LudoKz FINAL (CORRIGIDO)
+ * BUGS CORRIGIDOS:
+ * 1. Dado 3D — faces corrigidas com pontos visíveis (cor preta, sem conflito CSS)
+ * 2. Peças — movimento suave corrigido (path por ID numérico, não coordenadas internas)
+ * 3. _BASE_POSITIONS — verificação correta com os IDs do CMAP
+ * 4. _getNextPos — usa IDs numéricos em vez de coordenadas internas
+ * 5. Animação de captura — não bloqueia o render
  */
 
 // ══════════════════════════════════════════════════════════════════
 //  MAPA DE CORES  backend → UI
-//  Backend envia: players[i].color = "blue"|"green"|"red"|"yellow"
-//  P1=Azul(inf-esq) P2=Verde(sup-dir) P3=Verm(inf-dir) P4=Amar(sup-esq)
 // ══════════════════════════════════════════════════════════════════
 const COLOUR_TO_PK = { blue:'P1', green:'P2', red:'P3', yellow:'P4' };
 const PK_COLOUR    = { P1:'blue', P2:'green', P3:'red', P4:'yellow' };
@@ -22,7 +24,7 @@ const COLOUR_GRAD  = {
 const COLOUR_TEXT  = { blue:'#fff', green:'#fff', red:'#fff', yellow:'#222' };
 
 // ══════════════════════════════════════════════════════════════════
-//  COORDENADAS  (grelha 15×15, passo = 100/15 ≈ 6.667%)
+//  COORDENADAS  (grelha 15×15)
 // ══════════════════════════════════════════════════════════════════
 const CMAP = {
   0:[6,13],1:[6,12],2:[6,11],3:[6,10],4:[6,9],5:[5,8],6:[4,8],7:[3,8],8:[2,8],9:[1,8],10:[0,8],
@@ -40,20 +42,65 @@ const CMAP = {
   700:[10.5,10.58],701:[12.57,10.58],702:[10.5,12.43],703:[12.57,12.43],
   800:[1.5,1.58], 801:[3.57,1.58], 802:[1.5,3.45],  803:[3.55,3.45]
 };
-const STEP = 6.6667; // 100/15
+const STEP = 6.6667;
 
 const BASE_POS  = { P1:[500,501,502,503], P2:[600,601,602,603], P3:[700,701,702,703], P4:[800,801,802,803] };
 const START_POS = { P1:0, P2:26, P3:39, P4:13 };
+
+// Corredores finais por PK (IDs numéricos, em ordem de percurso)
 const HOME_ENT  = {
-  P1:[100,101,102,103,104], P2:[200,201,202,203,204],
-  P3:[300,301,302,303,304], P4:[400,401,402,403,404]
+  P1:[100,101,102,103,104],
+  P2:[200,201,202,203,204],
+  P3:[300,301,302,303,304],
+  P4:[400,401,402,403,404]
 };
 const HOME_POS   = { P1:105, P2:205, P3:305, P4:405 };
+
+// Ponto onde cada cor vira para o corredor final (ID numérico no tabuleiro principal)
 const TURN_PTS   = { P1:50,  P2:24,  P3:37,  P4:11  };
 const SAFE_SET   = new Set([0,8,13,21,26,34,39,47]);
 
 // ══════════════════════════════════════════════════════════════════
-//  SONS  (Web Audio API — sem ficheiros externos)
+//  CAMINHO COMPLETO POR COR  (IDs numéricos, casa a casa)
+//  Usado por _getNextPos para animação suave
+// ══════════════════════════════════════════════════════════════════
+function _buildFullPath(pk) {
+  const start = START_POS[pk];
+  const turnPt = TURN_PTS[pk];
+  const lane   = HOME_ENT[pk];
+  const home   = HOME_POS[pk];
+
+  // Percurso principal: start → 51 → 0 → turnPt (wrapping)
+  const mainPath = [];
+  let pos = start;
+  while (pos !== turnPt) {
+    mainPath.push(pos);
+    pos = (pos + 1) % 52;
+  }
+  mainPath.push(turnPt);
+
+  // Corredor final
+  const fullPath = mainPath.concat(lane).concat([home]);
+  return fullPath;
+}
+
+const FULL_PATH = {
+  P1: _buildFullPath('P1'),
+  P2: _buildFullPath('P2'),
+  P3: _buildFullPath('P3'),
+  P4: _buildFullPath('P4'),
+};
+
+// Dada a posição atual (ID numérico) e o PK, devolve o próximo ID no caminho
+function _getNextPos(pk, currentId) {
+  const path = FULL_PATH[pk];
+  const idx = path.indexOf(currentId);
+  if (idx === -1 || idx >= path.length - 1) return currentId; // já no fim
+  return path[idx + 1];
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SONS
 // ══════════════════════════════════════════════════════════════════
 const SFX = (() => {
   let ctx = null;
@@ -86,11 +133,10 @@ const SFX = (() => {
 })();
 window.SFX = SFX;
 
-// Desbloqueia audio no primeiro toque
 document.addEventListener('click', () => { try { SFX.dice(); } catch(e){} }, { once: true });
 
 // ══════════════════════════════════════════════════════════════════
-//  CSS DO JOGO  (injectado uma vez)
+//  CSS  — DADO CORRIGIDO: pontos sempre pretos, visíveis em todas as faces
 // ══════════════════════════════════════════════════════════════════
 (function injectCSS() {
   if (document.getElementById('ludokz-game-css')) return;
@@ -151,49 +197,65 @@ document.addEventListener('click', () => { try { SFX.dice(); } catch(e){} }, { o
       100% { transform:translate(-50%,-50%) scale(0); opacity:0; }
     }
 
-    /* ── Dado 3D ── */
-    .dice-scene-lk { perspective:500px; width:90px;height:90px; margin:6px auto; cursor:pointer; }
+    /* ══════════════════════════════════════
+       DADO 3D — CORRIGIDO
+       Pontos feitos com elementos <span> via JS
+       para garantir cor preta e visibilidade
+       em todas as faces sem conflito CSS
+    ══════════════════════════════════════ */
+    .dice-scene-lk {
+      perspective:500px;
+      width:90px;height:90px;
+      margin:6px auto;
+      cursor:pointer;
+    }
     .dice-3d-lk {
-      position:relative;width:90px;height:90px;
+      position:relative;
+      width:90px;height:90px;
       transform-style:preserve-3d;
       transition:transform .7s cubic-bezier(.34,1.2,.64,1);
     }
-    @keyframes dice-roll-lk { 50%{ transform:rotateX(455deg) rotateY(455deg); } }
-    .dice-3d-lk.rolling { animation:dice-roll-lk 1s ease-in-out; }
+    @keyframes dice-roll-lk {
+      0%   { transform:rotateX(0deg)   rotateY(0deg); }
+      25%  { transform:rotateX(180deg) rotateY(90deg); }
+      50%  { transform:rotateX(360deg) rotateY(180deg); }
+      75%  { transform:rotateX(270deg) rotateY(270deg); }
+      100% { transform:rotateX(360deg) rotateY(360deg); }
+    }
+    .dice-3d-lk.rolling {
+      animation:dice-roll-lk 0.9s ease-in-out;
+    }
+    /* Face base — face branca com borda */
     .df {
-      position:absolute;width:86px;height:86px;
-      border-radius:14px;
-      border:3px solid #e8e4de;
-      background:linear-gradient(145deg,#dddbd8,#fff);
+      position:absolute;
+      width:84px;height:84px;
+      border-radius:12px;
+      border:2px solid #c8c4be;
+      background:linear-gradient(145deg,#f8f6f3,#ffffff);
+      box-sizing:border-box;
     }
-    .df::before {
-      content:'';position:absolute;inset:0;border-radius:12px;
-      background:#f6f3f0;transform:translateZ(-1px);
+    /* Posicionamento das 6 faces */
+    .df.f1 { transform:translateZ(43px); }
+    .df.f6 { transform:rotateX(180deg) translateZ(43px); }
+    .df.f2 { transform:rotateY(-90deg) translateZ(43px); }
+    .df.f5 { transform:rotateY(90deg)  translateZ(43px); }
+    .df.f3 { transform:rotateX(-90deg) translateZ(43px); }
+    .df.f4 { transform:rotateX(90deg)  translateZ(43px); }
+
+    /* Pontos do dado — classe reutilizável */
+    .dp {
+      position:absolute;
+      width:14px;height:14px;
+      border-radius:50%;
+      background:#111111;
+      box-shadow:inset 0 1px 3px rgba(0,0,0,.4);
     }
-    .df::after {
-      content:'';position:absolute;
-      top:50%;left:50%;
-      width:16px;height:16px;margin:-8px 0 0 -8px;
-      border-radius:50%;background:#131210;
+    /* Face 1 — ponto vermelho central especial */
+    .dp.red-dot {
+      background:radial-gradient(circle at 35% 30%, #ff6b6b, #c41230);
+      box-shadow:0 0 6px rgba(196,18,48,.5);
+      width:18px;height:18px;
     }
-    .df.f1  { transform:translateZ(45px); }
-    .df.f6  { transform:rotateX(180deg) translateZ(45px); }
-    .df.f2  { transform:rotateY(90deg)  translateZ(45px); }
-    .df.f5  { transform:rotateY(-90deg) translateZ(45px); }
-    .df.f3  { transform:rotateX(90deg)  translateZ(45px); }
-    .df.f4  { transform:rotateX(-90deg) translateZ(45px); }
-    /* face 1 — ponto vermelho central */
-    .df.f1::after  { width:22px;height:22px;margin:-11px 0 0 -11px;background:radial-gradient(circle at 35% 30%,#ff6b6b,#c41230);box-shadow:0 0 8px rgba(196,18,48,.5); }
-    /* face 2 */
-    .df.f2::after  { margin:-32px 0 0 -32px;box-shadow:48px 48px; }
-    /* face 3 */
-    .df.f3::after  { margin:-30px 0 0 -30px;box-shadow:28px 28px; }
-    /* face 4 */
-    .df.f4::after  { margin:-32px 0 0 -32px;box-shadow:0 48px,48px 0,48px 48px; }
-    /* face 5 */
-    .df.f5::after  { margin:-32px 0 0 -32px;box-shadow:48px 0,0 48px,48px 48px,0 0,24px 24px; }
-    /* face 6 */
-    .df.f6::after  { margin:-36px 0 0 -36px;box-shadow:32px 0,64px 0,0 32px,32px 32px,64px 32px,0 64px; }
 
     /* ── Botão Lançar ── */
     #rb {
@@ -252,13 +314,8 @@ document.addEventListener('click', () => { try { SFX.dice(); } catch(e){} }, { o
     .gli.k  { color:#ff4757; }
     .gli.r  { color:#f5c518; }
 
-    /* ── Partículas de fundo ── */
-    #lk-particles {
-      position:fixed;inset:0;pointer-events:none;z-index:1;
-      display:none;
-    }
-    #s-game:not([style*="display: none"]) ~ #lk-particles,
-    body.in-game #lk-particles { display:block; }
+    /* ── Partículas ── */
+    #lk-particles { position:fixed;inset:0;pointer-events:none;z-index:1; }
 
     /* ── Dado resultado ── */
     #gm-dice-num {
@@ -268,7 +325,6 @@ document.addEventListener('click', () => { try { SFX.dice(); } catch(e){} }, { o
       margin:2px 0 10px;
       min-height:46px;
     }
-
     @keyframes num-pop {
       0%   { transform:scale(.5); opacity:0; }
       60%  { transform:scale(1.3); opacity:1; }
@@ -294,28 +350,18 @@ _resizePC();
 addEventListener('resize', _resizePC);
 
 function _initParts(n) {
-  _parts = Array.from({length: n || 18}, () => {
-    const p = _newPart();
-    p.y = Math.random() * innerHeight;
-    return p;
-  });
+  _parts = Array.from({length: n || 18}, () => { const p = _newPart(); p.y = Math.random() * innerHeight; return p; });
 }
 
 function _newPart() {
   return {
-    x: Math.random() * innerWidth,
-    y: -30,
-    vx: (Math.random()-.5)*1.2,
-    vy: .4 + Math.random()*1,
-    size: 10 + Math.random()*16,
-    rot: Math.random()*Math.PI*2,
-    rotS: (Math.random()-.5)*.05,
-    wb: Math.random()*Math.PI*2,
-    wbS: .02 + Math.random()*.04,
-    alpha: .6 + Math.random()*.4,
+    x: Math.random() * innerWidth, y: -30,
+    vx: (Math.random()-.5)*1.2, vy: .4 + Math.random()*1,
+    size: 10 + Math.random()*16, rot: Math.random()*Math.PI*2,
+    rotS: (Math.random()-.5)*.05, wb: Math.random()*Math.PI*2,
+    wbS: .02 + Math.random()*.04, alpha: .6 + Math.random()*.4,
     em: ['💰','🪙','⭐','💎','🎲'][Math.floor(Math.random()*5)],
-    life: 0,
-    maxLife: 250 + Math.random()*200,
+    life: 0, maxLife: 250 + Math.random()*200,
   };
 }
 
@@ -338,7 +384,6 @@ let _partsActive = false;
   });
 })();
 
-// Burst de moedas num ponto
 function _burst(x, y, n) {
   for (let i = 0; i < (n||16); i++) {
     setTimeout(() => {
@@ -360,22 +405,147 @@ function _burst(x, y, n) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  TABULEIRO  — div + img + peças HTML
+//  DADO 3D — PONTOS VIA JS (garante visibilidade em todas as faces)
 // ══════════════════════════════════════════════════════════════════
-let _pieceEls = {}; // colour -> [el×4]
+
+/**
+ * Layout dos pontos para cada face (coordenadas em %, dentro da face 84×84px)
+ * Usa posições absolutas em pixels calculadas numa grelha de 3×3
+ * Grelha: col=[10,35,60] row=[10,35,60] (valores em px dentro do div 84×84)
+ */
+const DICE_DOT_POSITIONS = {
+  // [col%, row%] dentro da face
+  1: [[50,50]],                                          // centro
+  2: [[25,25],[75,75]],                                  // diagonal
+  3: [[25,25],[50,50],[75,75]],
+  4: [[25,25],[75,25],[25,75],[75,75]],
+  5: [[25,25],[75,25],[50,50],[25,75],[75,75]],
+  6: [[25,20],[75,20],[25,50],[75,50],[25,80],[75,80]],
+};
+
+function _makeDiceFace(faceNum, value, isF1) {
+  const face = document.createElement('div');
+  face.className = `df f${faceNum}`;
+
+  const dots = DICE_DOT_POSITIONS[value] || [];
+  dots.forEach(([cx, cy], i) => {
+    const dot = document.createElement('span');
+    dot.className = 'dp' + (isF1 && i === 0 && value === 1 ? ' red-dot' : '');
+    // Tamanho do ponto: 14px (ou 18px para o ponto vermelho)
+    const size = (isF1 && value === 1) ? 18 : 14;
+    dot.style.cssText = `
+      left: calc(${cx}% - ${size/2}px);
+      top:  calc(${cy}% - ${size/2}px);
+    `;
+    face.appendChild(dot);
+  });
+
+  return face;
+}
+
+/**
+ * Reconstrói as 6 faces do dado com os pontos corretos para o valor atual.
+ * face 1 (frente) mostra o valor rolado.
+ * As outras faces mostram os valores complementares (1+6=7, 2+5=7, 3+4=7).
+ */
+function _rebuildDiceFaces(value) {
+  const inner = document.getElementById('lk-dice-3d');
+  if (!inner) return;
+  inner.innerHTML = '';
+
+  // face 1 (frente) = valor rolado, face 6 (trás) = 7 - valor
+  // face 2 (direita) = 2, face 5 (esq) = 5
+  // face 3 (baixo) = 3, face 4 (cima) = 4
+  const faceValues = {
+    f1: value,
+    f6: 7 - value,
+    f2: value === 2 ? 2 : (value === 5 ? 5 : 2),
+    f5: value === 2 ? 5 : (value === 5 ? 2 : 5),
+    f3: value === 3 ? 3 : (value === 4 ? 4 : 3),
+    f4: value === 3 ? 4 : (value === 4 ? 3 : 4),
+  };
+
+  // Garante que todos os valores são 1-6
+  const clamp = v => Math.max(1, Math.min(6, v));
+  ['f1','f2','f3','f4','f5','f6'].forEach((fname, i) => {
+    const fnum = i + 1;
+    const fval = clamp(faceValues[fname] || fnum);
+    const face = _makeDiceFace(fnum, fval, fname === 'f1');
+    inner.appendChild(face);
+  });
+}
+
+const DICE_TRANSFORMS = {
+  1:'rotateX(0deg) rotateY(0deg)',
+  2:'rotateX(-90deg) rotateY(0deg)',
+  3:'rotateX(0deg) rotateY(-90deg)',
+  4:'rotateX(0deg) rotateY(90deg)',
+  5:'rotateX(90deg) rotateY(0deg)',
+  6:'rotateX(180deg) rotateY(0deg)',
+};
+
+function _animDice(value, cb) {
+  SFX.dice();
+  const inner = document.getElementById('lk-dice-3d');
+  const numEl = document.getElementById('gm-dice-num');
+
+  if (inner) {
+    // Reposiciona a face 1 para o valor correto ANTES da animação
+    _rebuildDiceFaces(value);
+    // Lança a animação de roll
+    inner.style.transition = 'none';
+    inner.style.transform   = 'rotateX(0deg) rotateY(0deg)';
+    inner.classList.remove('rolling');
+    // Força reflow
+    void inner.offsetWidth;
+    inner.classList.add('rolling');
+  }
+
+  setTimeout(() => {
+    if (inner) {
+      inner.classList.remove('rolling');
+      inner.style.transition = 'transform .6s cubic-bezier(.34,1.2,.64,1)';
+      inner.style.transform  = DICE_TRANSFORMS[value] || DICE_TRANSFORMS[1];
+    }
+    if (numEl) {
+      numEl.textContent = value;
+      numEl.classList.remove('num-pop');
+      void numEl.offsetWidth;
+      numEl.classList.add('num-pop');
+    }
+
+    // Fallback emoji
+    const dfc = document.getElementById('dfc');
+    const dnm = document.getElementById('dnm');
+    const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+    if (dfc) dfc.textContent = faces[value-1];
+    if (dnm) dnm.textContent = value;
+
+    if (value === 6) {
+      const dw = document.getElementById('lk-dice-wrap');
+      if (dw) { const r = dw.getBoundingClientRect(); _burst(r.left+r.width/2, r.top+r.height/2, 18); }
+      SFX.myTurn();
+    }
+    if (cb) setTimeout(cb, 350);
+  }, 950);
+}
+
+window.BOARD = { animateDice: _animDice };
+
+// ══════════════════════════════════════════════════════════════════
+//  TABULEIRO — div + img + peças HTML
+// ══════════════════════════════════════════════════════════════════
+let _pieceEls = {};
 
 function _buildBoard() {
   const sg = document.getElementById('s-game');
   if (!sg) return;
 
-  // Limpar peças antigas
   Object.values(_pieceEls).flat().forEach(el => el?.remove());
   _pieceEls = {};
 
-  // Encontrar ou criar wrapper do tabuleiro
   let wrap = document.getElementById('ludo-board-wrap');
   if (!wrap) {
-    // Substituir canvas por div
     const canvas = document.getElementById('ludo-canvas');
     wrap = document.createElement('div');
     wrap.id = 'ludo-board-wrap';
@@ -394,7 +564,6 @@ function _buildBoard() {
     wrap.appendChild(img);
   }
 
-  // Criar peças para cada cor
   ['blue','green','red','yellow'].forEach(colour => {
     _pieceEls[colour] = [];
     for (let i = 0; i < 4; i++) {
@@ -411,10 +580,10 @@ function _buildBoard() {
     }
   });
 
-  // Posições iniciais (bases)
-  const PK_TO_COLOUR = { P1:'blue', P2:'green', P3:'red', P4:'yellow' };
+  // Posições iniciais
   ['P1','P2','P3','P4'].forEach(pk => {
-    BASE_POS[pk].forEach((pos,i) => _placePiece(PK_TO_COLOUR[pk], i, pos));
+    const colour = PK_COLOUR[pk];
+    BASE_POS[pk].forEach((pos,i) => _placePiece(colour, i, pos));
   });
 }
 
@@ -446,14 +615,12 @@ function _clearSelectable() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  DADO 3D  (CSS preserve-3d)
+//  DADO 3D — BUILD
 // ══════════════════════════════════════════════════════════════════
 function _buildDice() {
-  // Encontrar container do dado
   let diceWrap = document.getElementById('lk-dice-wrap');
-  if (diceWrap) return; // já existe
+  if (diceWrap) return;
 
-  // Onde inserir (depois do elemento .btd ou no .gcd)
   const gcd = document.querySelector('#s-game .gcd');
   if (!gcd) return;
 
@@ -461,19 +628,11 @@ function _buildDice() {
   diceWrap.id = 'lk-dice-wrap';
   diceWrap.innerHTML = `
     <div class="dice-scene-lk" onclick="window.doRoll && window.doRoll()" title="Clica para lançar">
-      <div class="dice-3d-lk" id="lk-dice-3d">
-        <div class="df f1"></div>
-        <div class="df f6"></div>
-        <div class="df f2"></div>
-        <div class="df f5"></div>
-        <div class="df f3"></div>
-        <div class="df f4"></div>
-      </div>
+      <div class="dice-3d-lk" id="lk-dice-3d"></div>
     </div>
     <div id="gm-dice-num">—</div>
   `;
 
-  // Substituir emoji dado existente
   const dfc = document.getElementById('dfc');
   const dnm = document.getElementById('dnm');
   if (dfc) {
@@ -485,71 +644,77 @@ function _buildDice() {
     else gcd.prepend(diceWrap);
   }
   if (dnm) dnm.style.display = 'none';
+
+  // Inicializa com face 1
+  _rebuildDiceFaces(1);
 }
-
-const DICE_TRANSFORMS = {
-  1:'rotateX(0deg) rotateY(0deg)',
-  2:'rotateX(-90deg) rotateY(0deg)',
-  3:'rotateX(0deg) rotateY(90deg)',
-  4:'rotateX(0deg) rotateY(-90deg)',
-  5:'rotateX(90deg) rotateY(0deg)',
-  6:'rotateX(180deg) rotateY(0deg)',
-};
-
-function _animDice(value, cb) {
-  SFX.dice();
-  const inner = document.getElementById('lk-dice-3d');
-  const numEl = document.getElementById('gm-dice-num');
-  if (inner) {
-    inner.classList.add('rolling');
-    inner.style.transition = 'none';
-  }
-  setTimeout(() => {
-    if (inner) {
-      inner.classList.remove('rolling');
-      inner.style.transition = 'transform .65s cubic-bezier(.34,1.2,.64,1)';
-      inner.style.transform  = DICE_TRANSFORMS[value] || DICE_TRANSFORMS[1];
-    }
-    if (numEl) {
-      numEl.textContent = value;
-      numEl.classList.remove('num-pop');
-      void numEl.offsetWidth;
-      numEl.classList.add('num-pop');
-    }
-    // Emoji fallback
-    const dfc = document.getElementById('dfc');
-    const dnm = document.getElementById('dnm');
-    const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
-    if (dfc) dfc.textContent = faces[value-1];
-    if (dnm) dnm.textContent = value;
-
-    if (value === 6) {
-      const dw = document.getElementById('lk-dice-wrap');
-      if (dw) { const r = dw.getBoundingClientRect(); _burst(r.left+r.width/2, r.top+r.height/2, 18); }
-      SFX.myTurn();
-    }
-    cb && setTimeout(cb, 350);
-  }, 1000);
-}
-
-// Expõe como window.BOARD para compatibilidade
-window.BOARD = { animateDice: _animDice };
 
 // ══════════════════════════════════════════════════════════════════
-//  RENDER STATE  — actualiza toda a UI
+//  IDs de base (para deteção de captura e saída da base)
+// ══════════════════════════════════════════════════════════════════
+const _BASE_ID_SET = new Set([
+  500,501,502,503,   // blue
+  600,601,602,603,   // green
+  700,701,702,703,   // red
+  800,801,802,803,   // yellow
+]);
+
+// ══════════════════════════════════════════════════════════════════
+//  MOVIMENTO SUAVE — casa a casa por ID numérico
+// ══════════════════════════════════════════════════════════════════
+const _animatingPieces = new Set();
+
+function _movePieceSmooth(colour, pieceIdx, fromId, toId, done) {
+  const pk  = COLOUR_TO_PK[colour];
+  const key = colour + '-' + pieceIdx;
+
+  // Saída da base: movimento direto para o ponto de partida
+  if (_BASE_ID_SET.has(fromId)) {
+    _placePiece(colour, pieceIdx, toId);
+    if (done) done();
+    return;
+  }
+
+  // Verifica se o destino está no caminho — se não estiver, vai direto
+  const path = FULL_PATH[pk];
+  const fromIdx = path.indexOf(fromId);
+  const toIdx   = path.indexOf(toId);
+  if (fromIdx === -1 || toIdx === -1 || toIdx <= fromIdx) {
+    _placePiece(colour, pieceIdx, toId);
+    if (done) done();
+    return;
+  }
+
+  _animatingPieces.add(key);
+  let currentId = fromId;
+
+  function step() {
+    if (currentId === toId) {
+      _animatingPieces.delete(key);
+      if (done) done();
+      return;
+    }
+    currentId = _getNextPos(pk, currentId);
+    _placePiece(colour, pieceIdx, currentId);
+    SFX.move();
+    setTimeout(step, 160);
+  }
+
+  step();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  RENDER STATE
 // ══════════════════════════════════════════════════════════════════
 window.CUR_STATE  = null;
 window.PREV_STATE = null;
 window.SELECTABLE_PIECES = [];
 
-// Rastreia peças que estão a animar — renderState não as deve mover
-const _animatingPieces = new Set(); // chave: "colour-pieceIdx"
-
 window.renderState = function(state) {
   if (!state || !state.players) return;
   window.CUR_STATE = state;
 
-  // ── Posicionar peças (só as que NÃO estão a animar) ──
+  // Posicionar peças (só as que não estão a animar)
   state.players.forEach(pl => {
     const colour = pl.color || pl.colour;
     if (!colour || !_pieceEls[colour]) return;
@@ -562,15 +727,15 @@ window.renderState = function(state) {
 
   _clearSelectable();
 
-  // ── Player cards ──
+  // Player cards
   const pcardsEl = document.getElementById('player-cards');
   if (pcardsEl && state.players) {
     let html = '';
     state.players.forEach((pl, idx) => {
-      const colour  = pl.color || pl.colour || 'blue';
+      const colour   = pl.color || pl.colour || 'blue';
       const isActive = idx === state.turn;
-      const hex     = COLOUR_HEX[colour] || '#888';
-      const fin     = pl.fin ?? 0;
+      const hex      = COLOUR_HEX[colour] || '#888';
+      const fin      = pl.fin ?? 0;
       html += `<div class="pc ${isActive ? 'mt' : ''}">
         <div class="pdot" style="background:${hex};box-shadow:0 0 6px ${hex}"></div>
         <div>
@@ -583,7 +748,7 @@ window.renderState = function(state) {
     pcardsEl.innerHTML = html;
   }
 
-  // ── Botão dado ──
+  // Botão dado
   const rb = document.getElementById('rb');
   if (rb) {
     const myT = _isMyTurn(state);
@@ -592,13 +757,13 @@ window.renderState = function(state) {
     if (myT && state.phase === 0 && !state.over) SFX.myTurn();
   }
 
-  // ── Aposta ──
+  // Aposta
   const gbv = document.getElementById('gbv');
   if (gbv && state.bet != null) {
     try { gbv.textContent = Number(state.bet).toLocaleString('pt-AO') + ' KZ'; } catch(e) {}
   }
 
-  // ── Log ──
+  // Log
   if (state.log?.length) {
     const le = document.getElementById('glog');
     if (le) {
@@ -609,7 +774,7 @@ window.renderState = function(state) {
     }
   }
 
-  // ── Chat online ──
+  // Chat online
   const co = document.getElementById('chat-online');
   if (co && state.players) co.textContent = state.players.length + ' online';
 };
@@ -640,16 +805,13 @@ window.onGameStarted = function(state) {
   window.CUR_STATE  = state;
   window.PREV_STATE = null;
 
-  // Navegar para ecrã de jogo
   if (typeof pg === 'function') pg('game');
 
-  // Construir tabuleiro e dado
   setTimeout(() => {
     _buildBoard();
     _buildDice();
     window.renderState(state);
 
-    // Mensagens de início no chat
     const chatEl = document.getElementById('chat-msgs');
     if (chatEl) chatEl.innerHTML = '';
     if (typeof addChat === 'function') {
@@ -660,7 +822,6 @@ window.onGameStarted = function(state) {
       });
     }
 
-    // Ativar partículas
     _partsActive = true;
     _initParts(20);
   }, 50);
@@ -674,76 +835,8 @@ window.onGameUpdate = function(state) {
 };
 
 // ══════════════════════════════════════════════════════════════════
-//  MOVIMENTO SUAVE — casa a casa com som sincronizado
+//  ANIMAÇÃO DIFF — detecta peças que mudaram e anima casa a casa
 // ══════════════════════════════════════════════════════════════════
-
-/**
- * Calcula a próxima posição no caminho correto para cada jogador.
- * Ordem correcta: corredor final → ponto de viragem → wrap → tabuleiro normal.
- */
-function _getNextPos(pk, pos) {
-  // 1. Dentro do corredor final: avança ou chega ao centro
-  const lane = HOME_ENT[pk];
-  const laneIdx = lane.indexOf(pos);
-  if (laneIdx !== -1) {
-    return laneIdx < lane.length - 1 ? lane[laneIdx + 1] : HOME_POS[pk];
-  }
-
-  // 2. Ponto de viragem: entra no corredor final
-  if (pos === TURN_PTS[pk]) return lane[0];
-
-  // 3. Wrap do tabuleiro principal (51 → 0)
-  if (pos === 51) return 0;
-
-  // 4. Tabuleiro principal normal
-  return pos + 1;
-}
-
-/**
- * Move uma peça visualmente, uma casa por vez, com som a cada passo.
- * - Se a peça vem da base (saiu agora), coloca-a directamente no destino sem animação casa-a-casa.
- * - Caso contrário, anima normalmente.
- * - Regista a peça como "a animar" para impedir que renderState a mova.
- */
-function _movePieceSmooth(colour, pieceIdx, from, to, done) {
-  const pk = COLOUR_TO_PK[colour];
-  const key = colour + '-' + pieceIdx;
-
-  // Saída da base: não há caminho contíguo — vai direto para o destino
-  if (_BASE_POSITIONS.has(from)) {
-    _placePiece(colour, pieceIdx, to);
-    if (done) done();
-    return;
-  }
-
-  _animatingPieces.add(key);
-  let current = from;
-
-  function step() {
-    if (current === to) {
-      _animatingPieces.delete(key);
-      if (done) done();
-      return;
-    }
-    current = _getNextPos(pk, current);
-    _placePiece(colour, pieceIdx, current);
-    SFX.move();
-    setTimeout(step, 160); // 160ms por casa — ajusta para mais rápido/lento
-  }
-
-  step();
-}
-
-// ══════════════════════════════════════════════════════════════════
-//  ANIMAÇÃO DIFF  — detecta peças que mudaram e anima casa a casa
-// ══════════════════════════════════════════════════════════════════
-const _BASE_POSITIONS = new Set([
-  500,501,502,503,
-  600,601,602,603,
-  700,701,702,703,
-  800,801,802,803,
-]);
-
 function _animateMoveDiff(prev, next) {
   if (!prev?.players || !next?.players) return;
 
@@ -753,29 +846,28 @@ function _animateMoveDiff(prev, next) {
     const prevPl = prev.players[idx];
     if (!prevPl || !pk) return;
 
-    (pl.pos || []).forEach((pos, i) => {
-      const prevPos = prevPl.pos?.[i];
+    (pl.pos || []).forEach((toId, i) => {
+      const fromId = prevPl.pos?.[i];
 
       // Sem mudança — ignora
-      if (prevPos === pos) return;
+      if (fromId === toId) return;
 
-      const voltouParaBase = _BASE_POSITIONS.has(pos) && !_BASE_POSITIONS.has(prevPos);
+      const voltouParaBase = _BASE_ID_SET.has(toId) && !_BASE_ID_SET.has(fromId);
 
       if (voltouParaBase) {
-        // ── Captura: peça comida volta à base ──
+        // Captura: animação de morte e volta à base
         const el = _pieceEls[colour]?.[i];
         if (!el) return;
         el.classList.add('captured');
         SFX.capture();
         setTimeout(() => {
           el.classList.remove('captured');
-          _placePiece(colour, i, pos);
+          _placePiece(colour, i, toId);
         }, 420);
-
       } else {
-        // ── Movimento normal: casa a casa ──
-        _movePieceSmooth(colour, i, prevPos, pos, () => {
-          if (pos === HOME_POS[pk]) SFX.home();
+        // Movimento normal: casa a casa
+        _movePieceSmooth(colour, i, fromId, toId, () => {
+          if (toId === HOME_POS[pk]) SFX.home();
         });
       }
     });
@@ -801,12 +893,10 @@ window.onGameOver = function(d) {
     SFX.win();
     if (typeof coinRain  === 'function') coinRain();
     if (typeof showFlash === 'function') showFlash('🏆');
-    // Burst épico
     for (let i = 0; i < 6; i++) {
       setTimeout(() => _burst(
         innerWidth  * (.2 + Math.random()*.6),
-        innerHeight * .3,
-        28
+        innerHeight * .3, 28
       ), i * 250);
     }
     if (goic) goic.textContent = '🏆';
@@ -830,7 +920,7 @@ window.onGameOver = function(d) {
 };
 
 // ══════════════════════════════════════════════════════════════════
-//  DOROLL  (substitui o do index.html — mais robusto)
+//  DOROLL
 // ══════════════════════════════════════════════════════════════════
 window.doRoll = async function() {
   if (!window.RID) return;
@@ -914,13 +1004,13 @@ window.leaveGame = async function() {
 };
 
 // ══════════════════════════════════════════════════════════════════
-//  buildBoard / initCanvas  (compatibilidade com index.html)
+//  COMPATIBILIDADE
 // ══════════════════════════════════════════════════════════════════
 window.buildBoard  = _buildBoard;
 window.initCanvas  = _buildBoard;
-window.startRenderLoop = function() {}; // não necessário com divs
+window.startRenderLoop = function() {};
 
-// Pulsa o botão dado quando é a minha vez
+// Pulsa botão dado na minha vez
 setInterval(() => {
   const rb = document.getElementById('rb');
   if (!rb || !window.CUR_STATE) return;
@@ -928,4 +1018,4 @@ setInterval(() => {
   rb.classList.toggle('my-turn-glow', myT && !window.CUR_STATE.over && window.CUR_STATE.phase === 0);
 }, 600);
 
-console.log('[LudoKz] ludo_board_v2.js FINAL carregado ✓');
+console.log('[LudoKz] ludo_board_v2.js CORRIGIDO carregado ✓');
