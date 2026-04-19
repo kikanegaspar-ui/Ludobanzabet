@@ -675,32 +675,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 <div class="tst" id="tst"></div>
 
 <script>
-/* ══════════════════════════════════════════════
-   BACKGROUND PARTICLE CANVAS
-══════════════════════════════════════════════ */
-(function(){
-  const c=document.getElementById("cvs"),x=c.getContext("2d");
-  let pts=[];
-  const resize=()=>{c.width=innerWidth;c.height=innerHeight;};
-  resize();addEventListener("resize",resize);
-  for(let i=0;i<80;i++) pts.push({
-    x:Math.random()*innerWidth,y:Math.random()*innerHeight,
-    vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,
-    r:Math.random()*1.8+.3,
-    col:Math.random()<.5?`rgba(245,197,24,${(Math.random()*.15+.03).toFixed(2)})`:`rgba(93,68,209,${(Math.random()*.12+.02).toFixed(2)})`
-  });
-  (function loop(){
-    x.clearRect(0,0,c.width,c.height);
-    pts.forEach(p=>{
-      p.x+=p.vx;p.y+=p.vy;
-      if(p.x<0)p.x=c.width;if(p.x>c.width)p.x=0;
-      if(p.y<0)p.y=c.height;if(p.y>c.height)p.y=0;
-      x.beginPath();x.arc(p.x,p.y,p.r,0,Math.PI*2);
-      x.fillStyle=p.col;x.fill();
-    });
-    requestAnimationFrame(loop);
-  })();
-})();
+/* canvas gerido pelo módulo de dinamismo */
 
 /* ══════════════════════════════════════════════
    COIN RAIN v2 — SISTEMA PROFISSIONAL
@@ -831,30 +806,32 @@ let _COINS=[],_GLINTS=[],_COIN_LOOP=null;
 
 function _startCoinLoop(){
   if(_COIN_LOOP)return;
-  _COIN_LOOP=setInterval(()=>{
+  function loop(){
     _COINS.forEach(c=>c.update());
     _GLINTS.forEach(g=>g.update());
     _COINS=_COINS.filter(c=>{if(c.isDead()){c.remove();return false;}return true;});
     _GLINTS=_GLINTS.filter(g=>{if(g.isDead()){g.remove();return false;}return true;});
-    if(!_COINS.length&&!_GLINTS.length){clearInterval(_COIN_LOOP);_COIN_LOOP=null;}
-  },16);
+    if(_COINS.length||_GLINTS.length){_COIN_LOOP=requestAnimationFrame(loop);}
+    else{_COIN_LOOP=null;}
+  }
+  _COIN_LOOP=requestAnimationFrame(loop);
 }
 
 function coinRain(){
-  const count=22;
+  const count=14;
   for(let i=0;i<count;i++){
     setTimeout(()=>{
-      _COINS.push(new CoinDrop(undefined,false));
+      if(_COINS.length<30){_COINS.push(new CoinDrop(undefined,false));}
       _startCoinLoop();
-    },i*55);
+    },i*70);
   }
 }
 
 function coinBurst(x,y){
   const cx=x||window.innerWidth/2;
   const cy=y||window.innerHeight*0.45;
-  for(let i=0;i<32;i++)_COINS.push(new CoinDrop(cx,true));
-  for(let i=0;i<24;i++)_GLINTS.push(new GlintParticle(cx,cy));
+  for(let i=0;i<20;i++)_COINS.push(new CoinDrop(cx,true));
+  for(let i=0;i<14;i++)_GLINTS.push(new GlintParticle(cx,cy));
   _startCoinLoop();
 }
 
@@ -1433,103 +1410,62 @@ window.coinRain=coinRain;
 (function LUDOKZ_DINAMISMO(){
   'use strict';
 
-  /* ─── 1. AURORA REACTIVA AO RATO ─────────────────────────── */
+  /* ─── 1. AURORA REACTIVA AO RATO (throttled) ─────────── */
   let mx=window.innerWidth/2, my=window.innerHeight/2;
+  let _mThrottle=false;
   document.addEventListener('mousemove', e=>{
     mx=e.clientX; my=e.clientY;
-    document.querySelectorAll('.aurora-blob').forEach((b,i)=>{
-      const f=0.018+i*0.006;
-      b.style.transform=`translate(${(mx-window.innerWidth/2)*f}px,${(my-window.innerHeight/2)*f}px) scale(1)`;
+    if(_mThrottle)return; _mThrottle=true;
+    requestAnimationFrame(()=>{
+      _mThrottle=false;
+      document.querySelectorAll('.aurora-blob').forEach((b,i)=>{
+        const f=0.012+i*0.004;
+        b.style.transform=`translate(${(mx-window.innerWidth/2)*f}px,${(my-window.innerHeight/2)*f}px)`;
+      });
     });
   });
 
-  /* ─── 2. CANVAS AVANÇADO: AURORA + LINHAS GOLD ─────────── */
-  (function advancedCanvas(){
+  /* ─── 2. CANVAS LEVE: PARTÍCULAS + AURORA CSS ──────────── */
+  (function lightCanvas(){
     const c=document.getElementById('cvs');
     if(!c)return;
     const x=c.getContext('2d');
     let W,H;
     const resize=()=>{W=c.width=innerWidth;H=c.height=innerHeight;};
     resize(); addEventListener('resize',resize);
-
-    const pts=Array.from({length:100},()=>({
+    // Apenas 40 partículas, sem linhas de conexão O(n²)
+    const pts=Array.from({length:40},()=>({
       x:Math.random()*innerWidth, y:Math.random()*innerHeight,
-      vx:(Math.random()-.5)*.4, vy:(Math.random()-.5)*.4,
-      r:Math.random()*2+.4,
-      hue:Math.random()<.6?45:270,
-      a:Math.random()*.18+.04,
-      pulse:Math.random()*Math.PI*2,
-      pulseSpeed:.02+Math.random()*.02
+      vx:(Math.random()-.5)*.35, vy:(Math.random()-.5)*.35,
+      r:Math.random()*1.6+.3,
+      col:Math.random()<.55?`rgba(245,197,24,${(Math.random()*.14+.04).toFixed(2)})`:`rgba(93,68,209,${(Math.random()*.1+.03).toFixed(2)})`
     }));
-
-    const blobs=[
-      {x:.15,y:.2,rx:.4,ry:.3,col:'rgba(93,68,209,',a:.07,drift:{x:.0004,y:.0002}},
-      {x:.75,y:.5,rx:.35,ry:.28,col:'rgba(245,197,24,',a:.045,drift:{x:-.0003,y:.0003}},
-      {x:.45,y:.85,rx:.3,ry:.25,col:'rgba(0,230,118,',a:.038,drift:{x:.0002,y:-.0004}},
-      {x:.6,y:.1,rx:.25,ry:.2,col:'rgba(255,45,85,',a:.028,drift:{x:-.0002,y:.0003}},
-    ];
-    let t=0;
-
-    function drawLine(x1,y1,x2,y2,alpha){
-      const g=x.createLinearGradient(x1,y1,x2,y2);
-      g.addColorStop(0,'rgba(245,197,24,0)');
-      g.addColorStop(.5,`rgba(245,197,24,${alpha})`);
-      g.addColorStop(1,'rgba(245,197,24,0)');
-      x.beginPath(); x.moveTo(x1,y1); x.lineTo(x2,y2);
-      x.strokeStyle=g; x.lineWidth=.7; x.stroke();
-    }
-
+    // Conexões só entre partículas próximas ao cursor (máx 8 pares)
+    let frame=0;
     (function loop(){
       x.clearRect(0,0,W,H);
-      t+=.008;
-
-      blobs.forEach(b=>{
-        b.x+=b.drift.x; b.y+=b.drift.y;
-        if(b.x<0||b.x>1)b.drift.x*=-1;
-        if(b.y<0||b.y>1)b.drift.y*=-1;
-        const cx=b.x*W, cy=b.y*H;
-        const grd=x.createRadialGradient(cx,cy,0,cx,cy,Math.min(W,H)*Math.max(b.rx,b.ry));
-        const pulse=(Math.sin(t*1.3)+1)*.5;
-        grd.addColorStop(0,b.col+(b.a*(1+pulse*.5))+')');
-        grd.addColorStop(.5,b.col+(b.a*.35)+')');
-        grd.addColorStop(1,'rgba(0,0,0,0)');
-        x.beginPath();
-        x.ellipse(cx,cy,W*b.rx*(1+pulse*.06),H*b.ry*(1+pulse*.06),0,0,Math.PI*2);
-        x.fillStyle=grd; x.fill();
-      });
-
-      /* mouse-attracted blobs */
-      const mBlob=x.createRadialGradient(mx,my,0,mx,my,180);
-      mBlob.addColorStop(0,'rgba(245,197,24,0.03)');
-      mBlob.addColorStop(1,'rgba(0,0,0,0)');
-      x.beginPath(); x.arc(mx,my,180,0,Math.PI*2);
-      x.fillStyle=mBlob; x.fill();
-
+      frame++;
       pts.forEach(p=>{
         p.x+=p.vx; p.y+=p.vy;
         if(p.x<0)p.x=W; if(p.x>W)p.x=0;
         if(p.y<0)p.y=H; if(p.y>H)p.y=0;
-        p.pulse+=p.pulseSpeed;
-        const pa=p.a*(0.7+(Math.sin(p.pulse)+1)*.3);
-        x.beginPath(); x.arc(p.x,p.y,p.r*(0.8+(Math.sin(p.pulse)+1)*.2),0,Math.PI*2);
-        x.fillStyle=`hsla(${p.hue},90%,65%,${pa})`; x.fill();
+        x.beginPath(); x.arc(p.x,p.y,p.r,0,Math.PI*2);
+        x.fillStyle=p.col; x.fill();
       });
-
-      const MAX_DIST=130;
-      for(let i=0;i<pts.length;i++){
-        for(let j=i+1;j<pts.length;j++){
-          const dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y;
+      // Linhas ao cursor — só a cada 2 frames, máx 6
+      if(frame%2===0){
+        let drawn=0;
+        for(let i=0;i<pts.length&&drawn<6;i++){
+          const dx=pts[i].x-mx, dy=pts[i].y-my;
           const d=Math.sqrt(dx*dx+dy*dy);
-          if(d<MAX_DIST) drawLine(pts[i].x,pts[i].y,pts[j].x,pts[j].y,(1-d/MAX_DIST)*.055);
+          if(d<160){
+            const a=(1-d/160)*.09;
+            x.beginPath(); x.moveTo(pts[i].x,pts[i].y); x.lineTo(mx,my);
+            x.strokeStyle=`rgba(245,197,24,${a})`; x.lineWidth=.6; x.stroke();
+            drawn++;
+          }
         }
       }
-
-      pts.forEach(p=>{
-        const dx=p.x-mx, dy=p.y-my;
-        const d=Math.sqrt(dx*dx+dy*dy);
-        if(d<200) drawLine(p.x,p.y,mx,my,(1-d/200)*.12);
-      });
-
       requestAnimationFrame(loop);
     })();
   })();
@@ -1603,7 +1539,7 @@ window.coinRain=coinRain;
       animation:ripple-kz .6s ease-out forwards;`;
     btn.appendChild(r);
     setTimeout(()=>r.remove(),650);
-    spawnGlint(e.clientX,e.clientY,4);
+    spawnGlint(e.clientX,e.clientY,2);
   }
 
   function attachRipples(root=document){
@@ -1650,8 +1586,8 @@ window.coinRain=coinRain;
       hero.appendChild(el);
       setTimeout(()=>el.remove(),dur+100);
     }
-    setInterval(spawn,650);
-    for(let i=0;i<5;i++)setTimeout(spawn,i*200);
+    setInterval(spawn,1100);
+    for(let i=0;i<3;i++)setTimeout(spawn,i*400);
   })();
 
   /* ─── 9. CLICK "JOGAR AGORA": BURST ─────────────────── */
@@ -1755,17 +1691,22 @@ window.coinRain=coinRain;
 
   /* ─── 16. CARDS 3D TILT AO HOVER ────────────────────── */
   const TILT_SEL='.mm-card,.auth-card,.wait-box,.bal-card,.daily-card,.ref-card,.phd';
+  let _tiltThrottle=false;
   document.addEventListener('mousemove',e=>{
-    document.querySelectorAll(TILT_SEL).forEach(card=>{
-      const r=card.getBoundingClientRect();
-      const pad=80;
-      if(e.clientX<r.left-pad||e.clientX>r.right+pad||e.clientY<r.top-pad||e.clientY>r.bottom+pad){
-        card.style.transform=''; return;
-      }
-      const cx=r.left+r.width/2, cy=r.top+r.height/2;
-      const dx=(e.clientX-cx)/r.width, dy=(e.clientY-cy)/r.height;
-      card.style.transform=`perspective(800px) rotateX(${-dy*8}deg) rotateY(${dx*8}deg) translateZ(6px)`;
-      card.style.transition='transform .06s';
+    if(_tiltThrottle)return; _tiltThrottle=true;
+    requestAnimationFrame(()=>{
+      _tiltThrottle=false;
+      document.querySelectorAll(TILT_SEL).forEach(card=>{
+        const r=card.getBoundingClientRect();
+        const pad=60;
+        if(e.clientX<r.left-pad||e.clientX>r.right+pad||e.clientY<r.top-pad||e.clientY>r.bottom+pad){
+          card.style.transform=''; return;
+        }
+        const cx=r.left+r.width/2, cy=r.top+r.height/2;
+        const dx=(e.clientX-cx)/r.width, dy=(e.clientY-cy)/r.height;
+        card.style.transform=`perspective(800px) rotateX(${-dy*7}deg) rotateY(${dx*7}deg) translateZ(5px)`;
+        card.style.transition='transform .08s';
+      });
     });
   });
   document.addEventListener('mouseleave',()=>{
@@ -1804,7 +1745,7 @@ window.coinRain=coinRain;
       setTimeout(()=>{el.style.opacity='0';},900);
       setTimeout(()=>el.remove(),1300);
     }
-    setInterval(spawn,160);
+    setInterval(spawn,320);
   })();
 
   /* ─── 19. TOAST COM GLINT ─────────────────────────────── */
