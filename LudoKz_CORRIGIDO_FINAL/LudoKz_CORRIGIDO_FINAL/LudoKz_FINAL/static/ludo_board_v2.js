@@ -542,15 +542,22 @@ window.CUR_STATE  = null;
 window.PREV_STATE = null;
 window.SELECTABLE_PIECES = [];
 
+// Rastreia peças que estão a animar — renderState não as deve mover
+const _animatingPieces = new Set(); // chave: "colour-pieceIdx"
+
 window.renderState = function(state) {
   if (!state || !state.players) return;
   window.CUR_STATE = state;
 
-  // ── Posicionar peças ──
+  // ── Posicionar peças (só as que NÃO estão a animar) ──
   state.players.forEach(pl => {
     const colour = pl.color || pl.colour;
     if (!colour || !_pieceEls[colour]) return;
-    (pl.pos || []).forEach((pos, i) => _placePiece(colour, i, pos));
+    (pl.pos || []).forEach((pos, i) => {
+      if (!_animatingPieces.has(colour + '-' + i)) {
+        _placePiece(colour, i, pos);
+      }
+    });
   });
 
   _clearSelectable();
@@ -573,21 +580,7 @@ window.renderState = function(state) {
         ${isActive ? '<div style="font-size:16px;margin-left:auto">🎲</div>' : ''}
       </div>`;
     });
-    // Bloco central com turno
-    const curP  = state.players[state.turn];
-    const mid = `<div class="gmid" style="text-align:center;padding:0 6px">
-      <div class="ttx" style="font-size:11px;font-weight:800;color:#9890c0;text-transform:uppercase;letter-spacing:.5px">
-        ${_isMyTurn(state) ? 'Teu turno 🟢' : 'Aguarda 🔵'}
-      </div>
-      <div style="font-size:10px;color:#4a4470;font-family:'Bebas Neue',sans-serif;letter-spacing:1px">
-        RND ${state.round || 0}
-      </div>
-    </div>`;
-    // Inserir bloco central a meio
-    const half = Math.floor(state.players.length / 2);
-    const parts = html.match(/<div class="pc[^"]*"[\s\S]*?<\/div>/g) || [html];
-    pcardsEl.innerHTML = parts.slice(0,half).join('') + mid + parts.slice(half).join('');
-    pcardsEl.innerHTML = html; // simpler: just all cards
+    pcardsEl.innerHTML = html;
   }
 
   // ── Botão dado ──
@@ -681,39 +674,109 @@ window.onGameUpdate = function(state) {
 };
 
 // ══════════════════════════════════════════════════════════════════
-//  ANIMAÇÃO DIFF  (detecta peças que mudaram e anima)
+//  MOVIMENTO SUAVE — casa a casa com som sincronizado
 // ══════════════════════════════════════════════════════════════════
+
+/**
+ * Calcula a próxima posição no caminho correto para cada jogador.
+ * Ordem correcta: corredor final → ponto de viragem → wrap → tabuleiro normal.
+ */
+function _getNextPos(pk, pos) {
+  // 1. Dentro do corredor final: avança ou chega ao centro
+  const lane = HOME_ENT[pk];
+  const laneIdx = lane.indexOf(pos);
+  if (laneIdx !== -1) {
+    return laneIdx < lane.length - 1 ? lane[laneIdx + 1] : HOME_POS[pk];
+  }
+
+  // 2. Ponto de viragem: entra no corredor final
+  if (pos === TURN_PTS[pk]) return lane[0];
+
+  // 3. Wrap do tabuleiro principal (51 → 0)
+  if (pos === 51) return 0;
+
+  // 4. Tabuleiro principal normal
+  return pos + 1;
+}
+
+/**
+ * Move uma peça visualmente, uma casa por vez, com som a cada passo.
+ * - Se a peça vem da base (saiu agora), coloca-a directamente no destino sem animação casa-a-casa.
+ * - Caso contrário, anima normalmente.
+ * - Regista a peça como "a animar" para impedir que renderState a mova.
+ */
+function _movePieceSmooth(colour, pieceIdx, from, to, done) {
+  const pk = COLOUR_TO_PK[colour];
+  const key = colour + '-' + pieceIdx;
+
+  // Saída da base: não há caminho contíguo — vai direto para o destino
+  if (_BASE_POSITIONS.has(from)) {
+    _placePiece(colour, pieceIdx, to);
+    if (done) done();
+    return;
+  }
+
+  _animatingPieces.add(key);
+  let current = from;
+
+  function step() {
+    if (current === to) {
+      _animatingPieces.delete(key);
+      if (done) done();
+      return;
+    }
+    current = _getNextPos(pk, current);
+    _placePiece(colour, pieceIdx, current);
+    SFX.move();
+    setTimeout(step, 160); // 160ms por casa — ajusta para mais rápido/lento
+  }
+
+  step();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  ANIMAÇÃO DIFF  — detecta peças que mudaram e anima casa a casa
+// ══════════════════════════════════════════════════════════════════
+const _BASE_POSITIONS = new Set([
+  500,501,502,503,
+  600,601,602,603,
+  700,701,702,703,
+  800,801,802,803,
+]);
+
 function _animateMoveDiff(prev, next) {
   if (!prev?.players || !next?.players) return;
+
   next.players.forEach((pl, idx) => {
-    const colour  = pl.color || pl.colour;
-    const prevPl  = prev.players[idx];
-    if (!prevPl) return;
+    const colour = pl.color || pl.colour;
+    const pk     = COLOUR_TO_PK[colour];
+    const prevPl = prev.players[idx];
+    if (!prevPl || !pk) return;
+
     (pl.pos || []).forEach((pos, i) => {
       const prevPos = prevPl.pos?.[i];
+
+      // Sem mudança — ignora
       if (prevPos === pos) return;
-      // Peça voltou à base = capturada
-      const basePositions = [500,501,502,503,600,601,602,603,700,701,702,703,800,801,802,803];
-      if (basePositions.includes(pos) && !basePositions.includes(prevPos)) {
-        // Animação de captura (flash e volta)
+
+      const voltouParaBase = _BASE_POSITIONS.has(pos) && !_BASE_POSITIONS.has(prevPos);
+
+      if (voltouParaBase) {
+        // ── Captura: peça comida volta à base ──
         const el = _pieceEls[colour]?.[i];
-        if (el) {
-          el.classList.add('captured');
-          SFX.capture();
-          setTimeout(() => {
-            el.classList.remove('captured');
-            _placePiece(colour, i, pos);
-          }, 420);
-        }
+        if (!el) return;
+        el.classList.add('captured');
+        SFX.capture();
+        setTimeout(() => {
+          el.classList.remove('captured');
+          _placePiece(colour, i, pos);
+        }, 420);
+
       } else {
-        // Movimento normal
-        if (pos === HOME_POS?.['P1'] || pos === HOME_POS?.['P2'] ||
-            pos === HOME_POS?.['P3'] || pos === HOME_POS?.['P4']) {
-          SFX.home();
-        } else {
-          SFX.move();
-        }
-        _placePiece(colour, i, pos);
+        // ── Movimento normal: casa a casa ──
+        _movePieceSmooth(colour, i, prevPos, pos, () => {
+          if (pos === HOME_POS[pk]) SFX.home();
+        });
       }
     });
   });
