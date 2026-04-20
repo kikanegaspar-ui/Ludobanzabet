@@ -1,15 +1,18 @@
 """
-game_manager.py — Motor de Jogo LudoKz
-Lógica 100% fiel ao LibreLudo (React/TypeScript → Python)
-Caminhos exactos, bot com IA de pesos, capturas, casas seguras
-Integração com Flask/SSE via app.py
+game_manager.py — Motor de Jogo LudoKz CORRIGIDO
+Bugs corrigidos:
+  1. Peças saem da base com dado 6 (unlock correto)
+  2. state_dict envia in_base[] para o frontend
+  3. roll_dice não auto-move quando há escolha — devolve movable ao frontend
+  4. _do_move usa índice correto para tokens na base
+  5. _check_capture não captura peças já em casa
 """
 
 import random
 from copy import deepcopy
 
 # ══════════════════════════════════════════════════════════════════
-#  PESOS DO BOT (idênticos ao selectBestTokenForBot.ts)
+#  PESOS DO BOT
 # ══════════════════════════════════════════════════════════════════
 WEIGHTS = {
     "UNLOCK_BONUS":                      50000,
@@ -55,17 +58,8 @@ LOGIC_CONFIG = {
 }
 
 # ══════════════════════════════════════════════════════════════════
-#  MAPEAMENTO DE POSIÇÃO: ID numérico (frontend) ↔ coordenadas (backend)
-#
-#  O frontend (ludo_board_v2.js) usa IDs inteiros:
-#    0–51   → tabuleiro principal
-#    100–105, 200–205, 300–305, 400–405 → corredores finais + centro
-#    500–503, 600–603, 700–703, 800–803 → bases (peças bloqueadas)
-#
-#  O backend usa coordenadas (x, y). Esta secção faz a ponte.
+#  IDs de base e corredor por cor (alinhados com CMAP do frontend)
 # ══════════════════════════════════════════════════════════════════
-
-# IDs das bases por cor (correspondem ao CMAP do frontend)
 BASE_IDS = {
     "blue":   [500, 501, 502, 503],
     "green":  [600, 601, 602, 603],
@@ -73,7 +67,6 @@ BASE_IDS = {
     "yellow": [800, 801, 802, 803],
 }
 
-# IDs do corredor final + centro por cor
 HOME_ENTRY_IDS = {
     "blue":   [100, 101, 102, 103, 104, 105],
     "green":  [200, 201, 202, 203, 204, 205],
@@ -85,489 +78,207 @@ HOME_ID = {
     "blue": 105, "green": 205, "red": 305, "yellow": 405,
 }
 
-# Mapa inverso: coordenada (x,y) → ID numérico do CMAP do frontend
-# Construído a partir do CMAP exacto do ludo_board_v2.js
-_COORD_TO_ID = {
-    (6,13):0,(6,12):1,(6,11):2,(6,10):3,(6,9):4,(5,8):5,(4,8):6,(3,8):7,(2,8):8,(1,8):9,(0,8):10,
-    (0,7):11,(0,6):12,(1,6):13,(2,6):14,(3,6):15,(4,6):16,(5,6):17,(6,5):18,(6,4):19,(6,3):20,
-    (6,2):21,(6,1):22,(6,0):23,(7,0):24,(8,0):25,(8,1):26,(8,2):27,(8,3):28,(8,4):29,(8,5):30,
-    (9,6):31,(10,6):32,(11,6):33,(12,6):34,(13,6):35,(14,6):36,(14,7):37,(14,8):38,(13,8):39,
-    (12,8):40,(11,8):41,(10,8):42,(9,8):43,(8,9):44,(8,10):45,(8,11):46,(8,12):47,(8,13):48,
-    (8,14):49,(7,14):50,(6,14):51,
-    (7,13):100,(7,12):101,(7,11):102,(7,10):103,(7,9):104,(7,8):105,
-    (7,1):200,(7,2):201,(7,3):202,(7,4):203,(7,5):204,(7,6):205,
-    (13,7):300,(12,7):301,(11,7):302,(10,7):303,(9,7):304,(8,7):305,
-    (1,7):400,(2,7):401,(3,7):402,(4,7):403,(5,7):404,(6,7):405,
+# Posição de saída da base (primeiro ID no tabuleiro principal por cor)
+START_POS_ID = {
+    "blue":   0,
+    "green":  26,
+    "red":    39,
+    "yellow": 13,
 }
 
-def _coord_to_pos_id(colour, coord, token_id):
+# Ponto de viragem para entrar no corredor final por cor
+TURN_PT_ID = {
+    "blue":   50,   # posição 50 → entra em 100
+    "green":  24,   # posição 24 → entra em 200
+    "red":    37,   # posição 37 → entra em 300
+    "yellow": 11,   # posição 11 → entra em 400
+}
+
+# ══════════════════════════════════════════════════════════════════
+#  CAMINHOS COMPLETOS por cor (IDs numéricos, 0-51 + corredor final)
+# ══════════════════════════════════════════════════════════════════
+def _build_full_path(colour):
     """
-    Converte coordenada interna (x,y) para ID numérico do CMAP do frontend.
-    Lookup directo via _COORD_TO_ID (O(1)).
-    Se não encontrar (coord de base em float), devolve BASE_IDS[colour][token_id].
+    Constrói o caminho completo de IDs para uma cor:
+    começa em START_POS_ID, percorre o tabuleiro principal (0-51),
+    e entra no corredor final.
     """
-    cmap_id = _COORD_TO_ID.get(coord)
-    if cmap_id is not None:
-        return cmap_id
-    return BASE_IDS[colour][token_id]
+    start   = START_POS_ID[colour]
+    turn_pt = TURN_PT_ID[colour]
+    lane    = HOME_ENTRY_IDS[colour]
 
-
-# ══════════════════════════════════════════════════════════════════
-#  CAMINHOS (tradução exacta de paths.ts + constants.ts)
-# ══════════════════════════════════════════════════════════════════
-
-def _integers_between(a, b):
-    """Replica getIntegersBetween do LibreLudo."""
-    if a == b:
-        return [a]
-    start = min(a, b)
-    end   = max(a, b)
-    result = list(range(start, end + 1))
-    if a > b:
-        result = list(reversed(result))
-    return result
-
-
-def _expand_token_path(token_paths):
-    """Replica expandTokenPath do LibreLudo."""
-    expanded = []
-    for seg in token_paths:
-        sx, sy = seg["start"]
-        ex, ey = seg["end"]
-        is_vertical = (sx == ex)
-        if is_vertical:
-            static = sx
-            coords = _integers_between(sy, ey)
-            for c in coords:
-                expanded.append((static, c))
-        else:
-            static = sy
-            coords = _integers_between(sx, ex)
-            for c in coords:
-                expanded.append((c, static))
-    return expanded
-
-
-GENERAL_TOKEN_PATH = [
-    {"start": (6, 13), "end": (6,  9)},
-    {"start": (5,  8), "end": (1,  8)},
-    {"start": (0,  8), "end": (0,  6)},
-    {"start": (1,  6), "end": (5,  6)},
-    {"start": (6,  5), "end": (6,  1)},
-    {"start": (6,  0), "end": (8,  0)},
-    {"start": (8,  1), "end": (8,  5)},
-    {"start": (9,  6), "end": (13, 6)},
-    {"start": (14, 6), "end": (14, 8)},
-    {"start": (13, 8), "end": (9,  8)},
-    {"start": (8,  9), "end": (8, 13)},
-    {"start": (8, 14), "end": (6, 14)},
-]
-
-TOKEN_HOME_ENTRY_PATH = {
-    "blue":   {"start": (7, 13), "end": (7, 8)},
-    "red":    {"start": (1,  7), "end": (6, 7)},
-    "green":  {"start": (7,  1), "end": (7, 6)},
-    "yellow": {"start": (13, 7), "end": (8, 7)},
-}
-
-TOKEN_START_COORDINATES = {
-    "blue":   (6, 13),
-    "red":    (1,  6),
-    "green":  (8,  1),
-    "yellow": (13, 8),
-}
-
-TOKEN_SAFE_COORDINATES = set([
-    (6, 13),
-    (1,  6),
-    (8,  1),
-    (13, 8),
-    (8, 12),
-    (2,  8),
-    (6,  2),
-    (12, 6),
-])
-
-# Coordenadas de base (posição locked) — alinhadas com CMAP do frontend
-# CMAP: 500:[1.5,10.58], 501:[3.57,10.58], 502:[1.5,12.43], 503:[3.57,12.43]
-TOKEN_LOCKED_COORDINATES = {
-    "blue":   [(1.5, 10.58), (3.57, 10.58), (1.5, 12.43), (3.57, 12.43)],
-    "green":  [(10.5, 1.58), (12.54, 1.58), (10.5, 3.45), (12.54, 3.45)],
-    "red":    [(10.5, 10.58),(12.57, 10.58),(10.5, 12.43),(12.57, 12.43)],
-    "yellow": [(1.5, 1.58),  (3.57, 1.58),  (1.5, 3.45),  (3.55, 3.45)],
-}
-
-
-def _build_expanded_home_entry():
-    result = {}
-    for colour, seg in TOKEN_HOME_ENTRY_PATH.items():
-        result[colour] = _expand_token_path([seg])
-    return result
-
-
-def _gen_blue_path():
-    general = _expand_token_path(GENERAL_TOKEN_PATH)[:-1]
-    return general + _expand_home_entry["blue"]
-
-
-def _gen_red_path():
-    path = GENERAL_TOKEN_PATH[3:] + GENERAL_TOKEN_PATH[:3]
-    return _expand_token_path(path)[:-1] + _expand_home_entry["red"]
-
-
-def _gen_green_path():
-    path = GENERAL_TOKEN_PATH[6:] + GENERAL_TOKEN_PATH[:6]
-    return _expand_token_path(path)[:-1] + _expand_home_entry["green"]
-
-
-def _gen_yellow_path():
-    path = GENERAL_TOKEN_PATH[9:] + GENERAL_TOKEN_PATH[:9]
-    return _expand_token_path(path)[:-1] + _expand_home_entry["yellow"]
-
-
-_expand_home_entry = _build_expanded_home_entry()
-
-TOKEN_PATHS = {
-    "blue":   _gen_blue_path(),
-    "red":    _gen_red_path(),
-    "green":  _gen_green_path(),
-    "yellow": _gen_yellow_path(),
-}
-
-EXPANDED_GENERAL_PATH = _expand_token_path(GENERAL_TOKEN_PATH)
-
-
-# ══════════════════════════════════════════════════════════════════
-#  FUNÇÕES DE LÓGICA DE COORDENADAS
-# ══════════════════════════════════════════════════════════════════
-
-def coords_equal(c1, c2):
-    return c1[0] == c2[0] and c1[1] == c2[1]
-
-
-def get_distance_in_token_path(colour, initial_coord, target_coord):
-    path = TOKEN_PATHS[colour]
-    try:
-        i1 = next(i for i, c in enumerate(path) if coords_equal(c, initial_coord))
-        i2 = next(i for i, c in enumerate(path) if coords_equal(c, target_coord))
-        return abs(i1 - i2)
-    except StopIteration:
-        return -1
-
-
-def get_home_coord_for_colour(colour):
-    return TOKEN_PATHS[colour][-1]
-
-
-def get_final_coord(token, dice_number):
-    path = TOKEN_PATHS[token["colour"]]
-    try:
-        idx = next(i for i, c in enumerate(path) if coords_equal(c, token["coordinates"]))
-    except StopIteration:
-        return None
-    final_idx = idx + dice_number
-    if final_idx >= len(path):
-        return None
-    return path[final_idx]
-
-
-def is_coord_in_home_entry_path(coord, colour):
-    return any(coords_equal(coord, c) for c in _expand_home_entry[colour])
-
-
-def is_coord_safe(coord, colour=None):
-    is_safe = any(coords_equal(coord, c) for c in TOKEN_SAFE_COORDINATES)
-    if not colour:
-        return is_safe
-    return is_safe or is_coord_in_home_entry_path(coord, colour)
-
-
-def are_tokens_on_overlapping_paths(token1, token2):
-    c1 = token1["coordinates"]
-    c2 = token2["coordinates"]
-    path1 = TOKEN_PATHS[token1["colour"]]
-    path2 = TOKEN_PATHS[token2["colour"]]
-    try:
-        idx1 = next(i for i, c in enumerate(path1) if coords_equal(c, c1))
-        idx2 = next(i for i, c in enumerate(path2) if coords_equal(c, c2))
-    except StopIteration:
-        return False
-    remaining1 = path1[idx1:]
-    remaining2 = path2[idx2:]
-    return (
-        any(coords_equal(c, c2) for c in remaining1) or
-        any(coords_equal(c, c1) for c in remaining2)
-    )
-
-
-def get_distance_between_tokens(token1, token2):
-    if not are_tokens_on_overlapping_paths(token1, token2):
-        return -1
-    c1 = token1["coordinates"]
-    c2 = token2["coordinates"]
-    gen = EXPANDED_GENERAL_PATH
-    try:
-        i1 = next(i for i, c in enumerate(gen) if coords_equal(c, c1))
-        i2 = next(i for i, c in enumerate(gen) if coords_equal(c, c2))
-    except StopIteration:
-        return -1
-    n = len(gen)
-    fwd = (i2 - i1 + n) % n
-    bwd = (i1 - i2 + n) % n
-    return min(fwd, bwd)
-
-
-def is_token_ahead(token1, token2):
-    if coords_equal(token1["coordinates"], token2["coordinates"]):
-        return False
-    if not are_tokens_on_overlapping_paths(token1, token2):
-        return False
-    path1 = TOKEN_PATHS[token1["colour"]]
-    path2 = TOKEN_PATHS[token2["colour"]]
-    c1    = token1["coordinates"]
-    c2    = token2["coordinates"]
-    min_dist = get_distance_between_tokens(token1, token2)
-    try:
-        idx2 = next(i for i, c in enumerate(path2) if coords_equal(c, c2))
-        idx1 = next(i for i, c in enumerate(path1) if coords_equal(c, c1))
-    except StopIteration:
-        return False
-    for i in range(idx2, len(path2)):
-        if i - idx2 > min_dist:
+    main = []
+    pos = start
+    for _ in range(53):  # máximo 52 passos no tabuleiro principal
+        main.append(pos)
+        if pos == turn_pt:
             break
-        if coords_equal(path2[i], c1):
-            return True
-    for i in range(idx1, len(path1)):
-        if i - idx1 > min_dist:
-            break
-        if coords_equal(path1[i], c2):
-            return False
-    return False
+        pos = (pos + 1) % 52
+
+    return main + lane
+
+
+FULL_PATH = {
+    "blue":   _build_full_path("blue"),
+    "green":  _build_full_path("green"),
+    "red":    _build_full_path("red"),
+    "yellow": _build_full_path("yellow"),
+}
+
+# Conjunto de IDs que são posições seguras (não capturáveis)
+_SAFE_IDS = {
+    0, 13, 26, 39,      # casas de saída
+    8, 21, 34, 47,      # casas seguras intermédias
+    # corredores finais — todos seguros
+    100,101,102,103,104,105,
+    200,201,202,203,204,205,
+    300,301,302,303,304,305,
+    400,401,402,403,404,405,
+}
+
+# Conjunto de IDs de base
+_BASE_ID_SET = {
+    500,501,502,503,
+    600,601,602,603,
+    700,701,702,703,
+    800,801,802,803,
+}
+
+
+def _is_safe_id(pos_id):
+    return pos_id in _SAFE_IDS or pos_id in _BASE_ID_SET
+
+
+def _get_next_pos(colour, current_id, steps):
+    """
+    Avança 'steps' casas no caminho da cor a partir de current_id.
+    Devolve o novo ID, ou None se ultrapassar o fim.
+    """
+    path = FULL_PATH[colour]
+    try:
+        idx = path.index(current_id)
+    except ValueError:
+        return None
+    new_idx = idx + steps
+    if new_idx >= len(path):
+        return None
+    return path[new_idx]
+
+
+def _steps_to_home(colour, current_id):
+    """Quantos passos faltam para chegar a casa."""
+    path = FULL_PATH[colour]
+    try:
+        idx = path.index(current_id)
+    except ValueError:
+        return -1
+    return len(path) - 1 - idx
 
 
 # ══════════════════════════════════════════════════════════════════
-#  LÓGICA DE TOKENS
+#  LÓGICA DE TOKENS — usa IDs numéricos directamente
 # ══════════════════════════════════════════════════════════════════
-
-def get_available_steps(token):
-    return get_distance_in_token_path(
-        token["colour"],
-        token["coordinates"],
-        get_home_coord_for_colour(token["colour"])
-    )
-
-
-def is_token_movable(token, dice_number=None):
-    if token["is_locked"] or token["has_reached_home"]:
-        return False
-    if dice_number is None:
-        return True
-    return get_available_steps(token) >= dice_number
-
 
 def get_movable_tokens(player, dice_number):
+    """
+    Devolve lista de índices de peças que podem mover com este dado.
+    - Peça na base: só pode sair se dado == 6
+    - Peça no tabuleiro/corredor: pode mover se não ultrapassar a casa final
+    - Peça em casa (has_reached_home): nunca move
+    """
     movable = []
     for i, token in enumerate(player["tokens"]):
+        if token["has_reached_home"]:
+            continue
         if token["is_locked"]:
+            # Sai da base apenas com dado 6
             if dice_number == LOGIC_CONFIG["UNLOCK_DICE_VALUE"]:
                 movable.append(i)
-        elif is_token_movable(token, dice_number):
-            movable.append(i)
+        else:
+            # Verifica se pode avançar sem ultrapassar a casa final
+            colour = player["colour"]
+            next_id = _get_next_pos(colour, token["pos_id"], dice_number)
+            if next_id is not None:
+                movable.append(i)
     return movable
 
 
 # ══════════════════════════════════════════════════════════════════
-#  BOT IA
+#  BOT IA — simplificada e correcta com IDs numéricos
 # ══════════════════════════════════════════════════════════════════
 
-def select_best_token_for_bot(bot_colour, dice_number, all_players):
-    all_tokens = [t for p in all_players for t in p["tokens"]]
-    bot_tokens  = [t for t in all_tokens if t["colour"] == bot_colour]
-    movable_bot = [t for t in bot_tokens if (
-        (t["is_locked"] and dice_number == LOGIC_CONFIG["UNLOCK_DICE_VALUE"]) or
-        (not t["is_locked"] and is_token_movable(t, dice_number))
-    )]
-
-    if not movable_bot:
+def select_best_token_for_bot(player, dice_number, all_players):
+    """Escolhe o melhor índice de peça para o bot mover."""
+    movable = get_movable_tokens(player, dice_number)
+    if not movable:
         return None
+    if len(movable) == 1:
+        return movable[0]
 
-    bot_home_coord  = get_home_coord_for_colour(bot_colour)
-    bot_start_coord = TOKEN_PATHS[bot_colour][0]
+    colour    = player["colour"]
+    home_id   = HOME_ID[colour]
+    best_idx  = movable[0]
+    best_score = float("-inf")
 
-    active_opponent_tokens = [
-        t for t in all_tokens
-        if t["colour"] != bot_colour
-        and not t["is_locked"]
-        and not t["has_reached_home"]
-        and any(coords_equal(t["coordinates"], c) for c in EXPANDED_GENERAL_PATH)
-    ]
-
-    token_scores = []
-
-    for token in bot_tokens:
+    for i in movable:
+        token = player["tokens"][i]
         score = 0
-        final_coord = None
-
-        is_unlockable = (
-            token["is_locked"] and
-            not token["has_reached_home"] and
-            dice_number == LOGIC_CONFIG["UNLOCK_DICE_VALUE"]
-        )
-
-        if is_unlockable:
-            score += WEIGHTS["UNLOCK_BONUS"]
-            final_coord = TOKEN_PATHS[token["colour"]][0]
-        else:
-            final_coord = get_final_coord(token, dice_number)
-            if not is_token_movable(token, dice_number):
-                token_scores.append((token, float("-inf")))
-                continue
-
-        if final_coord is None:
-            token_scores.append((token, float("-inf")))
-            continue
-
-        is_final_safe   = is_coord_safe(final_coord, token["colour"])
-        is_current_safe = is_coord_safe(token["coordinates"], token["colour"])
-        bot_tokens_at_home = sum(1 for t in bot_tokens if t["has_reached_home"])
-
-        endgame_mult = (
-            LOGIC_CONFIG["ENDGAME_SCORE_MULTIPLIER"]
-            if bot_tokens_at_home >= LOGIC_CONFIG["ENDGAME_TOKEN_COUNT"]
-            else LOGIC_CONFIG["DEFAULT_MULTIPLIER"]
-        )
-        safety_mult = (
-            LOGIC_CONFIG["SAFETY_SCORE_MULTIPLIER"]
-            if bot_tokens_at_home > LOGIC_CONFIG["SAFETY_TOKEN_COUNT"]
-            else LOGIC_CONFIG["DEFAULT_MULTIPLIER"]
-        )
-
-        for opp in all_tokens:
-            if opp["colour"] == bot_colour:
-                continue
-            if coords_equal(final_coord, opp["coordinates"]) and not is_coord_safe(opp["coordinates"], opp["colour"]):
-                dist_to_end  = get_distance_in_token_path(opp["colour"], opp["coordinates"], get_home_coord_for_colour(opp["colour"]))
-                dist_traveled = len(TOKEN_PATHS[opp["colour"]]) - dist_to_end
-                score += WEIGHTS["CAPTURE_BASE"] + dist_traveled * WEIGHTS["OPPONENT_PROGRESS_MULTIPLIER"]
-
-        if is_final_safe:
-            score += WEIGHTS["SAFE_POSITION_BONUS"]
-
-        in_home_now    = is_coord_in_home_entry_path(token["coordinates"], token["colour"])
-        will_be_home   = is_coord_in_home_entry_path(final_coord, token["colour"])
-        if will_be_home and not in_home_now:
-            score += WEIGHTS["HOME_ENTRY_BONUS"]
-        if in_home_now:
-            score -= WEIGHTS["SAFE_TOKEN_MOVE_PENALTY"]
 
         if token["is_locked"]:
-            token_scores.append((token, score))
-            continue
+            score += WEIGHTS["UNLOCK_BONUS"]
+            # Verificar se a casa de saída está livre de adversários
+            start_id = START_POS_ID[colour]
+            for op in all_players:
+                if op["user_id"] == player["user_id"]:
+                    continue
+                for ot in op["tokens"]:
+                    if not ot["is_locked"] and not ot["has_reached_home"]:
+                        if ot["pos_id"] == start_id:
+                            score += WEIGHTS["CAPTURE_BASE"]
+        else:
+            next_id = _get_next_pos(colour, token["pos_id"], dice_number)
+            if next_id is None:
+                continue
 
-        dist_from_home = get_distance_in_token_path(token["colour"], token["coordinates"], bot_home_coord)
-        movable_bot_tokens = [t for t in bot_tokens if not t["is_locked"] and not t["has_reached_home"]]
+            # Chegar a casa
+            if next_id == home_id:
+                score += WEIGHTS["GOAL_COMPLETION_BONUS"]
 
-        if dist_from_home == dice_number:
-            score += WEIGHTS["GOAL_COMPLETION_BONUS"]
+            # Capturar adversário
+            if not _is_safe_id(next_id):
+                for op in all_players:
+                    if op["user_id"] == player["user_id"]:
+                        continue
+                    for ot in op["tokens"]:
+                        if not ot["is_locked"] and not ot["has_reached_home"]:
+                            if ot["pos_id"] == next_id:
+                                dist = _steps_to_home(op["colour"], next_id)
+                                score += WEIGHTS["CAPTURE_BASE"] + max(0, 52 - dist) * WEIGHTS["OPPONENT_PROGRESS_MULTIPLIER"] // 100
 
-        score -= dist_from_home * WEIGHTS["BASE_DISTANCE_PENALTY"] * endgame_mult
+            # Casa segura é bonus
+            if _is_safe_id(next_id):
+                score += WEIGHTS["SAFE_POSITION_BONUS"]
 
-        opp_in_current = sum(1 for t in active_opponent_tokens if coords_equal(t["coordinates"], token["coordinates"]))
-        is_crowded_safe_rolled6 = (
-            dice_number == LOGIC_CONFIG["UNLOCK_DICE_VALUE"] and
-            is_current_safe and
-            opp_in_current > 0
-        )
-        if is_crowded_safe_rolled6:
-            score += WEIGHTS["CROWDED_EXIT_BONUS"]
+            # Prefere peças mais perto de casa
+            dist = _steps_to_home(colour, token["pos_id"])
+            score -= dist * WEIGHTS["BASE_DISTANCE_PENALTY"] // 100
 
-        bot_in_final = sum(1 for t in movable_bot_tokens if coords_equal(t["coordinates"], final_coord))
-        if bot_in_final > 0 and not is_final_safe:
-            score -= WEIGHTS["UNSAFE_STACKING_PENALTY"]
+            # Penalizar entrar em perigo
+            if not _is_safe_id(next_id):
+                for op in all_players:
+                    if op["user_id"] == player["user_id"]:
+                        continue
+                    for ot in op["tokens"]:
+                        if not ot["is_locked"] and not ot["has_reached_home"]:
+                            ot_next = _get_next_pos(op["colour"], ot["pos_id"], 6)
+                            if ot_next == next_id:
+                                score -= WEIGHTS["IMMINENT_CAPTURE_PENALTY"] // 10
 
-        is_safe_launch_hunter = False
-        has_refunded_distance = False
+        if score > best_score:
+            best_score = score
+            best_idx = i
 
-        for opp in active_opponent_tokens:
-            future_token    = {**token, "coordinates": final_coord}
-            is_ahead_future = is_token_ahead(future_token, opp)
-            future_dist     = get_distance_between_tokens(future_token, opp)
-            is_ahead_now    = is_token_ahead(token, opp)
-            current_dist    = get_distance_between_tokens(token, opp)
-
-            if 1 <= current_dist <= LOGIC_CONFIG["MAX_CHASE_LOOKAHEAD"] and not is_ahead_now:
-                is_threatened = any(
-                    is_token_ahead(token, t) and
-                    1 <= get_distance_between_tokens(token, t) <= LOGIC_CONFIG["MAX_THREAT_LOOKAHEAD"]
-                    for t in active_opponent_tokens
-                )
-                if not is_threatened or is_final_safe:
-                    if current_dist <= LOGIC_CONFIG["CRITICAL_COMBAT_RANGE"]:
-                        score += WEIGHTS["SAFE_HUNT_CRITICAL_RANGE_BONUS"]
-                    score += WEIGHTS["SAFE_CHASE_BASE_BONUS"]
-                    if not is_threatened:
-                        is_safe_launch_hunter = True
-                elif current_dist <= LOGIC_CONFIG["RISKY_HUNT_RANGE"]:
-                    score += WEIGHTS["RISKY_CHASE_BASE_BONUS"]
-                    if current_dist <= LOGIC_CONFIG["CRITICAL_COMBAT_RANGE"]:
-                        score += WEIGHTS["RISKY_HUNT_CRITICAL_RANGE_BONUS"]
-
-            if (1 <= current_dist <= LOGIC_CONFIG["MAX_THREAT_LOOKAHEAD"] and
-                    is_ahead_now and not is_current_safe):
-                dist_from_start = len(TOKEN_PATHS[token["colour"]]) - dist_from_home
-                if dist_from_start > LOGIC_CONFIG["HIGH_INVESTMENT_DIST"]:
-                    score += WEIGHTS["HIGH_INVESTMENT_ESCAPE_PRIORITY"]
-                else:
-                    score += WEIGHTS["LOW_INVESTMENT_ESCAPE_PRIORITY"]
-
-            if future_dist >= 1 and future_dist <= LOGIC_CONFIG["MAX_THREAT_LOOKAHEAD"] and is_ahead_future:
-                threats = [
-                    t for t in active_opponent_tokens
-                    if is_token_ahead(future_token, t) and
-                    1 <= get_distance_between_tokens(future_token, t) <= LOGIC_CONFIG["DANGER_ZONE_RANGE"]
-                ]
-                is_going_into_danger = (
-                    is_ahead_future and not is_ahead_now and
-                    not is_final_safe and len(threats) > 0
-                )
-                if is_going_into_danger:
-                    dist_from_start = len(TOKEN_PATHS[token["colour"]]) - dist_from_home
-                    score -= WEIGHTS["IMMINENT_CAPTURE_PENALTY"] * len(threats) * max(1, dist_from_start / 2)
-
-                is_escaping = is_ahead_now and future_dist > current_dist and not is_current_safe
-                if is_escaping or (is_final_safe and is_ahead_now and not is_current_safe):
-                    if is_escaping:
-                        score += (future_dist - current_dist) * WEIGHTS["ESCAPE_DISTANCE_MULTIPLIER"]
-                    if current_dist <= LOGIC_CONFIG["CRITICAL_COMBAT_RANGE"]:
-                        if is_escaping:
-                            score += WEIGHTS["CRITICAL_ESCAPE_BONUS"]
-                        if not has_refunded_distance:
-                            score += dist_from_home * WEIGHTS["BASE_DISTANCE_PENALTY"] * endgame_mult
-                            has_refunded_distance = True
-                    if is_final_safe:
-                        score += WEIGHTS["SAFE_HAVEN_BONUS"]
-                    elif is_escaping:
-                        score -= WEIGHTS["UNSAFE_ESCAPE_PENALTY"]
-                else:
-                    is_protected = is_final_safe or will_be_home
-                    if not is_protected and is_current_safe and not is_going_into_danger:
-                        score -= WEIGHTS["SAFE_SPOT_ABANDONMENT_PENALTY"] * safety_mult
-
-        bot_in_current = sum(1 for t in movable_bot_tokens if coords_equal(t["coordinates"], token["coordinates"]))
-        if is_current_safe and not is_safe_launch_hunter and not is_crowded_safe_rolled6:
-            score -= WEIGHTS["SAFE_SPOT_EXIT_PENALTY"]
-        elif bot_in_current > 1:
-            score += bot_in_current * WEIGHTS["STACK_SPLIT_BONUS"]
-
-        token_scores.append((token, score))
-
-    if not token_scores:
-        return None
-
-    max_score = max(s for _, s in token_scores)
-    best = [t for t, s in token_scores if s == max_score]
-    chosen = random.choice(best)
-    return chosen["id"]
+    return best_idx
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -584,7 +295,7 @@ class GameManager:
         self.max_players = max_players
         self.players     = []
         self.turn        = 0
-        self.phase       = 0
+        self.phase       = 0   # 0=lançar dado, 1=mover peça
         self.dice        = 0
         self.round       = 0
         self.over        = False
@@ -594,7 +305,7 @@ class GameManager:
         self.started     = False
         self._add_player(host_user_id, host_name)
 
-    # ── Gestão de jogadores ──
+    # ── Gestão de jogadores ──────────────────────────────────────
 
     def _colour_for_index(self, idx):
         return self.COLOUR_ORDER[idx % len(self.COLOUR_ORDER)]
@@ -614,13 +325,14 @@ class GameManager:
         })
 
     def _gen_tokens(self, colour):
-        locked_coords = TOKEN_LOCKED_COORDINATES[colour]
+        """Cria 4 tokens na base com pos_id correcto."""
+        base_ids = BASE_IDS[colour]
         tokens = []
         for i in range(4):
             tokens.append({
                 "id":               i,
                 "colour":           colour,
-                "coordinates":      locked_coords[i],
+                "pos_id":           base_ids[i],   # ID numérico para o frontend
                 "is_locked":        True,
                 "has_reached_home": False,
             })
@@ -650,7 +362,7 @@ class GameManager:
             return None
         return self.players[self.turn % len(self.players)]
 
-    # ── Início do jogo ──
+    # ── Início do jogo ──────────────────────────────────────────
 
     def start(self):
         if self.started:
@@ -663,9 +375,14 @@ class GameManager:
         self._log(f"🎮 Jogo iniciado com {len(self.players)} jogadores!")
         return True, None
 
-    # ── Rolar dado ──
+    # ── Rolar dado ──────────────────────────────────────────────
 
     def roll_dice(self, user_id):
+        """
+        Rola o dado. Devolve (value, error).
+        NÃO auto-move — o frontend escolhe a peça.
+        Só passa a vez automaticamente se não há jogadas possíveis.
+        """
         if not self.started or self.over:
             return None, "Jogo não está em curso."
         cur = self.get_current_player()
@@ -674,25 +391,24 @@ class GameManager:
         if self.phase != 0:
             return None, "Já rolaste o dado."
 
-        value = random.randint(1, 6)
+        value      = random.randint(1, 6)
         self.dice  = value
         self.phase = 1
 
         self._log(f"🎲 {cur['name']} tirou {value}")
 
         movable = get_movable_tokens(cur, value)
-        if not movable:
-            self._log(f"↩️ {cur['name']} tirou {value} — sem jogadas, passa a vez")
-            self._next_turn(rolled_six=(value == 6))
-            return value, None
 
-        # Só uma peça pode mover → mover automaticamente
-        if len(movable) == 1:
-            self._do_move(cur, movable[0])
+        if not movable:
+            # Sem jogadas — passa a vez
+            self._log(f"↩️ {cur['name']} sem jogadas possíveis, passa a vez")
+            self.phase = 0
+            self.dice  = 0
+            self._next_turn(rolled_six=(value == 6))
 
         return value, None
 
-    # ── Obter peças movíveis ──
+    # ── Peças movíveis ──────────────────────────────────────────
 
     def get_movable(self, user_id):
         cur = self.get_current_player()
@@ -700,7 +416,7 @@ class GameManager:
             return []
         return get_movable_tokens(cur, self.dice)
 
-    # ── Mover peça ──
+    # ── Mover peça ──────────────────────────────────────────────
 
     def move_piece(self, user_id, piece_idx):
         if not self.started or self.over:
@@ -724,93 +440,94 @@ class GameManager:
         dice   = self.dice
 
         if token["is_locked"]:
-            start = TOKEN_PATHS[colour][0]
-            token["coordinates"] = start
-            token["is_locked"]   = False
-            self._log(f"🚀 {player['name']}: peça {piece_idx+1} saiu da base!")
+            # Sair da base: coloca na posição de saída
+            start_id = START_POS_ID[colour]
+            token["pos_id"]    = start_id
+            token["is_locked"] = False
+            self._log(f"🚀 {player['name']}: peça {piece_idx + 1} saiu da base!")
+            # Verificar captura na casa de saída
+            self._check_capture(player, start_id)
         else:
-            path    = TOKEN_PATHS[colour]
-            cur_idx = next((i for i, c in enumerate(path) if coords_equal(c, token["coordinates"])), -1)
-            if cur_idx == -1:
+            next_id = _get_next_pos(colour, token["pos_id"], dice)
+            if next_id is None:
+                # Não devia acontecer — movable já filtrou
                 return
-            new_idx = cur_idx + dice
-            if new_idx >= len(path):
-                return
-            new_coord = path[new_idx]
-            token["coordinates"] = new_coord
 
-            if coords_equal(new_coord, path[-1]):
+            token["pos_id"] = next_id
+
+            if next_id == HOME_ID[colour]:
                 token["has_reached_home"] = True
                 player["fin"] += 1
-                self._log(f"🏠 {player['name']}: peça {piece_idx+1} chegou a casa!")
+                self._log(f"🏠 {player['name']}: peça {piece_idx + 1} chegou a casa!")
                 if player["fin"] == 4:
                     self._end_game(player)
                     return
             else:
-                self._log(f"♟️ {player['name']} moveu peça {piece_idx+1}")
-                self._check_capture(player, new_coord)
+                self._log(f"♟️ {player['name']} moveu peça {piece_idx + 1}")
+                self._check_capture(player, next_id)
 
         rolled_six = (dice == LOGIC_CONFIG["UNLOCK_DICE_VALUE"])
+        self.phase = 0
+        self.dice  = 0
         self._next_turn(rolled_six=rolled_six)
 
-    def _check_capture(self, moving_player, coord):
-        if is_coord_safe(coord):
+    def _check_capture(self, moving_player, pos_id):
+        """Captura adversários na posição pos_id (se não for casa segura)."""
+        if _is_safe_id(pos_id):
             return
         for player in self.players:
             if player["user_id"] == moving_player["user_id"]:
                 continue
             for token in player["tokens"]:
-                if not token["is_locked"] and not token["has_reached_home"] and coords_equal(token["coordinates"], coord):
-                    # Volta para a posição correta na base (coordenadas alinhadas com CMAP)
-                    locked_coords = TOKEN_LOCKED_COORDINATES[player["colour"]]
-                    token["coordinates"] = locked_coords[token["id"]]
-                    token["is_locked"]   = True
+                if token["is_locked"] or token["has_reached_home"]:
+                    continue
+                if token["pos_id"] == pos_id:
+                    # Devolver à base
+                    token["pos_id"]    = BASE_IDS[player["colour"]][token["id"]]
+                    token["is_locked"] = True
                     self._log(f"💀 {moving_player['name']} capturou peça de {player['name']}!")
 
-    # ── Turno seguinte ──
+    # ── Turno seguinte ──────────────────────────────────────────
 
     def _next_turn(self, rolled_six=False):
-        self.phase = 0
-        self.dice  = 0
-
         if rolled_six:
             self.consecutive_sixes += 1
             if self.consecutive_sixes >= 3:
                 self.consecutive_sixes = 0
-                self._log(f"⚠️ Três seis seguidos — perde a vez!")
+                self._log("⚠️ Três seis seguidos — perde a vez!")
                 self._advance_turn()
             else:
-                self._log(f"🎯 {self.get_current_player()['name']} joga novamente (tirou 6)!")
+                self._log(f"🎯 {self.get_current_player()['name']} joga novamente!")
+                # Mantém o turno, apenas reinicia fase
         else:
             self.consecutive_sixes = 0
             self._advance_turn()
 
     def _advance_turn(self):
-        active = [p for p in self.players if p["fin"] < 4]
-        if not active:
-            return
         n = len(self.players)
+        if n == 0:
+            return
         for _ in range(n):
             self.turn = (self.turn + 1) % n
             if self.players[self.turn]["fin"] < 4:
                 break
         self.round += 1
 
-    # ── Fim de jogo ──
+    # ── Fim de jogo ─────────────────────────────────────────────
 
     def _end_game(self, winner_player):
         self.over   = True
         self.winner = winner_player["user_id"]
         self._log(f"🏆 {winner_player['name']} VENCEU a partida!")
 
-    # ── Log ──
+    # ── Log ─────────────────────────────────────────────────────
 
     def _log(self, msg):
         self.log.append(msg)
         if len(self.log) > 50:
             self.log = self.log[-50:]
 
-    # ── Bot ──
+    # ── Bot ─────────────────────────────────────────────────────
 
     def bot_turn(self, bot_user_id):
         cur = self.get_current_player()
@@ -821,40 +538,37 @@ class GameManager:
         if err:
             return None, err
 
+        # Se ainda está na fase 1 (há jogadas disponíveis)
         if self.phase == 1:
-            best_idx = select_best_token_for_bot(cur["colour"], dice, self.players)
+            best_idx = select_best_token_for_bot(cur, dice, self.players)
             if best_idx is not None:
                 self._do_move(cur, best_idx)
 
         return self.state_dict(bot_user_id), None
 
-    # ── Estado serializável ──
-    # CRÍTICO: envia pos[] com IDs numéricos que o frontend (CMAP) entende.
-    # Cada pos[i] é um inteiro: 0-51 (tabuleiro), 100-405 (corredores), 500-803 (bases).
+    # ── Estado serializável ─────────────────────────────────────
+    # Envia pos[] e in_base[] para o frontend (ludo_board_v2.js)
 
     def state_dict(self, requesting_user_id=None):
         players_out = []
         for p in self.players:
-            pos_list = []
+            pos_list     = []
+            in_base_list = []
+
             for t in p["tokens"]:
-                if t["is_locked"]:
-                    # Base: ID fixo por índice da peça
-                    pos_id = BASE_IDS[p["colour"]][t["id"]]
-                elif t["has_reached_home"]:
-                    pos_id = HOME_ID[p["colour"]]
-                else:
-                    pos_id = _coord_to_pos_id(p["colour"], t["coordinates"], t["id"])
-                pos_list.append(pos_id)
+                pos_list.append(t["pos_id"])
+                in_base_list.append(1 if t["is_locked"] else 0)
 
             players_out.append({
-                "user_id": p["user_id"],
-                "name":    p["name"],
-                "color":   p["colour"],   # frontend lê "color" ou "colour"
-                "colour":  p["colour"],
-                "idx":     p["idx"],
-                "fin":     p["fin"],
-                "is_bot":  p["is_bot"],
-                "pos":     pos_list,      # ← array de IDs numéricos para o CMAP
+                "user_id":  p["user_id"],
+                "name":     p["name"],
+                "color":    p["colour"],   # frontend usa "color"
+                "colour":   p["colour"],
+                "idx":      p["idx"],
+                "fin":      p["fin"],
+                "is_bot":   p["is_bot"],
+                "pos":      pos_list,       # IDs numéricos → CMAP do frontend
+                "in_base":  in_base_list,   # 1=na base, 0=em jogo
             })
 
         return {
