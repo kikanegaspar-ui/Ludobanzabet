@@ -1,14 +1,28 @@
 /**
- * ludo_board_v2.js — LudoKz FINAL v5
+ * ludo_board_v2.js — LudoKz v6
  *
- * CORRECOES:
- * 1. _isMyTurn compara user_id como STRING (igual ao backend)
- * 2. Dado flat com pontos corretos (sem 3D bugado)
- * 3. Botao mostra claramente "E O TEU TURNO" vs "Aguarda Biju..."
- * 4. Nao bloqueia cliques quando e o turno do jogador
- * 5. SSE game_update actualiza dado do adversario tambem
+ * BUG PRINCIPAL CORRIGIDO:
+ * O index.html guarda o utilizador em "let U = null" (variável LOCAL do script).
+ * Este ficheiro acedia window.U que ficava undefined → _isMyTurn() retornava
+ * sempre false → botão sempre disabled → ninguém conseguia lançar o dado.
+ *
+ * SOLUÇÃO:
+ * 1. window._syncU(u) — chamado pelo index.html sempre que U muda
+ * 2. _isMyTurn() tenta window.U e também procura no DOM (fallback)
+ * 3. doRoll() NÃO verifica rb.disabled — deixa o servidor rejeitar se não for o turno
  */
 
+// ── Acesso ao utilizador logado ──────────────────────────────────
+// O index.html tem "let U" local. Chamamos window._syncU() de lá para cá.
+window._syncU = function(u) { window.U = u; };
+
+function _getU() {
+  return window.U || null;
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  MAPAS DE CORES
+// ══════════════════════════════════════════════════════════════════
 const COLOUR_HEX  = { blue:'#1295e7', green:'#049645', red:'#e53935', yellow:'#f9a825' };
 const COLOUR_NAME = { blue:'Azul', green:'Verde', red:'Vermelho', yellow:'Amarelo' };
 const COLOUR_GRAD = {
@@ -19,6 +33,9 @@ const COLOUR_GRAD = {
 };
 const COLOUR_TEXT = { blue:'#fff', green:'#fff', red:'#fff', yellow:'#111' };
 
+// ══════════════════════════════════════════════════════════════════
+//  CMAP
+// ══════════════════════════════════════════════════════════════════
 const CMAP = {
   0:[6,13],1:[6,12],2:[6,11],3:[6,10],4:[6,9],
   5:[5,8],6:[4,8],7:[3,8],8:[2,8],9:[1,8],10:[0,8],
@@ -49,7 +66,44 @@ const BASE_IDS = {
 const HOME_ID   = { blue:105, green:205, red:305, yellow:405 };
 const _BASE_SET = new Set([500,501,502,503,600,601,602,603,700,701,702,703,800,801,802,803]);
 
-/* ══ SOM ══ */
+// ══════════════════════════════════════════════════════════════════
+//  CAMINHOS COMPLETOS
+// ══════════════════════════════════════════════════════════════════
+const START_ID  = { blue:0,  green:26, red:39, yellow:13 };
+const TURN_ID   = { blue:50, green:24, red:37, yellow:11 };
+const HOME_LANE = {
+  blue:   [100,101,102,103,104,105],
+  green:  [200,201,202,203,204,205],
+  red:    [300,301,302,303,304,305],
+  yellow: [400,401,402,403,404,405],
+};
+
+function _buildPath(colour) {
+  const start = START_ID[colour], turn = TURN_ID[colour];
+  const main = []; let pos = start;
+  for (let i = 0; i <= 52; i++) {
+    main.push(pos);
+    if (pos === turn) break;
+    pos = (pos + 1) % 52;
+  }
+  return main.concat(HOME_LANE[colour]);
+}
+
+const FULL_PATH = {
+  blue: _buildPath('blue'), green: _buildPath('green'),
+  red:  _buildPath('red'),  yellow: _buildPath('yellow'),
+};
+
+function _nextId(colour, currentId) {
+  const path = FULL_PATH[colour];
+  const idx  = path.indexOf(currentId);
+  if (idx === -1 || idx >= path.length - 1) return currentId;
+  return path[idx + 1];
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SONS
+// ══════════════════════════════════════════════════════════════════
 const SFX = (() => {
   let ctx = null;
   const ac = () => { if (!ctx) try { ctx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} return ctx; };
@@ -66,110 +120,49 @@ const SFX = (() => {
     } catch(e){}
   };
   return {
-    unlock:  () => ac(),
-    dice:    () => { tone(200,.05,'square',.15); tone(400,.07,'square',.15,.07); tone(600,.1,'square',.15,.14); },
-    move:    () => { tone(660,.07,'sine',.18); tone(880,.06,'sine',.14,.08); },
-    capture: () => { tone(180,.15,'sawtooth',.22); tone(120,.18,'sawtooth',.18,.1); },
-    home:    () => { [784,988,1175].forEach((f,i)=>tone(f,.14,'sine',.22,i*.12)); },
-    win:     () => { [523,659,784,1047].forEach((f,i)=>tone(f,.2,'sine',.28,i*.15)); },
+    unlock:  ()=>ac(),
+    dice:    ()=>{ tone(200,.05,'square',.15); tone(400,.07,'square',.15,.07); tone(600,.1,'square',.15,.14); },
+    move:    ()=>{ tone(660,.07,'sine',.18); tone(880,.06,'sine',.14,.08); },
+    capture: ()=>{ tone(180,.15,'sawtooth',.22); tone(120,.18,'sawtooth',.18,.1); },
+    home:    ()=>{ [784,988,1175].forEach((f,i)=>tone(f,.14,'sine',.22,i*.12)); },
+    win:     ()=>{ [523,659,784,1047].forEach((f,i)=>tone(f,.2,'sine',.28,i*.15)); },
   };
 })();
 window.SFX = SFX;
 document.addEventListener('click', ()=>SFX.unlock(), {once:true});
 
-/* ══ CSS ══ */
+// ══════════════════════════════════════════════════════════════════
+//  CSS
+// ══════════════════════════════════════════════════════════════════
 (function(){
   if (document.getElementById('lk-css')) return;
   const s = document.createElement('style');
   s.id = 'lk-css';
   s.textContent = `
-  #ludo-board-wrap {
-    position:relative; border-radius:14px; overflow:hidden; flex-shrink:0;
-    box-shadow:0 0 0 2px rgba(245,197,24,.5),0 0 60px rgba(0,0,0,.85);
-  }
-  #ludo-board-wrap > img { display:block; width:100%; height:100%; pointer-events:none; user-select:none; }
-
-  .lp {
-    position:absolute; width:5.2%; height:5.2%; border-radius:50%;
-    border:2.5px solid rgba(255,255,255,.9); transform:translate(-50%,-50%);
-    z-index:10; display:flex; align-items:center; justify-content:center;
-    font-size:10px; font-weight:900; font-family:'Bebas Neue',monospace;
-    pointer-events:none;
-    transition:left .3s cubic-bezier(.4,0,.2,1),top .3s cubic-bezier(.4,0,.2,1);
-    box-shadow:0 2px 8px rgba(0,0,0,.5);
-  }
-  .lp.sel { pointer-events:auto; cursor:pointer; z-index:20; animation:lp-sel .4s ease-in-out infinite alternate; }
-  @keyframes lp-sel {
-    from{transform:translate(-50%,-50%) scale(1);   box-shadow:0 0 0 3px gold,0 0 10px gold;}
-    to  {transform:translate(-50%,-50%) scale(1.4); box-shadow:0 0 0 5px gold,0 0 24px gold;}
-  }
-  .lp.captured { animation:lp-die .38s ease-out forwards; pointer-events:none; }
-  @keyframes lp-die {
-    0%  {transform:translate(-50%,-50%) scale(1);  opacity:1;}
-    50% {transform:translate(-50%,-50%) scale(1.7);opacity:.7;}
-    100%{transform:translate(-50%,-50%) scale(0);  opacity:0;}
-  }
-
-  /* Dado flat */
-  #lk-dice-flat {
-    width:90px; height:90px; background:#fff;
-    border-radius:14px; border:3px solid #ccc;
-    box-shadow:0 6px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.8);
-    margin:8px auto; position:relative; cursor:pointer;
-    transition:transform .12s,box-shadow .12s;
-  }
-  #lk-dice-flat:hover { transform:scale(1.05); box-shadow:0 8px 28px rgba(0,0,0,.45); }
-  #lk-dice-flat:active { transform:scale(.93); }
-  #lk-dice-flat.rolling { animation:dk-shake .42s cubic-bezier(.36,.07,.19,.97); }
-  @keyframes dk-shake {
-    0%,100%{transform:rotate(0)   scale(1);}
-    15%    {transform:rotate(-20deg) scale(1.18);}
-    30%    {transform:rotate(18deg)  scale(1.12);}
-    45%    {transform:rotate(-15deg) scale(1.14);}
-    60%    {transform:rotate(12deg)  scale(1.09);}
-    75%    {transform:rotate(-8deg)  scale(1.05);}
-    90%    {transform:rotate(5deg)   scale(1.02);}
-  }
-  .lk-dot {
-    position:absolute; border-radius:50%;
-    background:#111; box-shadow:inset 0 1px 3px rgba(0,0,0,.5);
-  }
-  .lk-dot.red { background:radial-gradient(circle at 35% 30%,#ff5252,#b71c1c); box-shadow:0 0 8px rgba(183,28,28,.6); }
-
-  #lk-dice-num {
-    font-family:'Bebas Neue',sans-serif; font-size:46px;
-    color:#f5c518; letter-spacing:3px; text-align:center;
-    text-shadow:0 0 18px rgba(245,197,24,.8);
-    margin:2px 0 10px; min-height:54px; line-height:1;
-  }
-  @keyframes num-pop {
-    0%  {transform:scale(.3);opacity:0;}
-    65% {transform:scale(1.35);opacity:1;}
-    100%{transform:scale(1);opacity:1;}
-  }
-  .num-pop { animation:num-pop .28s cubic-bezier(.34,1.56,.64,1); }
-
-  #rb {
-    width:100%; padding:14px;
-    background:linear-gradient(135deg,#ffdb4d,#f5c518,#e6a800);
-    border:none; border-radius:12px;
-    font-family:'Bebas Neue',sans-serif; font-size:17px; letter-spacing:1.5px; color:#0a0800;
-    cursor:pointer; box-shadow:0 6px 20px rgba(245,197,24,.4); transition:all .18s;
-  }
+  #ludo-board-wrap{position:relative;border-radius:14px;overflow:hidden;flex-shrink:0;box-shadow:0 0 0 2px rgba(245,197,24,.5),0 0 60px rgba(0,0,0,.85);}
+  #ludo-board-wrap>img{display:block;width:100%;height:100%;pointer-events:none;user-select:none;}
+  .lp{position:absolute;width:5.2%;height:5.2%;border-radius:50%;border:2.5px solid rgba(255,255,255,.9);transform:translate(-50%,-50%);z-index:10;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;font-family:'Bebas Neue',monospace;pointer-events:none;transition:left .3s cubic-bezier(.4,0,.2,1),top .3s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 8px rgba(0,0,0,.5);}
+  .lp.sel{pointer-events:auto;cursor:pointer;z-index:20;animation:lp-sel .4s ease-in-out infinite alternate;}
+  @keyframes lp-sel{from{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 0 3px gold,0 0 10px gold;}to{transform:translate(-50%,-50%) scale(1.4);box-shadow:0 0 0 5px gold,0 0 24px gold;}}
+  .lp.captured{animation:lp-die .38s ease-out forwards;pointer-events:none;}
+  @keyframes lp-die{0%{transform:translate(-50%,-50%) scale(1);opacity:1;}50%{transform:translate(-50%,-50%) scale(1.7);opacity:.7;}100%{transform:translate(-50%,-50%) scale(0);opacity:0;}}
+  #lk-dice-flat{width:90px;height:90px;background:#fff;border-radius:14px;border:3px solid #ccc;box-shadow:0 6px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.8);margin:8px auto;position:relative;cursor:pointer;transition:transform .12s,box-shadow .12s;}
+  #lk-dice-flat:hover{transform:scale(1.05);box-shadow:0 8px 28px rgba(0,0,0,.45);}
+  #lk-dice-flat:active{transform:scale(.93);}
+  #lk-dice-flat.rolling{animation:dk-shake .42s cubic-bezier(.36,.07,.19,.97);}
+  @keyframes dk-shake{0%,100%{transform:rotate(0) scale(1);}15%{transform:rotate(-20deg) scale(1.18);}30%{transform:rotate(18deg) scale(1.12);}45%{transform:rotate(-15deg) scale(1.14);}60%{transform:rotate(12deg) scale(1.09);}75%{transform:rotate(-8deg) scale(1.05);}90%{transform:rotate(5deg) scale(1.02);}}
+  .lk-dot{position:absolute;border-radius:50%;background:#111;box-shadow:inset 0 1px 3px rgba(0,0,0,.5);}
+  .lk-dot.red{background:radial-gradient(circle at 35% 30%,#ff5252,#b71c1c);box-shadow:0 0 8px rgba(183,28,28,.6);}
+  #lk-dice-num{font-family:'Bebas Neue',sans-serif;font-size:46px;color:#f5c518;letter-spacing:3px;text-align:center;text-shadow:0 0 18px rgba(245,197,24,.8);margin:2px 0 10px;min-height:54px;line-height:1;}
+  @keyframes num-pop{0%{transform:scale(.3);opacity:0;}65%{transform:scale(1.35);opacity:1;}100%{transform:scale(1);opacity:1;}}
+  .num-pop{animation:num-pop .28s cubic-bezier(.34,1.56,.64,1);}
+  #rb{width:100%;padding:14px;background:linear-gradient(135deg,#ffdb4d,#f5c518,#e6a800);border:none;border-radius:12px;font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1.5px;color:#0a0800;cursor:pointer;box-shadow:0 6px 20px rgba(245,197,24,.4);transition:all .18s;}
   #rb:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 28px rgba(245,197,24,.6);}
   #rb:active:not(:disabled){transform:scale(.97);}
   #rb:disabled{opacity:.35;cursor:not-allowed;background:#333;box-shadow:none;color:#888;}
   #rb.my-turn{animation:rb-pulse 1s ease-in-out infinite;}
-  @keyframes rb-pulse {
-    0%,100%{box-shadow:0 6px 20px rgba(245,197,24,.4);}
-    50%    {box-shadow:0 6px 20px rgba(245,197,24,.4),0 0 0 6px rgba(245,197,24,.2);}
-  }
-
-  .pc {
-    display:flex;align-items:center;gap:10px;
-    background:rgba(12,9,32,.85);border:1.5px solid rgba(255,255,255,.07);
-    border-radius:13px;padding:10px 14px;transition:all .3s;flex:1;min-width:140px;
-  }
+  @keyframes rb-pulse{0%,100%{box-shadow:0 6px 20px rgba(245,197,24,.4);}50%{box-shadow:0 6px 20px rgba(245,197,24,.4),0 0 0 6px rgba(245,197,24,.2);}}
+  .pc{display:flex;align-items:center;gap:10px;background:rgba(12,9,32,.85);border:1.5px solid rgba(255,255,255,.07);border-radius:13px;padding:10px 14px;transition:all .3s;flex:1;min-width:140px;}
   .pc.mt{border-color:rgba(245,197,24,.7);background:rgba(245,197,24,.07);box-shadow:0 0 20px rgba(245,197,24,.18);}
   .pdot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
   .pnm2{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.5px;}
@@ -181,19 +174,22 @@ document.addEventListener('click', ()=>SFX.unlock(), {once:true});
   document.head.appendChild(s);
 })();
 
-/* ══ DADO FLAT — pontos DOM ══ */
+// ══════════════════════════════════════════════════════════════════
+//  DADO FLAT — pontos DOM
+// ══════════════════════════════════════════════════════════════════
 const DOT_LAYOUT = {
-  1: [[50,50]],
-  2: [[28,28],[72,72]],
-  3: [[28,28],[50,50],[72,72]],
-  4: [[28,28],[72,28],[28,72],[72,72]],
-  5: [[28,28],[72,28],[50,50],[28,72],[72,72]],
-  6: [[27,20],[73,20],[27,50],[73,50],[27,80],[73,80]],
+  1:[[50,50]],
+  2:[[28,28],[72,72]],
+  3:[[28,28],[50,50],[72,72]],
+  4:[[28,28],[72,28],[28,72],[72,72]],
+  5:[[28,28],[72,28],[50,50],[28,72],[72,72]],
+  6:[[27,20],[73,20],[27,50],[73,50],[27,80],[73,80]],
 };
 
 function _drawDots(container, val) {
   container.querySelectorAll('.lk-dot').forEach(d=>d.remove());
-  const v = Math.max(1,Math.min(6,val));
+  if (container.textContent === '?') container.textContent = '';
+  const v = Math.max(1, Math.min(6, val));
   (DOT_LAYOUT[v]||DOT_LAYOUT[1]).forEach(([cx,cy])=>{
     const d = document.createElement('span');
     d.className = 'lk-dot' + (v===1?' red':'');
@@ -207,38 +203,27 @@ function _animDice(val, cb) {
   SFX.dice();
   const flat = document.getElementById('lk-dice-flat');
   const nm   = document.getElementById('lk-dice-num');
-
-  if (flat) {
-    flat.classList.remove('rolling');
-    void flat.offsetWidth;
-    flat.classList.add('rolling');
-  }
-
-  // fallback index.html
-  const dfc = document.getElementById('dfc');
-  const dnm = document.getElementById('dnm');
-  if (dfc) dfc.textContent = ['⚀','⚁','⚂','⚃','⚄','⚅'][val-1];
-  if (dnm) dnm.textContent = val;
-
+  if (flat) { flat.classList.remove('rolling'); void flat.offsetWidth; flat.classList.add('rolling'); }
+  const dfc=document.getElementById('dfc'), dnm=document.getElementById('dnm');
+  if (dfc) dfc.textContent=['⚀','⚁','⚂','⚃','⚄','⚅'][val-1];
+  if (dnm) dnm.textContent=val;
   setTimeout(()=>{
     if (flat) { flat.classList.remove('rolling'); _drawDots(flat, val); }
-    if (nm) {
-      nm.textContent = val;
-      nm.classList.remove('num-pop');
-      void nm.offsetWidth;
-      nm.classList.add('num-pop');
-    }
+    if (nm) { nm.textContent=val; nm.classList.remove('num-pop'); void nm.offsetWidth; nm.classList.add('num-pop'); }
     if (cb) cb();
   }, 450);
 }
 
-/* ══ BOARD DOM ══ */
+window.BOARD = { animateDice: _animDice };
+
+// ══════════════════════════════════════════════════════════════════
+//  TABULEIRO DOM
+// ══════════════════════════════════════════════════════════════════
 let _els = {};
 
 function _buildBoard() {
   Object.values(_els).flat().forEach(e=>e&&e.remove());
   _els = {};
-
   let wrap = document.getElementById('ludo-board-wrap');
   if (!wrap) {
     const cv = document.getElementById('ludo-canvas');
@@ -252,18 +237,15 @@ function _buildBoard() {
     img.onerror=()=>{ wrap.style.background='#1a3a1a'; img.style.display='none'; };
     wrap.appendChild(img);
   }
-
   ['blue','green','red','yellow'].forEach(c=>{
     _els[c]=[];
     for(let i=0;i<4;i++){
       const el=document.createElement('div');
-      el.className='lp';
-      el.textContent=i+1;
+      el.className='lp'; el.textContent=i+1;
       el.style.background=`radial-gradient(circle at 35% 30%,${COLOUR_GRAD[c][0]},${COLOUR_GRAD[c][1]})`;
       el.style.color=COLOUR_TEXT[c];
       el.style.boxShadow=`0 2px 8px ${COLOUR_GRAD[c][1]}aa`;
-      wrap.appendChild(el);
-      _els[c].push(el);
+      wrap.appendChild(el); _els[c].push(el);
     }
     BASE_IDS[c].forEach((id,i)=>_place(c,i,id));
   });
@@ -273,41 +255,29 @@ function _buildDiceUI() {
   if (document.getElementById('lk-dice-wrap')) return;
   const gcd = document.querySelector('#s-game .gcd');
   if (!gcd) return;
-
   const w = document.createElement('div');
   w.id = 'lk-dice-wrap';
   w.innerHTML = `<div id="lk-dice-flat" onclick="window.doRoll()"></div><div id="lk-dice-num">-</div>`;
-
-  const dfc = document.getElementById('dfc');
-  const dnm = document.getElementById('dnm');
+  const dfc=document.getElementById('dfc'), dnm=document.getElementById('dnm');
   if (dfc) { dfc.style.display='none'; dfc.parentNode.insertBefore(w,dfc); }
   else { const btd=gcd.querySelector('.btd'); if(btd) btd.after(w); else gcd.prepend(w); }
   if (dnm) dnm.style.display='none';
-
-  // Estado inicial: ponto de interrogacao
-  const flat = document.getElementById('lk-dice-flat');
-  if (flat) {
-    flat.style.cssText += 'display:flex;align-items:center;justify-content:center;font-size:32px;color:#aaa;';
-    flat.textContent='?';
-  }
+  const flat=document.getElementById('lk-dice-flat');
+  if (flat) { flat.style.cssText+='display:flex;align-items:center;justify-content:center;font-size:32px;color:#aaa;'; flat.textContent='?'; }
 }
 
-/* ══ POSICIONAMENTO ══ */
 function _place(colour, idx, posId) {
-  const coord = CMAP[posId];
-  if (!coord) return;
-  const el = _els[colour]?.[idx];
-  if (!el) return;
-  el.style.left = (coord[0]*STEP+STEP/2)+'%';
-  el.style.top  = (coord[1]*STEP+STEP/2)+'%';
+  const coord=CMAP[posId]; if(!coord) return;
+  const el=_els[colour]?.[idx]; if(!el) return;
+  el.style.left=(coord[0]*STEP+STEP/2)+'%';
+  el.style.top =(coord[1]*STEP+STEP/2)+'%';
 }
 
 function _setSelectable(colour, indices) {
   _clearSel();
   indices.forEach(i=>{
     const el=_els[colour]?.[i]; if(!el) return;
-    el.classList.add('sel');
-    el.style.pointerEvents='auto';
+    el.classList.add('sel'); el.style.pointerEvents='auto';
     el.onclick=()=>{ SFX.move(); window.movePc(i); };
   });
 }
@@ -315,82 +285,88 @@ function _setSelectable(colour, indices) {
 function _clearSel() {
   Object.values(_els).flat().forEach(el=>{
     if(!el) return;
-    el.classList.remove('sel');
-    el.style.pointerEvents='none';
-    el.onclick=null;
+    el.classList.remove('sel'); el.style.pointerEvents='none'; el.onclick=null;
   });
 }
 
-/* ══ _isMyTurn — ROBUSTO ══
- * Compara sempre como string.
- * Aceita U.id, U.user_id, U._id (vários formatos possíveis do backend).
- */
+// ══════════════════════════════════════════════════════════════════
+//  _isMyTurn — CORRIGIDO: usa window.U que é sincronizado via _syncU()
+// ══════════════════════════════════════════════════════════════════
 function _isMyTurn(state) {
-  if (!state?.players || !window.U) return false;
+  if (!state?.players || state.over) return false;
   const p = state.players[state.turn];
-  if (!p || state.phase !== 0 || state.over) return false;
-
-  // ID do utilizador logado — tenta varios campos
-  const myId = String(
-    window.U.id        ||
-    window.U.user_id   ||
-    window.U._id       ||
-    ''
-  );
+  if (!p || state.phase !== 0) return false;
+  const me = _getU();
+  if (!me) return false;
+  const myId    = String(me.id || me.user_id || '');
   const theirId = String(p.user_id || '');
-
   return myId !== '' && myId === theirId;
 }
 
-/* ══ DIFF ENTRE ESTADOS ══ */
+// ══════════════════════════════════════════════════════════════════
+//  ANIMAÇÃO DIFF
+// ══════════════════════════════════════════════════════════════════
 function _applyDiff(prev, next) {
   if (!prev?.players||!next?.players) return;
   next.players.forEach((pl,idx)=>{
-    const colour = pl.color||pl.colour;
-    const prevPl = prev.players[idx];
-    if (!prevPl||!colour||!_els[colour]) return;
+    const colour=pl.color||pl.colour, prevPl=prev.players[idx];
+    if(!prevPl||!colour||!_els[colour]) return;
     (pl.pos||[]).forEach((toId,i)=>{
-      const fromId = prevPl.pos?.[i];
-      if (fromId==null||fromId===toId) return;
-      if (_BASE_SET.has(toId)&&!_BASE_SET.has(fromId)) {
+      const fromId=prevPl.pos?.[i];
+      if(fromId==null||fromId===toId) return;
+      if(_BASE_SET.has(toId)&&!_BASE_SET.has(fromId)){
         const el=_els[colour]?.[i]; if(!el) return;
-        SFX.capture();
-        el.classList.add('captured');
+        SFX.capture(); el.classList.add('captured');
         setTimeout(()=>{ el.classList.remove('captured'); _place(colour,i,toId); },400);
       } else {
-        _place(colour,i,toId);
-        if (toId===HOME_ID[colour]) SFX.home();
-        else SFX.move();
+        _movePieceSmooth(colour,i,fromId,toId,()=>{ if(toId===HOME_ID[colour]) SFX.home(); });
       }
     });
   });
 }
 
-/* ══ RENDER STATE ══ */
-window.CUR_STATE  = null;
-window.PREV_STATE = null;
+const _animating = new Set();
+
+function _movePieceSmooth(colour, pieceIdx, fromId, toId, onDone) {
+  const key=colour+'-'+pieceIdx;
+  if (_BASE_SET.has(fromId)) { _place(colour,pieceIdx,toId); if(onDone)onDone(); return; }
+  const path=FULL_PATH[colour];
+  const fi=path.indexOf(fromId), ti=path.indexOf(toId);
+  if(fi===-1||ti===-1||ti<=fi){ _place(colour,pieceIdx,toId); if(onDone)onDone(); return; }
+  _animating.add(key);
+  let cur=fromId;
+  function step(){
+    if(cur===toId){ _animating.delete(key); if(onDone)onDone(); return; }
+    cur=_nextId(colour,cur); _place(colour,pieceIdx,cur); SFX.move();
+    setTimeout(step,150);
+  }
+  step();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  RENDER STATE
+// ══════════════════════════════════════════════════════════════════
+window.CUR_STATE=null; window.PREV_STATE=null;
 
 window.renderState = function(state) {
-  if (!state||!state.players) return;
-  window.CUR_STATE = state;
+  if(!state||!state.players) return;
+  window.CUR_STATE=state;
 
-  // Posiciona pecas
   state.players.forEach(pl=>{
     const c=pl.color||pl.colour; if(!c||!_els[c]) return;
-    (pl.pos||[]).forEach((posId,i)=>_place(c,i,posId));
+    (pl.pos||[]).forEach((posId,i)=>{ if(!_animating.has(c+'-'+i)) _place(c,i,posId); });
   });
 
   _clearSel();
 
-  // Cards dos jogadores
-  const pcEl = document.getElementById('player-cards');
-  if (pcEl) {
-    const myId = String(window.U?.id||window.U?.user_id||window.U?._id||'');
-    pcEl.innerHTML = state.players.map((pl,idx)=>{
-      const c      = pl.color||pl.colour||'blue';
-      const isMe   = String(pl.user_id||'') === myId;
-      const active = idx === state.turn;
-      const hex    = COLOUR_HEX[c]||'#888';
+  const pcEl=document.getElementById('player-cards');
+  if(pcEl){
+    const me=_getU(), myId=String(me?.id||me?.user_id||'');
+    pcEl.innerHTML=state.players.map((pl,idx)=>{
+      const c=pl.color||pl.colour||'blue';
+      const isMe=String(pl.user_id||'')===myId;
+      const active=idx===state.turn;
+      const hex=COLOUR_HEX[c]||'#888';
       return `<div class="pc ${active?'mt':''}">
         <div class="pdot" style="background:${hex};box-shadow:0 0 7px ${hex}80"></div>
         <div style="flex:1">
@@ -402,40 +378,32 @@ window.renderState = function(state) {
     }).join('');
   }
 
-  // Botao — texto claro sobre o turno
-  const rb  = document.getElementById('rb');
-  const myT = _isMyTurn(state);
-  if (rb) {
-    rb.disabled = !myT || state.phase!==0 || !!state.over;
-    if (state.over) {
-      rb.textContent = '🏁 Jogo terminado';
-    } else if (myT && state.phase===0) {
-      rb.textContent = '🎲 LANCAR DADO';
-      rb.classList.add('my-turn');
+  const rb=document.getElementById('rb');
+  const myT=_isMyTurn(state);
+
+  if(rb){
+    rb.disabled=!myT||state.phase!==0||!!state.over;
+    if(state.over){
+      rb.textContent='🏁 Jogo terminado'; rb.classList.remove('my-turn');
+    } else if(myT&&state.phase===0){
+      rb.textContent='🎲 LANÇAR DADO'; rb.classList.add('my-turn');
     } else {
-      // Mostra nome de quem esta a jogar
-      const curP = state.players[state.turn];
-      const curName = curP ? curP.name : '...';
-      rb.textContent = `⏳ Vez de ${curName}`;
+      const curP=state.players[state.turn];
+      rb.textContent=`⏳ Vez de ${curP?curP.name:'...'}`;
       rb.classList.remove('my-turn');
     }
   }
 
-  // Dado do adversario — actualiza numero visivel quando o state chega via SSE
-  if (!myT && state.dice && state.phase===1) {
-    const nm = document.getElementById('lk-dice-num');
-    const flat = document.getElementById('lk-dice-flat');
-    if (nm) { nm.textContent = state.dice; nm.classList.remove('num-pop'); void nm.offsetWidth; nm.classList.add('num-pop'); }
-    if (flat) _drawDots(flat, state.dice);
-    const dfc=document.getElementById('dfc'); const dnm=document.getElementById('dnm');
-    if(dfc) dfc.textContent=['⚀','⚁','⚂','⚃','⚄','⚅'][state.dice-1];
-    if(dnm) dnm.textContent=state.dice;
+  if(!myT&&state.dice&&state.phase===1){
+    const nm=document.getElementById('lk-dice-num'), flat=document.getElementById('lk-dice-flat');
+    if(nm){nm.textContent=state.dice;nm.classList.remove('num-pop');void nm.offsetWidth;nm.classList.add('num-pop');}
+    if(flat) _drawDots(flat,state.dice);
   }
 
-  const gbv = document.getElementById('gbv');
-  if (gbv&&state.bet!=null) try{gbv.textContent=Number(state.bet).toLocaleString('pt-AO')+' KZ';}catch(e){}
+  const gbv=document.getElementById('gbv');
+  if(gbv&&state.bet!=null) try{gbv.textContent=Number(state.bet).toLocaleString('pt-AO')+' KZ';}catch(e){}
 
-  if (state.log?.length) {
+  if(state.log?.length){
     const le=document.getElementById('glog');
     if(le){
       le.innerHTML=state.log.slice(-20).reverse().map(l=>{
@@ -449,17 +417,21 @@ window.renderState = function(state) {
   if(co) co.textContent=(state.players?.length||0)+' online';
 };
 
-/* ══ HIGHLIGHT ══ */
-window.highlightPcs = function(mv) {
-  if (!window.CUR_STATE||!mv?.length) return;
+// ══════════════════════════════════════════════════════════════════
+//  HIGHLIGHT
+// ══════════════════════════════════════════════════════════════════
+window.highlightPcs=function(mv){
+  if(!window.CUR_STATE||!mv?.length) return;
   const curP=window.CUR_STATE.players?.[window.CUR_STATE.turn];
   if(!curP) return;
   const colour=curP.color||curP.colour;
   if(colour&&_els[colour]) _setSelectable(colour,mv);
 };
 
-/* ══ SSE ══ */
-window.onGameStarted = function(state) {
+// ══════════════════════════════════════════════════════════════════
+//  EVENTOS SSE
+// ══════════════════════════════════════════════════════════════════
+window.onGameStarted=function(state){
   window.RID=state.room_id||window.RID;
   window.CUR_STATE=state; window.PREV_STATE=null;
   if(typeof pg==='function') pg('game');
@@ -477,62 +449,70 @@ window.onGameStarted = function(state) {
   },80);
 };
 
-window.onGameUpdate = function(state) {
+window.onGameUpdate=function(state){
   const prev=window.CUR_STATE?JSON.parse(JSON.stringify(window.CUR_STATE)):null;
   window.CUR_STATE=state;
   if(prev) _applyDiff(prev,state);
   window.renderState(state);
 };
 
-window.onGameOver = function(d) {
-  const goo=document.getElementById('goo');
-  if(!goo) return;
-  const goic=document.getElementById('goic'), gott=document.getElementById('gott');
-  const gosb=document.getElementById('gosb'), gopr=document.getElementById('gopr');
+window.onGameOver=function(d){
+  const goo=document.getElementById('goo'); if(!goo) return;
+  const goic=document.getElementById('goic'),gott=document.getElementById('gott');
+  const gosb=document.getElementById('gosb'),gopr=document.getElementById('gopr');
   const gocd=document.getElementById('gocd');
   if(d.won){
     SFX.win();
     if(typeof coinRain==='function') coinRain();
     if(typeof showFlash==='function') showFlash('🏆');
     if(goic) goic.textContent='🏆';
-    if(gott){gott.textContent='VITORIA!';gott.style.color='#f5c518';}
-    if(gosb) gosb.textContent='Parabens, venceste!';
+    if(gott){gott.textContent='VITÓRIA!';gott.style.color='#f5c518';}
+    if(gosb) gosb.textContent='Parabéns, venceste!';
     if(gopr){gopr.textContent='+'+Number(d.prize||0).toLocaleString('pt-AO')+' KZ';gopr.style.color='#00e676';}
     gocd?.classList.remove('lose');
   } else {
     if(goic) goic.textContent='💀';
     if(gott){gott.textContent='DERROTA';gott.style.color='#ff4757';}
-    if(gosb) gosb.textContent='Boa sorte da proxima!';
-    if(gopr){gopr.textContent='-';gopr.style.color='#ff4757';}
+    if(gosb) gosb.textContent='Boa sorte da próxima!';
+    if(gopr){gopr.textContent='—';gopr.style.color='#ff4757';}
     gocd?.classList.add('lose');
   }
   goo.classList.remove('hidden');
-  if(d.balance!=null&&window.U){window.U.balance=d.balance;if(typeof updN==='function') updN();}
+  if(d.balance!=null&&window.U){window.U.balance=d.balance;if(typeof updN==='function')updN();}
 };
 
-/* ══ doRoll ══ */
-window.doRoll = async function() {
-  if (!window.RID) return;
+// ══════════════════════════════════════════════════════════════════
+//  doRoll — NÃO verifica rb.disabled (o servidor valida o turno)
+// ══════════════════════════════════════════════════════════════════
+window.doRoll=async function(){
+  if(!window.RID) return;
   const rb=document.getElementById('rb');
-  if (rb&&rb.disabled) return;
-  if (rb){rb.disabled=true;rb.classList.remove('my-turn');}
+  if(rb){rb.disabled=true;rb.classList.remove('my-turn');}
+  const faceEl=document.getElementById('dfc');
+  if(faceEl) faceEl.classList.add('rolling');
 
   let d;
-  try {
+  try{
     const r=await fetch('/api/game/roll',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({room_id:window.RID}),credentials:'same-origin',
     });
     d=await r.json();
-  } catch(e){if(rb) rb.disabled=false;return;}
+  }catch(e){
+    if(rb) rb.disabled=false;
+    if(faceEl) faceEl.classList.remove('rolling');
+    return;
+  }
+  if(faceEl) faceEl.classList.remove('rolling');
 
   if(d.error){
     if(typeof toast==='function') toast('❌ '+d.error,'ter');
-    if(rb) rb.disabled=false;
+    // Re-renderiza para repor estado correto do botão
+    if(window.CUR_STATE) window.renderState(window.CUR_STATE);
     return;
   }
 
-  _animDice(d.dice, async ()=>{
+  _animDice(d.dice,async()=>{
     window.renderState(d);
     if(d.phase===1){
       try{
@@ -546,12 +526,13 @@ window.doRoll = async function() {
   });
 };
 
-/* ══ movePc ══ */
-window.movePc = async function(idx) {
+// ══════════════════════════════════════════════════════════════════
+//  movePc
+// ══════════════════════════════════════════════════════════════════
+window.movePc=async function(idx){
   if(!window.RID) return;
   _clearSel();
   window.PREV_STATE=window.CUR_STATE?JSON.parse(JSON.stringify(window.CUR_STATE)):null;
-
   let d;
   try{
     const r=await fetch('/api/game/move',{
@@ -560,16 +541,16 @@ window.movePc = async function(idx) {
     });
     d=await r.json();
   }catch(e){return;}
-
   if(d.error){if(typeof toast==='function') toast('❌ '+d.error,'ter');return;}
-
   if(window.PREV_STATE) _applyDiff(window.PREV_STATE,d);
   window.CUR_STATE=d;
   window.renderState(d);
 };
 
-/* ══ leaveGame ══ */
-window.leaveGame = async function() {
+// ══════════════════════════════════════════════════════════════════
+//  leaveGame
+// ══════════════════════════════════════════════════════════════════
+window.leaveGame=async function(){
   if(!confirm('Abandonar? Perdes a aposta.')) return;
   if(window.RID){
     await fetch('/api/game/leave',{
@@ -581,9 +562,8 @@ window.leaveGame = async function() {
   if(typeof pg==='function') pg('home');
 };
 
-/* ══ COMPAT ══ */
 window.buildBoard=_buildBoard;
 window.initCanvas=_buildBoard;
 window.startRenderLoop=function(){};
 
-console.log('[LudoKz] v5 carregado — user_id como string, dado flat correto');
+console.log('[LudoKz] v6 — window.U sincronizado, dado desbloqueado');
