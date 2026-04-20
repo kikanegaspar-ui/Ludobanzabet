@@ -1,11 +1,6 @@
 /**
- * ludo_board_v2.js — LudoKz FINAL
- * - Pecas saem da base com dado 6
- * - Dado rapido (520ms)
- * - Som toca UMA vez por movimento
- * - Highlight vibrante nas pecas seleccionaveis
- * - Movimento suave via CSS transition (sem lag)
- * - Botao mostra "Aguarda" quando nao e o teu turno
+ * ludo_board_v2.js — LudoKz FINAL v4
+ * CORRIGIDO: dado 3D mostra face correta para cada valor
  */
 
 const COLOUR_HEX  = { blue:'#1295e7', green:'#049645', red:'#e53935', yellow:'#f9a825' };
@@ -47,7 +42,7 @@ const BASE_IDS = {
   red:[700,701,702,703],
   yellow:[800,801,802,803],
 };
-const HOME_ID  = { blue:105, green:205, red:305, yellow:405 };
+const HOME_ID   = { blue:105, green:205, red:305, yellow:405 };
 const _BASE_SET = new Set([500,501,502,503,600,601,602,603,700,701,702,703,800,801,802,803]);
 
 /* ══ SOM ══ */
@@ -76,7 +71,6 @@ const SFX = (() => {
     capture: () => { tone(180,0.15,'sawtooth',0.22); tone(120,0.18,'sawtooth',0.18,0.1); },
     home:    () => { [784,988,1175].forEach((f,i) => tone(f,0.14,'sine',0.22,i*0.12)); },
     win:     () => { [523,659,784,1047].forEach((f,i) => tone(f,0.2,'sine',0.28,i*0.15)); },
-    turn:    () => { tone(880,0.07,'sine',0.16); tone(1100,0.09,'sine',0.16,0.09); },
   };
 })();
 window.SFX = SFX;
@@ -124,48 +118,55 @@ document.addEventListener('click', () => SFX.unlock(), { once: true });
     50%  { transform:translate(-50%,-50%) scale(1.7); opacity:.7; }
     100% { transform:translate(-50%,-50%) scale(0);   opacity:0; }
   }
-  .lk-dice-scene { perspective:600px; width:88px; height:88px; margin:6px auto; cursor:pointer; }
-  .lk-dice-3d {
-    position:relative; width:88px; height:88px;
-    transform-style:preserve-3d;
-    transition:transform .4s cubic-bezier(.34,1.2,.64,1);
+
+  /* ── DADO FLAT (sem 3D bugado) ── */
+  #lk-dice-flat {
+    width:88px; height:88px;
+    background:#fff;
+    border-radius:14px;
+    border:3px solid #ccc;
+    box-shadow:0 6px 20px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.8);
+    margin:8px auto;
+    display:grid;
+    position:relative;
+    cursor:pointer;
+    transition:transform .12s;
   }
-  @keyframes lk-roll {
-    0%  { transform:rotateX(0)      rotateY(0); }
-    30% { transform:rotateX(220deg) rotateY(130deg); }
-    65% { transform:rotateX(380deg) rotateY(250deg); }
-    100%{ transform:rotateX(360deg) rotateY(360deg); }
+  #lk-dice-flat:hover { transform:scale(1.06); }
+  #lk-dice-flat:active { transform:scale(.94); }
+  #lk-dice-flat.rolling {
+    animation:dice-shake .45s cubic-bezier(.36,.07,.19,.97);
   }
-  .lk-dice-3d.rolling { animation:lk-roll .5s ease-out; }
-  .lk-face {
-    position:absolute; width:82px; height:82px;
-    border-radius:11px; border:2px solid #bbb;
-    background:linear-gradient(145deg,#f5f3f0,#fff);
-    box-sizing:border-box;
+  @keyframes dice-shake {
+    0%,100%{ transform:rotate(0deg) scale(1); }
+    15%    { transform:rotate(-18deg) scale(1.15); }
+    30%    { transform:rotate(16deg)  scale(1.1); }
+    45%    { transform:rotate(-14deg) scale(1.12); }
+    60%    { transform:rotate(12deg)  scale(1.08); }
+    75%    { transform:rotate(-8deg)  scale(1.05); }
+    90%    { transform:rotate(5deg)   scale(1.02); }
   }
-  .lk-face.f1 { transform:translateZ(42px); }
-  .lk-face.f6 { transform:rotateX(180deg) translateZ(42px); }
-  .lk-face.f2 { transform:rotateY(-90deg) translateZ(42px); }
-  .lk-face.f5 { transform:rotateY(90deg)  translateZ(42px); }
-  .lk-face.f3 { transform:rotateX(-90deg) translateZ(42px); }
-  .lk-face.f4 { transform:rotateX(90deg)  translateZ(42px); }
   .lk-dot {
-    position:absolute; border-radius:50%;
-    background:#111; box-shadow:inset 0 1px 2px rgba(0,0,0,.4);
+    position:absolute;
+    border-radius:50%;
+    background:#111;
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.5);
   }
-  .lk-dot.rdot { background:radial-gradient(circle at 35% 30%,#ff6b6b,#c41230); }
+  .lk-dot.red { background:radial-gradient(circle at 35% 30%,#ff5252,#b71c1c); box-shadow:0 0 6px rgba(183,28,28,.5); }
+
   #lk-dice-num {
-    font-family:'Bebas Neue',sans-serif; font-size:42px;
+    font-family:'Bebas Neue',sans-serif; font-size:44px;
     color:#f5c518; letter-spacing:3px; text-align:center;
-    text-shadow:0 0 16px rgba(245,197,24,.7);
-    margin:0 0 8px; min-height:50px; line-height:1;
+    text-shadow:0 0 18px rgba(245,197,24,.8);
+    margin:2px 0 10px; min-height:52px; line-height:1;
   }
   @keyframes num-pop {
-    0%  { transform:scale(.4); opacity:0; }
-    65% { transform:scale(1.3); opacity:1; }
-    100%{ transform:scale(1);  opacity:1; }
+    0%  { transform:scale(.3); opacity:0; }
+    65% { transform:scale(1.35); opacity:1; }
+    100%{ transform:scale(1);   opacity:1; }
   }
-  .num-pop { animation:num-pop .28s cubic-bezier(.34,1.56,.64,1); }
+  .num-pop { animation:num-pop .3s cubic-bezier(.34,1.56,.64,1); }
+
   #rb {
     width:100%; padding:13px;
     background:linear-gradient(135deg,#ffdb4d,#f5c518,#e6a800);
@@ -188,93 +189,69 @@ document.addEventListener('click', () => SFX.unlock(), { once: true });
     border-radius:13px; padding:10px 14px;
     transition:all .3s; flex:1; min-width:140px;
   }
-  .pc.mt {
-    border-color:rgba(245,197,24,.7);
-    background:rgba(245,197,24,.07);
-    box-shadow:0 0 20px rgba(245,197,24,.18);
-  }
+  .pc.mt { border-color:rgba(245,197,24,.7); background:rgba(245,197,24,.07); box-shadow:0 0 20px rgba(245,197,24,.18); }
   .pdot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
   .pnm2 { font-family:'Bebas Neue',sans-serif; font-size:15px; letter-spacing:.5px; }
   .pft  { font-size:10px; color:#4a4470; font-weight:700; margin-top:1px; }
   .gli  { padding:4px 0; border-bottom:1px solid rgba(255,255,255,.04); color:#9890c0; font-size:12px; font-weight:600; line-height:1.5; }
   .gli:last-child { border:none; }
-  .gli.w { color:#00e676; }
-  .gli.k { color:#ff4757; }
-  .gli.r { color:#f5c518; }
+  .gli.w { color:#00e676; } .gli.k { color:#ff4757; } .gli.r { color:#f5c518; }
   `;
   document.head.appendChild(s);
 })();
 
-/* ══ DADO 3D ══ */
-const DOT_POS = {
-  1:[[50,50]],
-  2:[[27,27],[73,73]],
-  3:[[27,27],[50,50],[73,73]],
-  4:[[27,27],[73,27],[27,73],[73,73]],
-  5:[[27,27],[73,27],[50,50],[27,73],[73,73]],
-  6:[[27,20],[73,20],[27,50],[73,50],[27,80],[73,80]],
+/* ══ DADO FLAT — pontos posicionados correctamente ══
+ *
+ * Layout dos pontos para cada face (em % do tamanho da face 88x88):
+ * Coordenadas [cx%, cy%] do centro de cada ponto
+ */
+const DOT_LAYOUT = {
+  1: [[50,50]],
+  2: [[28,28],[72,72]],
+  3: [[28,28],[50,50],[72,72]],
+  4: [[28,28],[72,28],[28,72],[72,72]],
+  5: [[28,28],[72,28],[50,50],[28,72],[72,72]],
+  6: [[28,22],[72,22],[28,50],[72,50],[28,78],[72,78]],
 };
-const DOT_SZ = 12;
-const DICE_ROT = {
-  1:'rotateX(0deg) rotateY(0deg)',
-  2:'rotateX(90deg) rotateY(0deg)',
-  3:'rotateX(0deg) rotateY(-90deg)',
-  4:'rotateX(0deg) rotateY(90deg)',
-  5:'rotateX(-90deg) rotateY(0deg)',
-  6:'rotateX(180deg) rotateY(0deg)',
-};
+const DOT_R = 8; // raio do ponto em px
 
-function _makeFace(fn, val, isF1) {
-  const f = document.createElement('div');
-  f.className = 'lk-face f' + fn;
-  const v = Math.min(6, Math.max(1, val));
-  (DOT_POS[v] || DOT_POS[1]).forEach(([cx, cy], i) => {
-    const isRed = isF1 && v === 1 && i === 0;
+function _renderDotsFace(container, val) {
+  // Limpa pontos anteriores
+  container.querySelectorAll('.lk-dot').forEach(d => d.remove());
+  const v = Math.max(1, Math.min(6, val));
+  (DOT_LAYOUT[v] || DOT_LAYOUT[1]).forEach(([cx, cy], i) => {
     const d = document.createElement('span');
-    d.className = 'lk-dot' + (isRed ? ' rdot' : '');
-    const sz = isRed ? 15 : DOT_SZ;
+    // Ponto vermelho central para o 1
+    d.className = 'lk-dot' + (v === 1 ? ' red' : '');
+    const sz = v === 1 ? 18 : DOT_R * 2;
     d.style.cssText = `width:${sz}px;height:${sz}px;left:calc(${cx}% - ${sz/2}px);top:calc(${cy}% - ${sz/2}px);`;
-    f.appendChild(d);
-  });
-  return f;
-}
-
-function _setDiceFaces(val) {
-  const el = document.getElementById('lk-dice-3d');
-  if (!el) return;
-  el.innerHTML = '';
-  const opp = {1:6,2:5,3:4,4:3,5:2,6:1};
-  const fv = { f1:val, f6:opp[val], f2:2, f5:5, f3:3, f4:4 };
-  ['f1','f2','f3','f4','f5','f6'].forEach((fn, i) => {
-    el.appendChild(_makeFace(i + 1, fv[fn], fn === 'f1'));
+    container.appendChild(d);
   });
 }
 
 function _animDice(val, cb) {
   SFX.dice();
-  const el = document.getElementById('lk-dice-3d');
-  const nm = document.getElementById('lk-dice-num');
+  const flat = document.getElementById('lk-dice-flat');
+  const nm   = document.getElementById('lk-dice-num');
 
-  if (el) {
-    _setDiceFaces(val);
-    el.style.transition = 'none';
-    el.style.transform  = 'rotateX(0deg) rotateY(0deg)';
-    el.classList.remove('rolling');
-    void el.offsetWidth;
-    el.classList.add('rolling');
+  if (flat) {
+    flat.classList.remove('rolling');
+    void flat.offsetWidth;
+    flat.classList.add('rolling');
   }
 
+  // Fallback emoji para index.html
   const dfc = document.getElementById('dfc');
   const dnm = document.getElementById('dnm');
   const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
   if (dfc) dfc.textContent = faces[val - 1];
   if (dnm) dnm.textContent = val;
 
+  // Mostra o valor correcto ao fim da animação (450ms)
   setTimeout(() => {
-    if (el) {
-      el.classList.remove('rolling');
-      el.style.transition = 'transform .4s cubic-bezier(.34,1.2,.64,1)';
-      el.style.transform  = DICE_ROT[val] || DICE_ROT[1];
+    if (flat) {
+      flat.classList.remove('rolling');
+      _renderDotsFace(flat, val); // <-- renderiza face CORRETA
     }
     if (nm) {
       nm.textContent = val;
@@ -283,7 +260,7 @@ function _animDice(val, cb) {
       nm.classList.add('num-pop');
     }
     if (cb) cb();
-  }, 520);
+  }, 460);
 }
 
 /* ══ TABULEIRO DOM ══ */
@@ -331,9 +308,9 @@ function _buildDiceUI() {
 
   const w = document.createElement('div');
   w.id = 'lk-dice-wrap';
+  // Dado flat em vez do 3D bugado
   w.innerHTML = `
-    <div class="lk-dice-scene" onclick="window.doRoll()">
-      <div class="lk-dice-3d" id="lk-dice-3d"></div>
+    <div id="lk-dice-flat" onclick="window.doRoll()" title="Clica para lancar">
     </div>
     <div id="lk-dice-num">-</div>`;
 
@@ -342,7 +319,17 @@ function _buildDiceUI() {
   if (dfc) { dfc.style.display = 'none'; dfc.parentNode.insertBefore(w, dfc); }
   else { const btd = gcd.querySelector('.btd'); if (btd) btd.after(w); else gcd.prepend(w); }
   if (dnm) dnm.style.display = 'none';
-  _setDiceFaces(1);
+
+  // Mostra "?" inicial
+  const flat = document.getElementById('lk-dice-flat');
+  if (flat) {
+    flat.style.display = 'flex';
+    flat.style.alignItems = 'center';
+    flat.style.justifyContent = 'center';
+    flat.style.fontSize = '28px';
+    flat.style.color = '#ccc';
+    flat.textContent = '?';
+  }
 }
 
 /* ══ POSICIONAMENTO ══ */
@@ -481,14 +468,11 @@ window.onGameStarted = function(state) {
   window.RID        = state.room_id || window.RID;
   window.CUR_STATE  = state;
   window.PREV_STATE = null;
-
   if (typeof pg === 'function') pg('game');
-
   setTimeout(() => {
     _buildBoard();
     _buildDiceUI();
     window.renderState(state);
-
     const chatEl = document.getElementById('chat-msgs');
     if (chatEl) chatEl.innerHTML = '';
     if (typeof addChat === 'function') {
@@ -517,7 +501,6 @@ window.onGameOver = function(d) {
   const gopr = document.getElementById('gopr');
   const gocd = document.getElementById('gocd');
   if (!goo) return;
-
   if (d.won) {
     SFX.win();
     if (typeof coinRain  === 'function') coinRain();
@@ -535,7 +518,6 @@ window.onGameOver = function(d) {
     gocd?.classList.add('lose');
   }
   goo.classList.remove('hidden');
-
   if (d.balance != null && window.U) {
     window.U.balance = d.balance;
     if (typeof updN === 'function') updN();
@@ -632,4 +614,4 @@ window.buildBoard      = _buildBoard;
 window.initCanvas      = _buildBoard;
 window.startRenderLoop = function() {};
 
-console.log('[LudoKz] ludo_board_v2.js FINAL carregado OK');
+console.log('[LudoKz] ludo_board_v2.js v4 carregado OK');
