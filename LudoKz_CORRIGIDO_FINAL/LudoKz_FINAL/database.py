@@ -18,10 +18,6 @@ BLOCKED_DOMAINS = {
     "mailexpire.com","throwaway.email","getnada.com","moakt.com","spamwc.de"
 }
 
-# Bónus de boas-vindas e de 10 partidas
-WELCOME_BONUS    = 1000
-TEN_GAMES_BONUS  = 2000
-
 # Referidos: bónus a cada 5 registados
 REFERRAL_BONUS_PER_GROUP = 500
 REFERRAL_GROUP_SIZE      = 5
@@ -37,7 +33,6 @@ def _c():
 def init_db():
     c = _c(); cur = c.cursor()
 
-    # ── Tabelas base ──────────────────────────────────────────
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
         id SERIAL PRIMARY KEY,
@@ -161,7 +156,7 @@ def init_db():
     );
     """)
 
-    # ── Migracoes: adiciona colunas novas se ainda nao existirem ──
+    # Migrações
     _migrations = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS welcome_bonus_claimed BOOLEAN DEFAULT FALSE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS ten_games_bonus_claimed BOOLEAN DEFAULT FALSE",
@@ -172,7 +167,29 @@ def init_db():
         except Exception:
             c.rollback()
 
-    # ── Jackpot inicial se nao existir ──
+    # ── REMOVER SALDOS DE BÓNUS DE TODOS OS UTILIZADORES ──
+    # Zera saldo de todos os utilizadores que tenham saldo proveniente apenas de bónus
+    # (saldo > 0 e nunca fizeram depósito aprovado)
+    try:
+        cur.execute("""
+            UPDATE users
+            SET balance = 0,
+                welcome_bonus_claimed = FALSE,
+                ten_games_bonus_claimed = FALSE
+            WHERE id NOT IN (
+                SELECT DISTINCT user_id FROM deposits WHERE status = 'approved'
+            )
+            AND balance > 0
+        """)
+        # Remove transações de bónus de boas-vindas e de 10 partidas
+        cur.execute("""
+            DELETE FROM transactions
+            WHERE type IN ('welcome_bonus', 'ten_games_bonus')
+        """)
+    except Exception:
+        c.rollback()
+
+    # Jackpot inicial
     cur.execute("SELECT id FROM jackpot LIMIT 1")
     if not cur.fetchone():
         cur.execute("INSERT INTO jackpot(value) VALUES(245000)")
@@ -226,26 +243,23 @@ def validate_email(email):
 
 # ── USERS ────────────────────────────────────────────────────────────
 def create_user(phone, pw, name, age_confirmed=False, terms_accepted=False, ref_code=""):
+    """Cria utilizador SEM bónus de boas-vindas. Saldo inicial = 0."""
     c = _c(); cur = c.cursor()
     try:
         cur.execute(
             """INSERT INTO users(phone,password,name,phone_verified,age_confirmed,terms_accepted,
-               balance,welcome_bonus_claimed)
-               VALUES(%s,%s,%s,0,%s,%s,%s,FALSE) RETURNING id""",
+               balance,welcome_bonus_claimed,ten_games_bonus_claimed)
+               VALUES(%s,%s,%s,0,%s,%s,%s,TRUE,FALSE) RETURNING id""",
             (phone, _h(pw), name.strip(),
              1 if age_confirmed else 0,
              1 if terms_accepted else 0,
-             WELCOME_BONUS))          # bónus de boas-vindas creditado imediatamente
+             0))   # saldo inicial ZERO — sem bónus
         uid = cur.fetchone()['id']
         c.commit()
     except Exception as e:
         c.rollback(); cur.close(); c.close()
         raise ValueError("Número já registado.") from e
 
-    # Regista transação do bónus de boas-vindas
-    cur.execute(
-        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-        (uid, 'welcome_bonus', WELCOME_BONUS, "Bónus de boas-vindas"))
     cur.execute("UPDATE otp_codes SET used=1 WHERE phone=%s AND used=0", (phone,))
     c.commit(); cur.close(); c.close()
 
@@ -322,14 +336,8 @@ def refund_bet(uid, amount):
     c.commit(); cur.close(); c.close()
 
 def credit_prize(winner_id, loser_ids, bet, prize, rounds, room_id=""):
-    """
-    Credita o prémio ao vencedor, actualiza estatísticas de todos
-    e regista o histórico da partida.
-    A aposta já foi debitada em _collect_reservations — não debitar aqui.
-    """
     c = _c(); cur = c.cursor()
 
-    # Credita prémio e estatísticas do vencedor
     cur.execute("""
         UPDATE users
         SET balance      = balance + %s,
@@ -339,9 +347,8 @@ def credit_prize(winner_id, loser_ids, bet, prize, rounds, room_id=""):
         WHERE id = %s
     """, (prize, prize, winner_id))
 
-    # Estatísticas dos perdedores (aposta já debitada antes)
     for lid in loser_ids:
-        if lid > 0:   # ignora IDs de admin/bot
+        if lid > 0:
             cur.execute("""
                 UPDATE users
                 SET games_played = games_played + 1,
@@ -349,7 +356,6 @@ def credit_prize(winner_id, loser_ids, bet, prize, rounds, room_id=""):
                 WHERE id = %s
             """, (lid,))
 
-    # Histórico da partida
     all_players = [winner_id] + list(loser_ids)
     cur.execute("""
         INSERT INTO game_history(room_id, players, winner_id, bet, prize, rounds)
@@ -388,7 +394,6 @@ def get_user_games(uid, limit=30):
 
 # ── DEPÓSITOS ────────────────────────────────────────────────────────
 def create_deposit(uid, amount, ref, payer_name=""):
-    # Limite diário de depósito: 100.000 Kz
     DAILY_LIMIT = 100000
     from datetime import date
     today = date.today().isoformat()
@@ -453,12 +458,6 @@ def get_user_deposits(uid, limit=15):
 
 # ── LEVANTAMENTOS ────────────────────────────────────────────────────
 def create_withdrawal(uid, amount, express_num, account_name):
-    """
-    Taxa: 10% para a plataforma.
-    Limite diário: 50.000 Kz.
-    Sem restrições de bónus — o jogador pode sacar livremente
-    (apenas respeitando o limite diário e o saldo disponível).
-    """
     DAILY_LIMIT  = 50000
     MIN_AMOUNT   = 1000
 
@@ -469,14 +468,13 @@ def create_withdrawal(uid, amount, express_num, account_name):
     if not account_name or len(account_name.strip()) < 3:
         return None, "Nome da conta obrigatório para verificação."
 
-    net = round(amount * (1 - PLATFORM_FEE), 2)   # 90% para o jogador
+    net = round(amount * (1 - PLATFORM_FEE), 2)
 
     from datetime import date
     today = date.today().isoformat()
 
     c = _c(); cur = c.cursor()
 
-    # Verifica limite diário de saque
     cur.execute(
         "SELECT COALESCE(SUM(amount),0) AS total FROM withdrawals WHERE user_id=%s AND status IN ('pending','completed') AND created_at LIKE %s",
         (uid, today + '%'))
@@ -486,23 +484,19 @@ def create_withdrawal(uid, amount, express_num, account_name):
         cur.close(); c.close()
         return None, f"Limite diário atingido. Podes sacar mais {remaining:,.0f} Kz hoje."
 
-    # Verifica saldo
     cur.execute("SELECT balance FROM users WHERE id=%s FOR UPDATE", (uid,))
     row = cur.fetchone()
     if not row or float(row['balance']) < amount:
         cur.close(); c.close()
         return None, "Saldo insuficiente."
 
-    # Debita o valor total do saldo
     cur.execute("UPDATE users SET balance=balance-%s WHERE id=%s", (amount, uid))
 
-    # Regista o levantamento
     cur.execute(
         "INSERT INTO withdrawals(user_id,amount,net_amount,express_number,account_name) VALUES(%s,%s,%s,%s,%s) RETURNING id",
         (uid, amount, net, express_num, account_name))
     wid = cur.fetchone()['id']
 
-    # Transação de registo
     cur.execute(
         "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
         (uid, 'withdrawal_pending', -amount,
@@ -537,7 +531,6 @@ def reject_withdrawal(wid, note=""):
     w = cur.fetchone()
     if not w: cur.close(); c.close(); return False
     w = dict(w)
-    # Devolve o saldo ao utilizador
     cur.execute("UPDATE users SET balance=balance+%s WHERE id=%s", (w['amount'], w['user_id']))
     cur.execute("UPDATE withdrawals SET status='rejected',note=%s WHERE id=%s", (note, wid))
     cur.execute(
@@ -583,29 +576,21 @@ def get_user_by_refcode(code):
     return dict(r) if r else None
 
 def register_referral(referrer_id, referred_id):
-    """
-    Regista o referido. O bónus de 500 Kz é pago apenas
-    quando o referidor completar um grupo de 5 referidos.
-    """
     c = _c(); cur = c.cursor()
 
-    # Evita duplicados
     cur.execute("SELECT id FROM referrals WHERE referred_id=%s", (referred_id,))
     if cur.fetchone():
         cur.close(); c.close(); return
 
-    # Regista o referido (sem pagar bónus ainda)
     cur.execute(
         "INSERT INTO referrals(referrer_id,referred_id,bonus_paid) VALUES(%s,%s,0)",
         (referrer_id, referred_id))
 
-    # Conta quantos referidos (não pagos em grupo) o referidor tem
     cur.execute(
         "SELECT COUNT(*) AS n FROM referrals WHERE referrer_id=%s",
         (referrer_id,))
     total = int(cur.fetchone()['n'])
 
-    # Paga bónus a cada grupo de 5 completo
     if total % REFERRAL_GROUP_SIZE == 0:
         cur.execute(
             "UPDATE users SET balance=balance+%s WHERE id=%s",
@@ -668,7 +653,7 @@ def get_all_promos():
     rows = cur.fetchall(); cur.close(); c.close()
     return [dict(r) for r in rows]
 
-# ── BÓNUS DIÁRIO (mantido para compatibilidade interna) ───────────────
+# ── BÓNUS DIÁRIO ──────────────────────────────────────────────────────
 DAILY_BONUSES = [500, 750, 1000, 1500, 2000, 2500, 5000]
 
 def claim_daily(uid):
@@ -715,35 +700,6 @@ def get_daily_status(uid):
     next_streak  = min(streak + (0 if claimed else 1), 7)
     return {"claimed": claimed, "streak": streak,
             "next": DAILY_BONUSES[max(next_streak - 1, 0)]}
-
-# ── BÓNUS 10 PARTIDAS ────────────────────────────────────────────────
-def claim_ten_games_bonus(uid):
-    """
-    Credita 2.000 Kz ao jogador que completou 10 partidas.
-    Sem restrições de saque além do limite diário.
-    """
-    u = get_user(uid)
-    if not u:
-        return False, "Utilizador não encontrado."
-    if u.get('ten_games_bonus_claimed'):
-        return False, "Bónus já recebido."
-    if (u.get('games_played') or 0) < 10:
-        remaining = 10 - (u.get('games_played') or 0)
-        return False, f"Faltam {remaining} partidas para desbloquear este bónus."
-
-    c = _c(); cur = c.cursor()
-    cur.execute("""
-        UPDATE users
-        SET balance = balance + %s,
-            ten_games_bonus_claimed = TRUE
-        WHERE id = %s
-    """, (TEN_GAMES_BONUS, uid))
-    cur.execute(
-        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-        (uid, 'ten_games_bonus', TEN_GAMES_BONUS, "Bónus 10 partidas"))
-    c.commit(); cur.close(); c.close()
-    u = get_user(uid)
-    return True, {"amount": TEN_GAMES_BONUS, "balance": u['balance']}
 
 # ── SUPORTE ──────────────────────────────────────────────────────────
 def create_ticket(uid, message):
