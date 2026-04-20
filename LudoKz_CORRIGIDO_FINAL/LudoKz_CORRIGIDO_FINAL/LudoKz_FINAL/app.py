@@ -1,4 +1,10 @@
-"""app.py — LudoKz Backend completo com reserva temporária"""
+"""app.py — LudoKz Backend CORRIGIDO
+BUGS CORRIGIDOS:
+1. _remove_user_from_pending_rooms: comparação uid int vs string — agora str(uid) em todo o lado
+2. _collect_reservations: uid guardado sempre como int consistente
+3. api_join: verifica se jogador já está na sala antes de tentar adicionar
+4. Lobby: jogador 2 consegue encontrar e entrar na sala do jogador 1
+"""
 import json, queue, threading, os, secrets, time, uuid
 from functools import wraps
 from flask import (Flask, render_template, request, jsonify,
@@ -14,9 +20,7 @@ app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 PLATFORM_EXPRESS = os.environ.get("PLATFORM_EXPRESS", "922 745 946")
 ADMIN_KEY        = os.environ.get("ADMIN_KEY", "ludokz2025")
 
-ROOM_TIMEOUT_SECS = 300  # 5 minutos — sala expira se não ficar cheia
-
-# Comissão da plataforma (10%)
+ROOM_TIMEOUT_SECS = 300
 PLATFORM_FEE = 0.10
 
 init_db()
@@ -42,7 +46,6 @@ def options_handler(path):
 def get_pg():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
-# ── Salas activas ──────────────────────────────────────────────
 _rooms: dict = {}
 _rooms_lk = threading.Lock()
 
@@ -54,11 +57,9 @@ def _get_room(rid: str):
 def _make_rid() -> str:
     return str(uuid.uuid4())[:8].upper()
 
-# ── SSE ────────────────────────────────────────────────────────
 _sse: dict = {}
 _sse_lk = threading.Lock()
 
-# ── Rate limiting OTP ──────────────────────────────────────────
 _otp_rate: dict = {}
 _otp_rate_lk = threading.Lock()
 
@@ -73,10 +74,15 @@ def _otp_permitido(phone: str, max_por_minuto: int = 2) -> bool:
         _otp_rate[phone] = (contagem + 1, reset_em)
         return True
 
-def push(uid: int, event: str, data: dict):
+def push(uid, event: str, data: dict):
+    """uid pode ser int ou str — normaliza para int para o dicionário SSE"""
+    try:
+        uid_key = int(uid)
+    except (ValueError, TypeError):
+        uid_key = uid
     msg = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
     with _sse_lk:
-        for q in _sse.get(uid, []):
+        for q in _sse.get(uid_key, []):
             try:
                 if q.full():
                     try: q.get_nowait()
@@ -125,7 +131,8 @@ _reservations: dict = {}
 _res_lk = threading.Lock()
 
 def _reserve(rid: str, uid: int, amount: float) -> bool:
-    """Verifica saldo e cria reserva. Não debita ainda."""
+    """Verifica saldo e cria reserva. uid sempre int."""
+    uid = int(uid)
     conn = get_pg(); cur = conn.cursor()
     cur.execute("SELECT balance FROM users WHERE id=%s", (uid,))
     row = cur.fetchone()
@@ -139,8 +146,9 @@ def _reserve(rid: str, uid: int, amount: float) -> bool:
 def _collect_reservations(rid: str) -> bool:
     """Debita todos os jogadores reservados quando o jogo inicia."""
     with _res_lk:
-        res = _reservations.get(rid, {})
+        res = dict(_reservations.get(rid, {}))
     for uid, amount in res.items():
+        uid = int(uid)
         if uid < 0:
             continue
         if not deduct_bet(uid, amount):
@@ -151,36 +159,45 @@ def _collect_reservations(rid: str) -> bool:
         _reservations.pop(rid, None)
     return True
 
-def _release_reservation(rid: str, uid: int = None):
-    """Liberta reserva de um ou todos os jogadores (sem debitar nada)."""
+def _release_reservation(rid: str, uid=None):
+    """Liberta reserva de um ou todos os jogadores."""
     with _res_lk:
         if uid is not None:
+            uid = int(uid)
             _reservations.get(rid, {}).pop(uid, None)
         else:
             _reservations.pop(rid, None)
 
 # ══════════════════════════════════════════════════════════════
 #  LIMPAR SALAS PENDENTES DO UTILIZADOR
+#  CORRIGIDO: compara str(uid) com p["user_id"] que é sempre string
 # ══════════════════════════════════════════════════════════════
-def _remove_user_from_pending_rooms(uid: int):
+def _remove_user_from_pending_rooms(uid):
+    """Remove o utilizador de qualquer sala não iniciada em que esteja."""
+    uid_str = str(uid)   # game_manager guarda user_id como string
+    uid_int = int(uid)
+
     rids_to_clean = []
     with _rooms_lk:
         for rid, r in list(_rooms.items()):
             if r.started:
                 continue
-            if any(p["user_id"] == uid for p in r.players):
+            # CORRIGIDO: compara como string
+            if any(str(p["user_id"]) == uid_str for p in r.players):
                 rids_to_clean.append(rid)
 
     for rid in rids_to_clean:
-        _release_reservation(rid, uid)
+        _release_reservation(rid, uid_int)
         with _rooms_lk:
             r = _rooms.get(rid)
             if not r:
                 continue
-            r.players = [p for p in r.players if p["user_id"] != uid]
+            # Remove o jogador da sala
+            r.players = [p for p in r.players if str(p["user_id"]) != uid_str]
             if not r.players:
                 _rooms.pop(rid, None)
                 _release_reservation(rid)
+
 
 def _expire_room(rid: str):
     with _rooms_lk:
@@ -191,8 +208,9 @@ def _expire_room(rid: str):
     _release_reservation(rid)
     if r:
         for p in r.players:
+            u = get_user(int(p["user_id"]))
             push(p["user_id"], "balance_update", {
-                "balance": get_user(p["user_id"])["balance"],
+                "balance": u["balance"] if u else 0,
                 "msg": "⏰ A sala expirou por falta de jogadores. Reserva libertada."
             })
 
@@ -204,44 +222,33 @@ def _schedule_room_expire(rid: str):
     t.start()
 
 # ══════════════════════════════════════════════════════════════
-#  FINALIZAR JOGO — CORRIGIDO
-#  - Prémio = aposta × nº jogadores × 90% (10% comissão)
-#  - Envia balance actualizado a todos os jogadores
+#  FINALIZAR JOGO
 # ══════════════════════════════════════════════════════════════
 def _finish_game(rid: str):
     r = _get_room(rid)
     if not r or not r.over or not r.winner:
         return
 
-    winner_id = r.winner
-    loser_ids = [p["user_id"] for p in r.players if p["user_id"] != winner_id]
+    winner_id  = r.winner   # string
+    loser_ids  = [p["user_id"] for p in r.players if p["user_id"] != winner_id]
+    n_players  = len(r.players)
+    prize      = round(r.bet * n_players * (1 - PLATFORM_FEE), 2)
 
-    # Prémio correcto: 90% do pote total
-    n_players = len(r.players)
-    prize = round(r.bet * n_players * (1 - PLATFORM_FEE), 2)
+    credit_prize(int(winner_id), [int(l) for l in loser_ids], r.bet, prize, r.round, rid)
+    add_tx(int(winner_id), "prize", prize, f"Prémio vitória Ludo — sala {rid}")
 
-    # Credita o prémio e regista o histórico
-    credit_prize(winner_id, loser_ids, r.bet, prize, r.round, rid)
-
-    # Transacção de prémio para o vencedor
-    add_tx(winner_id, "prize", prize, f"Prémio vitória Ludo — sala {rid}")
-
-    # Notifica o vencedor com o saldo actualizado
-    wu = get_user(winner_id)
+    wu = get_user(int(winner_id))
     push(winner_id, "game_over", {
-        "won":      True,
-        "prize":    prize,
-        "balance":  wu["balance"] if wu else 0,
+        "won": True, "prize": prize,
+        "balance": wu["balance"] if wu else 0,
         "winner_id": winner_id,
     })
 
-    # Notifica os perdedores com o saldo actualizado
     for lid in loser_ids:
-        lu = get_user(lid)
+        lu = get_user(int(lid))
         push(lid, "game_over", {
-            "won":      False,
-            "prize":    0,
-            "balance":  lu["balance"] if lu else 0,
+            "won": False, "prize": 0,
+            "balance": lu["balance"] if lu else 0,
             "winner_id": winner_id,
         })
 
@@ -249,84 +256,62 @@ def _finish_game(rid: str):
         _rooms.pop(rid, None)
 
 # ══════════════════════════════════════════════════════════════
-#  ABANDONAR JOGO — CORRIGIDO
-#  - Se o jogo ainda não começou: liberta reserva (sem debitar)
-#  - Se o jogo já começou: debita a aposta do jogador que abandona
-#    e credita o prémio ao adversário imediatamente
+#  ABANDONAR JOGO
 # ══════════════════════════════════════════════════════════════
 @app.route("/api/game/leave", methods=["POST"])
 @login_req
 def api_leave():
     rid = (request.json or {}).get("room_id", "")
     uid = session["uid"]
-    r   = _get_room(rid)
+    uid_str = str(uid)
+    r = _get_room(rid)
     if not r:
         return jsonify({"ok": True})
 
-    # ── Sala ainda não iniciada: apenas liberta reserva ──
     if not r.started:
         _release_reservation(rid, uid)
-        remaining = [p for p in r.players if p["user_id"] != uid]
-        if not remaining:
-            with _rooms_lk:
-                _rooms.pop(rid, None)
-            _release_reservation(rid)
-        else:
-            with _rooms_lk:
-                if rid in _rooms:
-                    _rooms[rid].players = remaining
+        with _rooms_lk:
+            if rid in _rooms:
+                _rooms[rid].players = [p for p in r.players if str(p["user_id"]) != uid_str]
+                if not _rooms[rid].players:
+                    _rooms.pop(rid, None)
+                    _release_reservation(rid)
         return jsonify({"ok": True, "msg": "Saíste da sala. Reserva libertada."})
 
-    # ── Jogo já terminado ──
     if r.over:
         with _rooms_lk:
             _rooms.pop(rid, None)
         return jsonify({"ok": True})
 
-    # ── Jogo em curso: debitar quem abandona ──
-    # A aposta já foi debitada ao entrar (_collect_reservations).
-    # Não é necessário debitar de novo — a aposta já saiu do saldo.
-    # Apenas declaramos o adversário vencedor e creditamos o prémio.
-
-    remaining = [p for p in r.players if p["user_id"] != uid]
+    remaining = [p for p in r.players if str(p["user_id"]) != uid_str]
 
     if remaining:
-        # Marca o jogo como terminado com o adversário como vencedor
         r.over   = True
         r.winner = remaining[0]["user_id"]
-
-        # Calcula prémio e credita — a aposta de quem abandonou JÁ foi debitada
-        n_players = len(r.players)  # conta o abandonante também
+        n_players = len(r.players)
         prize = round(r.bet * n_players * (1 - PLATFORM_FEE), 2)
-
         winner_id = r.winner
         loser_ids = [p["user_id"] for p in r.players if p["user_id"] != winner_id]
 
-        credit_prize(winner_id, loser_ids, r.bet, prize, r.round, rid)
-        add_tx(winner_id, "prize", prize, f"Prémio — adversário abandonou sala {rid}")
+        credit_prize(int(winner_id), [int(l) for l in loser_ids], r.bet, prize, r.round, rid)
+        add_tx(int(winner_id), "prize", prize, f"Prémio — adversário abandonou sala {rid}")
 
-        # Notifica o vencedor
-        wu = get_user(winner_id)
+        wu = get_user(int(winner_id))
         push(winner_id, "game_over", {
-            "won":      True,
-            "prize":    prize,
-            "balance":  wu["balance"] if wu else 0,
+            "won": True, "prize": prize,
+            "balance": wu["balance"] if wu else 0,
             "winner_id": winner_id,
         })
-
-        # Notifica quem abandonou (perdeu)
         lu = get_user(uid)
-        push(uid, "game_over", {
-            "won":      False,
-            "prize":    0,
-            "balance":  lu["balance"] if lu else 0,
+        push(uid_str, "game_over", {
+            "won": False, "prize": 0,
+            "balance": lu["balance"] if lu else 0,
             "winner_id": winner_id,
         })
 
         with _rooms_lk:
             _rooms.pop(rid, None)
     else:
-        # Última pessoa na sala — apenas fecha
         r.over = True
         with _rooms_lk:
             _rooms.pop(rid, None)
@@ -521,6 +506,9 @@ def api_txs():
 def api_ghist():
     return jsonify({"games": get_user_games(session["uid"])})
 
+# ══════════════════════════════════════════════════════════════
+#  LOBBY
+# ══════════════════════════════════════════════════════════════
 @app.route("/api/lobby")
 @login_req
 def api_lobby():
@@ -531,6 +519,9 @@ def api_lobby():
         ]
     return jsonify({"rooms": lobby})
 
+# ══════════════════════════════════════════════════════════════
+#  CRIAR SALA
+# ══════════════════════════════════════════════════════════════
 @app.route("/api/room/create", methods=["POST"])
 @login_req
 def api_create():
@@ -544,12 +535,14 @@ def api_create():
     uid = session["uid"]
     u = get_user(uid)
 
+    # Remove salas antigas do utilizador (CORRIGIDO: usa str)
     _remove_user_from_pending_rooms(uid)
 
     if u["balance"] < bet:
         return jsonify({"error": "Saldo insuficiente."}), 400
 
     rid  = _make_rid()
+    # GameManager converte uid para str internamente
     room = GameManager(rid, bet, max_p, uid, u["name"])
 
     if not _reserve(rid, uid, bet):
@@ -561,15 +554,20 @@ def api_create():
     _schedule_room_expire(rid)
 
     return jsonify({"ok": True, "room_id": rid,
-                    "msg": f"Sala criada! Saldo reservado (não debitado). Tens 5 minutos."})
+                    "msg": "Sala criada! Saldo reservado. Tens 5 minutos."})
 
+# ══════════════════════════════════════════════════════════════
+#  ENTRAR NA SALA — CORRIGIDO
+# ══════════════════════════════════════════════════════════════
 @app.route("/api/room/join", methods=["POST"])
 @login_req
 def api_join():
     d   = request.json or {}
     rid = d.get("room_id", "").strip()
     uid = session["uid"]
+    uid_str = str(uid)
 
+    # Remove salas pendentes anteriores (CORRIGIDO)
     _remove_user_from_pending_rooms(uid)
 
     with _rooms_lk:
@@ -581,8 +579,12 @@ def api_join():
         if r.player_count() >= r.max_players:
             return jsonify({"error": "Sala cheia."}), 400
 
-        u = get_user(uid)
+        # CORRIGIDO: verifica se o jogador já está na sala (compara como string)
+        if any(str(p["user_id"]) == uid_str for p in r.players):
+            # Já está na sala — devolve o estado atual sem erro
+            return jsonify({"ok": True, "room_id": rid, "state": r.state_dict(uid_str)})
 
+        u = get_user(uid)
         if u["balance"] < r.bet:
             return jsonify({"error": "Saldo insuficiente."}), 400
 
@@ -594,12 +596,14 @@ def api_join():
             _release_reservation(rid, uid)
             return jsonify({"error": err}), 400
 
+    # Notifica todos da sala
     push_room(rid, "player_joined", {
         "name":    u["name"],
         "players": r.player_count(),
         "max":     r.max_players,
     })
 
+    # Se a sala ficou cheia, inicia o jogo
     if r.player_count() >= r.max_players:
         ok2 = _collect_reservations(rid)
         if not ok2:
@@ -610,10 +614,10 @@ def api_join():
 
         ok3, _ = r.start()
         if ok3:
-            push_room(rid, "game_started", r.state_dict())
+            state = r.state_dict()
+            push_room(rid, "game_started", state)
 
-    return jsonify({"ok": True, "room_id": rid,
-                    "state": r.state_dict(uid)})
+    return jsonify({"ok": True, "room_id": rid, "state": r.state_dict(uid_str)})
 
 @app.route("/api/room/start", methods=["POST"])
 @login_req
@@ -621,7 +625,7 @@ def api_start():
     rid = (request.json or {}).get("room_id", "")
     r   = _get_room(rid)
     if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    if r.players[0]["user_id"] != session["uid"]:
+    if str(r.players[0]["user_id"]) != str(session["uid"]):
         return jsonify({"error": "Só o criador pode iniciar."}), 403
     ok2 = _collect_reservations(rid)
     if not ok2:
@@ -630,14 +634,14 @@ def api_start():
     if not ok: return jsonify({"error": err}), 400
     state = r.state_dict()
     push_room(rid, "game_started", state)
-    return jsonify({"ok": True, "state": r.state_dict(session["uid"])})
+    return jsonify({"ok": True, "state": r.state_dict(str(session["uid"]))})
 
 @app.route("/api/room/<rid>/state")
 @login_req
 def api_state(rid):
     r = _get_room(rid)
     if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    return jsonify(r.state_dict(session["uid"]))
+    return jsonify(r.state_dict(str(session["uid"])))
 
 @app.route("/api/game/roll", methods=["POST"])
 @login_req
@@ -646,9 +650,9 @@ def api_roll():
     if not rid: return jsonify({"error": "ID inválido."}), 400
     r = _get_room(rid)
     if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    dice, err = r.roll_dice(session["uid"])
+    dice, err = r.roll_dice(str(session["uid"]))
     if err: return jsonify({"error": err}), 400
-    state = r.state_dict(session["uid"])
+    state = r.state_dict(str(session["uid"]))
     push_room(rid, "game_update", state)
     if r.over:
         _finish_game(rid)
@@ -663,7 +667,7 @@ def api_move():
     except: return jsonify({"error": "Peça inválida."}), 400
     r = _get_room(rid)
     if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    state, err = r.move_piece(session["uid"], piece)
+    state, err = r.move_piece(str(session["uid"]), piece)
     if err: return jsonify({"error": err}), 400
     push_room(rid, "game_update", state)
     if r.over:
@@ -677,7 +681,7 @@ def api_movable():
     if not rid: return jsonify({"movable": []})
     r = _get_room(rid)
     if not r: return jsonify({"movable": []})
-    return jsonify({"movable": r.get_movable(session["uid"]),
+    return jsonify({"movable": r.get_movable(str(session["uid"])),
                     "dice": r.dice})
 
 @app.route("/api/game/chat", methods=["POST"])
@@ -689,7 +693,8 @@ def api_chat():
     if not msg or not rid: return jsonify({"ok": False}), 400
     r = _get_room(rid)
     if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    if not any(p["user_id"] == session["uid"] for p in r.players):
+    uid_str = str(session["uid"])
+    if not any(str(p["user_id"]) == uid_str for p in r.players):
         return jsonify({"error": "Não estás nesta sala."}), 403
     u = get_user(session["uid"])
     push_room(rid, "chat_message", {"name": u["name"], "text": msg, "system": False})
@@ -929,7 +934,7 @@ def adm_play_roll():
     uid = int(d.get("uid", -999))
     r   = _get_room(rid)
     if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    dice, err = r.roll_dice(uid)
+    dice, err = r.roll_dice(str(uid))
     if err: return jsonify({"error": err}), 400
     state = r.state_dict()
     push_room(rid, "game_update", state)
@@ -944,7 +949,7 @@ def adm_play_move():
     piece = int(d.get("piece", 0))
     r     = _get_room(rid)
     if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    state, err = r.move_piece(uid, piece)
+    state, err = r.move_piece(str(uid), piece)
     if err: return jsonify({"error": err}), 400
     push_room(rid, "game_update", state)
     return jsonify(state)
@@ -957,7 +962,7 @@ def adm_play_movable():
     uid = int(d.get("uid", -999))
     r   = _get_room(rid)
     if not r: return jsonify({"movable": []})
-    return jsonify({"movable": r.get_movable(uid), "dice": r.dice})
+    return jsonify({"movable": r.get_movable(str(uid)), "dice": r.dice})
 
 @app.route("/api/admin/play/state/<rid>")
 @admin_req
@@ -975,7 +980,7 @@ def adm_bot_turn():
     r   = _get_room(rid)
     if not r: return jsonify({"error": "Sala não encontrada."}), 404
     def run():
-        state, err = r.bot_turn(uid)
+        state, err = r.bot_turn(str(uid))
         if state:
             push_room(rid, "game_update", state)
             if r.over:
@@ -1070,9 +1075,6 @@ def api_daily_claim():
            f"Bónus diário dia {result['streak']}")
     return jsonify({"ok": True, **result, "balance": u["balance"]})
 
-# ══════════════════════════════════════════════════════════════
-#  BÓNUS DE 10 PARTIDAS
-# ══════════════════════════════════════════════════════════════
 @app.route("/api/bonus/ten_games/claim", methods=["POST"])
 @login_req
 def api_ten_games_claim():
