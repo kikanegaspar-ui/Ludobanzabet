@@ -1,9 +1,5 @@
-"""app.py — LudoKz Backend CORRIGIDO
-BUGS CORRIGIDOS:
-1. _remove_user_from_pending_rooms: comparação uid int vs string — agora str(uid) em todo o lado
-2. _collect_reservations: uid guardado sempre como int consistente
-3. api_join: verifica se jogador já está na sala antes de tentar adicionar
-4. Lobby: jogador 2 consegue encontrar e entrar na sala do jogador 1
+"""app.py — LudoKz Backend
+ALTERAÇÕES: bónus de boas-vindas e bónus de 10 partidas removidos completamente.
 """
 import json, queue, threading, os, secrets, time, uuid
 from functools import wraps
@@ -75,7 +71,6 @@ def _otp_permitido(phone: str, max_por_minuto: int = 2) -> bool:
         return True
 
 def push(uid, event: str, data: dict):
-    """uid pode ser int ou str — normaliza para int para o dicionário SSE"""
     try:
         uid_key = int(uid)
     except (ValueError, TypeError):
@@ -131,7 +126,6 @@ _reservations: dict = {}
 _res_lk = threading.Lock()
 
 def _reserve(rid: str, uid: int, amount: float) -> bool:
-    """Verifica saldo e cria reserva. uid sempre int."""
     uid = int(uid)
     conn = get_pg(); cur = conn.cursor()
     cur.execute("SELECT balance FROM users WHERE id=%s", (uid,))
@@ -144,7 +138,6 @@ def _reserve(rid: str, uid: int, amount: float) -> bool:
     return True
 
 def _collect_reservations(rid: str) -> bool:
-    """Debita todos os jogadores reservados quando o jogo inicia."""
     with _res_lk:
         res = dict(_reservations.get(rid, {}))
     for uid, amount in res.items():
@@ -160,7 +153,6 @@ def _collect_reservations(rid: str) -> bool:
     return True
 
 def _release_reservation(rid: str, uid=None):
-    """Liberta reserva de um ou todos os jogadores."""
     with _res_lk:
         if uid is not None:
             uid = int(uid)
@@ -170,11 +162,9 @@ def _release_reservation(rid: str, uid=None):
 
 # ══════════════════════════════════════════════════════════════
 #  LIMPAR SALAS PENDENTES DO UTILIZADOR
-#  CORRIGIDO: compara str(uid) com p["user_id"] que é sempre string
 # ══════════════════════════════════════════════════════════════
 def _remove_user_from_pending_rooms(uid):
-    """Remove o utilizador de qualquer sala não iniciada em que esteja."""
-    uid_str = str(uid)   # game_manager guarda user_id como string
+    uid_str = str(uid)
     uid_int = int(uid)
 
     rids_to_clean = []
@@ -182,7 +172,6 @@ def _remove_user_from_pending_rooms(uid):
         for rid, r in list(_rooms.items()):
             if r.started:
                 continue
-            # CORRIGIDO: compara como string
             if any(str(p["user_id"]) == uid_str for p in r.players):
                 rids_to_clean.append(rid)
 
@@ -192,7 +181,6 @@ def _remove_user_from_pending_rooms(uid):
             r = _rooms.get(rid)
             if not r:
                 continue
-            # Remove o jogador da sala
             r.players = [p for p in r.players if str(p["user_id"]) != uid_str]
             if not r.players:
                 _rooms.pop(rid, None)
@@ -229,7 +217,7 @@ def _finish_game(rid: str):
     if not r or not r.over or not r.winner:
         return
 
-    winner_id  = r.winner   # string
+    winner_id  = r.winner
     loser_ids  = [p["user_id"] for p in r.players if p["user_id"] != winner_id]
     n_players  = len(r.players)
     prize      = round(r.bet * n_players * (1 - PLATFORM_FEE), 2)
@@ -535,14 +523,12 @@ def api_create():
     uid = session["uid"]
     u = get_user(uid)
 
-    # Remove salas antigas do utilizador (CORRIGIDO: usa str)
     _remove_user_from_pending_rooms(uid)
 
     if u["balance"] < bet:
         return jsonify({"error": "Saldo insuficiente."}), 400
 
     rid  = _make_rid()
-    # GameManager converte uid para str internamente
     room = GameManager(rid, bet, max_p, uid, u["name"])
 
     if not _reserve(rid, uid, bet):
@@ -557,7 +543,7 @@ def api_create():
                     "msg": "Sala criada! Saldo reservado. Tens 5 minutos."})
 
 # ══════════════════════════════════════════════════════════════
-#  ENTRAR NA SALA — CORRIGIDO
+#  ENTRAR NA SALA
 # ══════════════════════════════════════════════════════════════
 @app.route("/api/room/join", methods=["POST"])
 @login_req
@@ -567,7 +553,6 @@ def api_join():
     uid = session["uid"]
     uid_str = str(uid)
 
-    # Remove salas pendentes anteriores (CORRIGIDO)
     _remove_user_from_pending_rooms(uid)
 
     with _rooms_lk:
@@ -579,9 +564,7 @@ def api_join():
         if r.player_count() >= r.max_players:
             return jsonify({"error": "Sala cheia."}), 400
 
-        # CORRIGIDO: verifica se o jogador já está na sala (compara como string)
         if any(str(p["user_id"]) == uid_str for p in r.players):
-            # Já está na sala — devolve o estado atual sem erro
             return jsonify({"ok": True, "room_id": rid, "state": r.state_dict(uid_str)})
 
         u = get_user(uid)
@@ -596,14 +579,12 @@ def api_join():
             _release_reservation(rid, uid)
             return jsonify({"error": err}), 400
 
-    # Notifica todos da sala
     push_room(rid, "player_joined", {
         "name":    u["name"],
         "players": r.player_count(),
         "max":     r.max_players,
     })
 
-    # Se a sala ficou cheia, inicia o jogo
     if r.player_count() >= r.max_players:
         ok2 = _collect_reservations(rid)
         if not ok2:
@@ -1074,35 +1055,6 @@ def api_daily_claim():
     add_tx(session["uid"], "daily_bonus", result["amount"],
            f"Bónus diário dia {result['streak']}")
     return jsonify({"ok": True, **result, "balance": u["balance"]})
-
-@app.route("/api/bonus/ten_games/claim", methods=["POST"])
-@login_req
-def api_ten_games_claim():
-    uid = session["uid"]
-    u   = get_user(uid)
-    if not u:
-        return jsonify({"error": "Utilizador não encontrado."}), 404
-    if u.get("ten_games_bonus_claimed"):
-        return jsonify({"error": "Bónus já recebido."}), 400
-    if (u.get("games_played") or 0) < 10:
-        remaining = 10 - (u.get("games_played") or 0)
-        return jsonify({"error": f"Faltam {remaining} partidas para desbloquear este bónus."}), 400
-
-    BONUS = 2000
-    conn = get_pg(); cur = conn.cursor()
-    cur.execute(
-        "UPDATE users SET balance=balance+%s, ten_games_bonus_claimed=TRUE WHERE id=%s",
-        (BONUS, uid)
-    )
-    conn.commit(); cur.close(); conn.close()
-
-    add_tx(uid, "ten_games_bonus", BONUS, "Bónus 10 partidas")
-    u = get_user(uid)
-    push(uid, "balance_update", {
-        "balance": u["balance"],
-        "msg": f"🏅 +{BONUS:,} Kz bónus de 10 partidas creditado!"
-    })
-    return jsonify({"ok": True, "amount": BONUS, "balance": u["balance"]})
 
 @app.route("/api/support/ticket", methods=["POST"])
 @login_req
