@@ -1,28 +1,25 @@
 /**
- * ludo_board_v2.js — LudoKz v6
+ * ludo_board_v2.js — LudoKz v7 CORRIGIDO
  *
- * BUG PRINCIPAL CORRIGIDO:
- * O index.html guarda o utilizador em "let U = null" (variável LOCAL do script).
- * Este ficheiro acedia window.U que ficava undefined → _isMyTurn() retornava
- * sempre false → botão sempre disabled → ninguém conseguia lançar o dado.
- *
- * SOLUÇÃO:
- * 1. window._syncU(u) — chamado pelo index.html sempre que U muda
- * 2. _isMyTurn() tenta window.U e também procura no DOM (fallback)
- * 3. doRoll() NÃO verifica rb.disabled — deixa o servidor rejeitar se não for o turno
+ * BUGS CORRIGIDOS:
+ * 1. doRoll() removido deste ficheiro — definido apenas no index.html (evita conflito)
+ * 2. window._syncU() sincroniza window.U sempre que U muda no index.html
+ * 3. _isMyTurn() usa window.U corretamente
+ * 4. highlightPcs e renderState robustos a window.U null
  */
 
-// ── Acesso ao utilizador logado ──────────────────────────────────
-// O index.html tem "let U" local. Chamamos window._syncU() de lá para cá.
-window._syncU = function(u) { window.U = u; };
+// ── Sincronização do utilizador ──────────────────────────────
+window._syncU = function(u) {
+  window.U = u;
+};
 
 function _getU() {
   return window.U || null;
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  MAPAS DE CORES
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 const COLOUR_HEX  = { blue:'#1295e7', green:'#049645', red:'#e53935', yellow:'#f9a825' };
 const COLOUR_NAME = { blue:'Azul', green:'Verde', red:'Vermelho', yellow:'Amarelo' };
 const COLOUR_GRAD = {
@@ -33,9 +30,9 @@ const COLOUR_GRAD = {
 };
 const COLOUR_TEXT = { blue:'#fff', green:'#fff', red:'#fff', yellow:'#111' };
 
-// ══════════════════════════════════════════════════════════════════
-//  CMAP
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  CMAP — coordenadas do tabuleiro (coluna, linha)
+// ══════════════════════════════════════════════════════════════
 const CMAP = {
   0:[6,13],1:[6,12],2:[6,11],3:[6,10],4:[6,9],
   5:[5,8],6:[4,8],7:[3,8],8:[2,8],9:[1,8],10:[0,8],
@@ -66,9 +63,9 @@ const BASE_IDS = {
 const HOME_ID   = { blue:105, green:205, red:305, yellow:405 };
 const _BASE_SET = new Set([500,501,502,503,600,601,602,603,700,701,702,703,800,801,802,803]);
 
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  CAMINHOS COMPLETOS
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 const START_ID  = { blue:0,  green:26, red:39, yellow:13 };
 const TURN_ID   = { blue:50, green:24, red:37, yellow:11 };
 const HOME_LANE = {
@@ -101,9 +98,9 @@ function _nextId(colour, currentId) {
   return path[idx + 1];
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  SONS
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 const SFX = (() => {
   let ctx = null;
   const ac = () => { if (!ctx) try { ctx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} return ctx; };
@@ -131,9 +128,9 @@ const SFX = (() => {
 window.SFX = SFX;
 document.addEventListener('click', ()=>SFX.unlock(), {once:true});
 
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  CSS
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 (function(){
   if (document.getElementById('lk-css')) return;
   const s = document.createElement('style');
@@ -174,9 +171,9 @@ document.addEventListener('click', ()=>SFX.unlock(), {once:true});
   document.head.appendChild(s);
 })();
 
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  DADO FLAT — pontos DOM
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 const DOT_LAYOUT = {
   1:[[50,50]],
   2:[[28,28],[72,72]],
@@ -214,11 +211,12 @@ function _animDice(val, cb) {
   }, 450);
 }
 
+// Expõe para o index.html usar
 window.BOARD = { animateDice: _animDice };
 
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  TABULEIRO DOM
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 let _els = {};
 
 function _buildBoard() {
@@ -257,6 +255,7 @@ function _buildDiceUI() {
   if (!gcd) return;
   const w = document.createElement('div');
   w.id = 'lk-dice-wrap';
+  // IMPORTANTE: o onclick chama window.doRoll que está definido no index.html
   w.innerHTML = `<div id="lk-dice-flat" onclick="window.doRoll()"></div><div id="lk-dice-num">-</div>`;
   const dfc=document.getElementById('dfc'), dnm=document.getElementById('dnm');
   if (dfc) { dfc.style.display='none'; dfc.parentNode.insertBefore(w,dfc); }
@@ -289,9 +288,9 @@ function _clearSel() {
   });
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  _isMyTurn — CORRIGIDO: usa window.U que é sincronizado via _syncU()
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  _isMyTurn — compara user_id como string
+// ══════════════════════════════════════════════════════════════
 function _isMyTurn(state) {
   if (!state?.players || state.over) return false;
   const p = state.players[state.turn];
@@ -303,9 +302,9 @@ function _isMyTurn(state) {
   return myId !== '' && myId === theirId;
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  ANIMAÇÃO DIFF
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 function _applyDiff(prev, next) {
   if (!prev?.players||!next?.players) return;
   next.players.forEach((pl,idx)=>{
@@ -343,9 +342,9 @@ function _movePieceSmooth(colour, pieceIdx, fromId, toId, onDone) {
   step();
 }
 
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  RENDER STATE
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 window.CUR_STATE=null; window.PREV_STATE=null;
 
 window.renderState = function(state) {
@@ -394,6 +393,7 @@ window.renderState = function(state) {
     }
   }
 
+  // Mostra dado do adversário quando este já rolou
   if(!myT&&state.dice&&state.phase===1){
     const nm=document.getElementById('lk-dice-num'), flat=document.getElementById('lk-dice-flat');
     if(nm){nm.textContent=state.dice;nm.classList.remove('num-pop');void nm.offsetWidth;nm.classList.add('num-pop');}
@@ -417,9 +417,9 @@ window.renderState = function(state) {
   if(co) co.textContent=(state.players?.length||0)+' online';
 };
 
-// ══════════════════════════════════════════════════════════════════
-//  HIGHLIGHT
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  HIGHLIGHT — peças seleccionáveis
+// ══════════════════════════════════════════════════════════════
 window.highlightPcs=function(mv){
   if(!window.CUR_STATE||!mv?.length) return;
   const curP=window.CUR_STATE.players?.[window.CUR_STATE.turn];
@@ -428,9 +428,9 @@ window.highlightPcs=function(mv){
   if(colour&&_els[colour]) _setSelectable(colour,mv);
 };
 
-// ══════════════════════════════════════════════════════════════════
-//  EVENTOS SSE
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  EVENTOS SSE — chamados pelo index.html via window.*
+// ══════════════════════════════════════════════════════════════
 window.onGameStarted=function(state){
   window.RID=state.room_id||window.RID;
   window.CUR_STATE=state; window.PREV_STATE=null;
@@ -481,54 +481,9 @@ window.onGameOver=function(d){
   if(d.balance!=null&&window.U){window.U.balance=d.balance;if(typeof updN==='function')updN();}
 };
 
-// ══════════════════════════════════════════════════════════════════
-//  doRoll — NÃO verifica rb.disabled (o servidor valida o turno)
-// ══════════════════════════════════════════════════════════════════
-window.doRoll=async function(){
-  if(!window.RID) return;
-  const rb=document.getElementById('rb');
-  if(rb){rb.disabled=true;rb.classList.remove('my-turn');}
-  const faceEl=document.getElementById('dfc');
-  if(faceEl) faceEl.classList.add('rolling');
-
-  let d;
-  try{
-    const r=await fetch('/api/game/roll',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({room_id:window.RID}),credentials:'same-origin',
-    });
-    d=await r.json();
-  }catch(e){
-    if(rb) rb.disabled=false;
-    if(faceEl) faceEl.classList.remove('rolling');
-    return;
-  }
-  if(faceEl) faceEl.classList.remove('rolling');
-
-  if(d.error){
-    if(typeof toast==='function') toast('❌ '+d.error,'ter');
-    // Re-renderiza para repor estado correto do botão
-    if(window.CUR_STATE) window.renderState(window.CUR_STATE);
-    return;
-  }
-
-  _animDice(d.dice,async()=>{
-    window.renderState(d);
-    if(d.phase===1){
-      try{
-        const mv=await fetch('/api/game/movable',{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({room_id:window.RID}),credentials:'same-origin',
-        }).then(r=>r.json());
-        if(mv.movable?.length) window.highlightPcs(mv.movable);
-      }catch(e){}
-    }
-  });
-};
-
-// ══════════════════════════════════════════════════════════════════
-//  movePc
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  movePc — chamado quando o jogador clica na peça
+// ══════════════════════════════════════════════════════════════
 window.movePc=async function(idx){
   if(!window.RID) return;
   _clearSel();
@@ -547,9 +502,9 @@ window.movePc=async function(idx){
   window.renderState(d);
 };
 
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  leaveGame
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 window.leaveGame=async function(){
   if(!confirm('Abandonar? Perdes a aposta.')) return;
   if(window.RID){
@@ -566,4 +521,4 @@ window.buildBoard=_buildBoard;
 window.initCanvas=_buildBoard;
 window.startRenderLoop=function(){};
 
-console.log('[LudoKz] v6 — window.U sincronizado, dado desbloqueado');
+console.log('[LudoKz] v7 — doRoll centralizado no index.html, window.U sincronizado via _syncU()');
