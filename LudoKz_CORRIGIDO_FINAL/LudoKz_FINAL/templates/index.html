@@ -182,20 +182,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .dsp{background:rgba(255,159,10,.1);color:var(--orange);border:1px solid rgba(255,159,10,.2)}
 .dsa{background:rgba(0,230,118,.1);color:var(--jade);border:1px solid rgba(0,230,118,.2)}
 .dsr{background:rgba(255,45,85,.1);color:var(--red);border:1px solid rgba(255,45,85,.2)}
-
-/* ── BÓNUS CARD (substitui daily-card) ── */
-.bonus-card{background:linear-gradient(135deg,rgba(191,90,242,.10),rgba(10,132,255,.06));border:1.5px solid rgba(191,90,242,.28);border-radius:18px;padding:22px;margin-bottom:16px;transition:transform .08s}
-.bonus-card h3{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--purple);margin-bottom:4px;letter-spacing:1px}
-.bonus-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
-.bonus-item{flex:1;min-width:140px;background:rgba(0,0,0,.25);border:1.5px solid rgba(191,90,242,.18);border-radius:14px;padding:14px;text-align:center}
-.bonus-item-icon{font-size:26px;margin-bottom:6px}
-.bonus-item-val{font-family:"Bebas Neue",sans-serif;font-size:22px;color:var(--g1);letter-spacing:1px}
-.bonus-item-lbl{font-size:11px;color:var(--t3);font-weight:700;letter-spacing:.5px;margin-top:3px;line-height:1.5}
-.bonus-item-status{font-size:11px;font-weight:800;margin-top:7px}
-.bonus-item-status.claimed{color:var(--jade)}
-.bonus-item-status.locked{color:var(--t3)}
-.bonus-item-status.ready{color:var(--g1)}
-
 .ref-card{background:linear-gradient(135deg,rgba(0,230,118,.08),rgba(0,200,83,.04));border:1.5px solid rgba(0,230,118,.18);border-radius:18px;padding:22px;margin-bottom:16px;transition:transform .08s}
 .ref-card h3{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--jade);margin-bottom:12px;letter-spacing:1px}
 .ref-link{background:rgba(0,0,0,.3);border:1px solid rgba(0,230,118,.2);border-radius:11px;padding:12px 15px;font-family:monospace;font-size:12px;color:var(--jade);word-break:break-all;cursor:pointer;margin-bottom:12px;transition:background .2s}
@@ -203,7 +189,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
 .ref-progress{background:rgba(0,0,0,.2);border:1px solid rgba(0,230,118,.15);border-radius:11px;padding:12px 15px;margin-bottom:12px}
 .ref-progress-bar-wrap{height:8px;background:rgba(255,255,255,.06);border-radius:4px;margin-top:8px;overflow:hidden}
 .ref-progress-bar{height:100%;background:linear-gradient(90deg,var(--jade),var(--jade2));border-radius:4px;transition:width .5s ease}
-
 .sup-card{background:var(--c1);border:1px solid rgba(10,132,255,.2);border-radius:18px;padding:22px;margin-bottom:22px}
 .sup-card h3{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--blue);margin-bottom:12px;letter-spacing:1px}
 .tkt{background:rgba(0,0,0,.2);border:1px solid var(--rim);border-radius:11px;padding:12px;margin-bottom:8px;font-size:13px}
@@ -523,30 +508,6 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           <div style="font-size:12px;color:var(--t3);font-weight:700">📥 Dep. diário: <span style="color:var(--g1)">máx 100.000 Kz</span></div>
           <div style="font-size:12px;color:var(--t3);font-weight:700">📤 Saque diário: <span style="color:var(--g1)">máx 50.000 Kz</span></div>
         </div>
-      </div>
-
-      <!-- BÓNUS (substitui daily-card) -->
-      <div class="bonus-card">
-        <h3>🎁 Bónus</h3>
-        <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6;margin-bottom:4px">Recompensas para novos jogadores e jogadores activos.</p>
-        <div class="bonus-row" id="bonus-row">
-          <!-- Bónus Boas-Vindas -->
-          <div class="bonus-item" id="bw-item">
-            <div class="bonus-item-icon">🎉</div>
-            <div class="bonus-item-val">1.000 KZ</div>
-            <div class="bonus-item-lbl">Bónus Boas-Vindas<br>Recebido ao criar conta</div>
-            <div class="bonus-item-status" id="bw-status">A carregar...</div>
-          </div>
-          <!-- Bónus 10 Partidas -->
-          <div class="bonus-item" id="b10-item">
-            <div class="bonus-item-icon">🏅</div>
-            <div class="bonus-item-val">2.000 KZ</div>
-            <div class="bonus-item-lbl">Bónus 10 Partidas<br>Joga 10 partidas e saca!</div>
-            <div class="bonus-item-status" id="b10-status">A carregar...</div>
-          </div>
-        </div>
-        <div style="margin-top:14px" id="b10-claim-wrap"></div>
-        <p class="pnote" style="margin-top:10px">⚠️ O bónus de boas-vindas exige pelo menos 1 partida jogada para ser sacado. O bónus de 10 partidas não tem restrições de saque além do limite diário.</p>
       </div>
 
       <!-- REFERIDOS -->
@@ -963,7 +924,7 @@ async function doReg(){
   const d=await api("/api/register","POST",{name,phone:REG_PHONE,password:pw,ref_code:ref,age_confirmed:true,terms_accepted:true});
   if(d.error){err.textContent="❌ "+d.error;return;}
   U=d.user;connectSSE();showApp();
-  toast("🎉 Bem-vindo! Recebeste 1.000 Kz de bónus de boas-vindas!","tok");
+  toast("🎮 Bem-vindo ao LudoKz! Deposita para começar a jogar.","tok");
   coinBurst();
 }
 async function doLogout(){
@@ -1154,7 +1115,6 @@ async function loadWallet(){
   const t=await api("/api/transactions");renderTx(t.transactions||[]);
   const dp=await api("/api/deposit/list");renderDeps(dp.deposits||[]);
   if(U?.express_number)document.getElementById("wnum").value=U.express_number;
-  loadBonuses();
   loadReferral();
   loadTickets();
 }
@@ -1210,54 +1170,6 @@ function renderDeps(deps){
   }).join("");
 }
 
-/* ══ BÓNUS (boas-vindas + 10 partidas) ══ */
-async function loadBonuses(){
-  const games=U?.games_played||0;
-
-  // Bónus boas-vindas
-  const bwStatus=document.getElementById("bw-status");
-  if(bwStatus){
-    if(U?.welcome_bonus_claimed){
-      bwStatus.textContent="✅ Já recebido";
-      bwStatus.className="bonus-item-status claimed";
-    }else if(games>=1){
-      bwStatus.textContent="🎁 Disponível para saque!";
-      bwStatus.className="bonus-item-status ready";
-    }else{
-      bwStatus.textContent="🔒 Joga 1 partida para desbloquear";
-      bwStatus.className="bonus-item-status locked";
-    }
-  }
-
-  // Bónus 10 partidas
-  const b10Status=document.getElementById("b10-status");
-  const b10Wrap=document.getElementById("b10-claim-wrap");
-  if(b10Status){
-    if(U?.ten_games_bonus_claimed){
-      b10Status.textContent="✅ Já recebido";
-      b10Status.className="bonus-item-status claimed";
-      if(b10Wrap)b10Wrap.innerHTML="";
-    }else if(games>=10){
-      b10Status.textContent="🎁 Pronto a receber!";
-      b10Status.className="bonus-item-status ready";
-      if(b10Wrap)b10Wrap.innerHTML=`<button class="btn bg bfw" onclick="claimTenGamesBonus()" style="font-size:13px">🏅 Receber 2.000 Kz (10 Partidas)</button>`;
-    }else{
-      const rem=10-games;
-      b10Status.textContent=`🔒 Faltam ${rem} partida${rem===1?"":"s"}`;
-      b10Status.className="bonus-item-status locked";
-      if(b10Wrap)b10Wrap.innerHTML=`<div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${(games/10)*100}%;background:linear-gradient(90deg,var(--g1),var(--orange));border-radius:3px;transition:width .5s"></div></div><div style="font-size:11px;color:var(--t3);margin-top:5px;font-weight:600">${games}/10 partidas jogadas</div>`;
-    }
-  }
-}
-
-async function claimTenGamesBonus(){
-  const d=await api("/api/bonus/ten_games/claim","POST",{});
-  if(d.error){toast("❌ "+d.error,"ter");return;}
-  if(U){U.balance=d.balance;U.ten_games_bonus_claimed=true;updN();document.getElementById("wbn").textContent=fmt(U.balance);}
-  toast("🏅 +2.000 Kz! Bónus de 10 partidas recebido!","tok");
-  coinBurst();loadBonuses();
-}
-
 /* REFERIDOS */
 async function loadReferral(){
   const d=await api("/api/referral/code");
@@ -1272,7 +1184,6 @@ async function loadReferral(){
   const inGroup=total%5;
   const nextAt=5-inGroup;
 
-  // Progresso
   const pLabel=document.getElementById("ref-progress-label");
   const pBar=document.getElementById("ref-progress-bar");
   const pSub=document.getElementById("ref-progress-sub");
@@ -1649,7 +1560,7 @@ window.coinRain=coinRain;
   }
 
   /* 16. CARDS 3D TILT */
-  const TILT_SEL='.mm-card,.auth-card,.wait-box,.bal-card,.bonus-card,.ref-card,.phd';
+  const TILT_SEL='.mm-card,.auth-card,.wait-box,.bal-card,.ref-card,.phd';
   let _tiltThrottle=false;
   document.addEventListener('mousemove',e=>{
     if(_tiltThrottle)return;_tiltThrottle=true;
