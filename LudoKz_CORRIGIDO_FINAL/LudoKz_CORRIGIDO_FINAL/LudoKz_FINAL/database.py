@@ -18,6 +18,17 @@ BLOCKED_DOMAINS = {
     "mailexpire.com","throwaway.email","getnada.com","moakt.com","spamwc.de"
 }
 
+# Bónus de boas-vindas e de 10 partidas
+WELCOME_BONUS    = 1000
+TEN_GAMES_BONUS  = 2000
+
+# Referidos: bónus a cada 5 registados
+REFERRAL_BONUS_PER_GROUP = 500
+REFERRAL_GROUP_SIZE      = 5
+
+# Comissão da plataforma
+PLATFORM_FEE = 0.10   # 10%
+
 def _c():
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     conn.autocommit = False
@@ -25,6 +36,8 @@ def _c():
 
 def init_db():
     c = _c(); cur = c.cursor()
+
+    # ── Tabelas base ──────────────────────────────────────────
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
         id SERIAL PRIMARY KEY,
@@ -45,6 +58,8 @@ def init_db():
         referral_code TEXT DEFAULT '',
         referred_by INTEGER DEFAULT 0,
         bonus_claimed INTEGER DEFAULT 0,
+        welcome_bonus_claimed BOOLEAN DEFAULT FALSE,
+        ten_games_bonus_claimed BOOLEAN DEFAULT FALSE,
         created_at TEXT DEFAULT to_char(now(),'YYYY-MM-DD"T"HH24:MI:SS')
     );
     CREATE TABLE IF NOT EXISTS otp_codes(
@@ -140,7 +155,28 @@ def init_db():
         read INTEGER DEFAULT 0,
         created_at TEXT DEFAULT to_char(now(),'YYYY-MM-DD"T"HH24:MI:SS')
     );
+    CREATE TABLE IF NOT EXISTS jackpot(
+        id SERIAL PRIMARY KEY,
+        value REAL NOT NULL DEFAULT 245000
+    );
     """)
+
+    # ── Migracoes: adiciona colunas novas se ainda nao existirem ──
+    _migrations = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS welcome_bonus_claimed BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS ten_games_bonus_claimed BOOLEAN DEFAULT FALSE",
+    ]
+    for sql in _migrations:
+        try:
+            cur.execute(sql)
+        except Exception:
+            c.rollback()
+
+    # ── Jackpot inicial se nao existir ──
+    cur.execute("SELECT id FROM jackpot LIMIT 1")
+    if not cur.fetchone():
+        cur.execute("INSERT INTO jackpot(value) VALUES(245000)")
+
     c.commit(); cur.close(); c.close()
 
 def _h(p): return hashlib.sha256(p.encode()).hexdigest()
@@ -148,7 +184,7 @@ def _h(p): return hashlib.sha256(p.encode()).hexdigest()
 # ── OTP ──────────────────────────────────────────────────────────────
 def criar_otp(phone, purpose='register'):
     from datetime import datetime, timedelta
-    code = str(random.randint(100000, 999999))
+    code    = str(random.randint(100000, 999999))
     expires = (datetime.now() + timedelta(minutes=2)).isoformat()
     c = _c(); cur = c.cursor()
     cur.execute("UPDATE otp_codes SET used=1 WHERE phone=%s AND purpose=%s AND used=0", (phone, purpose))
@@ -188,24 +224,38 @@ def validate_email(email):
         return False, "Domínio de email inválido."
     return True, "OK"
 
+# ── USERS ────────────────────────────────────────────────────────────
 def create_user(phone, pw, name, age_confirmed=False, terms_accepted=False, ref_code=""):
     c = _c(); cur = c.cursor()
     try:
         cur.execute(
-            "INSERT INTO users(phone,password,name,phone_verified,age_confirmed,terms_accepted) VALUES(%s,%s,%s,0,%s,%s) RETURNING id",
-            (phone, _h(pw), name.strip(), 1 if age_confirmed else 0, 1 if terms_accepted else 0))
+            """INSERT INTO users(phone,password,name,phone_verified,age_confirmed,terms_accepted,
+               balance,welcome_bonus_claimed)
+               VALUES(%s,%s,%s,0,%s,%s,%s,FALSE) RETURNING id""",
+            (phone, _h(pw), name.strip(),
+             1 if age_confirmed else 0,
+             1 if terms_accepted else 0,
+             WELCOME_BONUS))          # bónus de boas-vindas creditado imediatamente
         uid = cur.fetchone()['id']
         c.commit()
     except Exception as e:
         c.rollback(); cur.close(); c.close()
         raise ValueError("Número já registado.") from e
+
+    # Regista transação do bónus de boas-vindas
+    cur.execute(
+        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
+        (uid, 'welcome_bonus', WELCOME_BONUS, "Bónus de boas-vindas"))
     cur.execute("UPDATE otp_codes SET used=1 WHERE phone=%s AND used=0", (phone,))
     c.commit(); cur.close(); c.close()
+
     set_referral_code(uid)
+
     if ref_code:
         referrer = get_user_by_refcode(ref_code)
         if referrer and referrer['id'] != uid:
             register_referral(referrer['id'], uid)
+
     add_admin_notif("new_user", f"Novo utilizador: {name} ({phone})", {"uid": uid, "phone": phone})
     return uid
 
@@ -252,16 +302,19 @@ def verify_reset_token(token):
 
 def reset_password(uid, new_pw):
     c = _c(); cur = c.cursor()
-    cur.execute("UPDATE users SET password=%s,reset_token='',reset_expires='' WHERE id=%s", (_h(new_pw), uid))
+    cur.execute("UPDATE users SET password=%s,reset_token='',reset_expires='' WHERE id=%s",
+                (_h(new_pw), uid))
     c.commit(); cur.close(); c.close()
 
 def deduct_bet(uid, amount):
     c = _c(); cur = c.cursor()
-    cur.execute("SELECT balance FROM users WHERE id=%s", (uid,))
+    cur.execute("SELECT balance FROM users WHERE id=%s FOR UPDATE", (uid,))
     row = cur.fetchone()
-    if not row or row['balance'] < amount: cur.close(); c.close(); return False
+    if not row or float(row['balance']) < amount:
+        c.rollback(); cur.close(); c.close(); return False
     cur.execute("UPDATE users SET balance=balance-%s WHERE id=%s", (amount, uid))
-    c.commit(); cur.close(); c.close(); return True
+    c.commit(); cur.close(); c.close()
+    return True
 
 def refund_bet(uid, amount):
     c = _c(); cur = c.cursor()
@@ -269,32 +322,62 @@ def refund_bet(uid, amount):
     c.commit(); cur.close(); c.close()
 
 def credit_prize(winner_id, loser_ids, bet, prize, rounds, room_id=""):
+    """
+    Credita o prémio ao vencedor, actualiza estatísticas de todos
+    e regista o histórico da partida.
+    A aposta já foi debitada em _collect_reservations — não debitar aqui.
+    """
     c = _c(); cur = c.cursor()
-    cur.execute("""UPDATE users SET balance=balance+%s,games_played=games_played+1,
-        wins=wins+1,total_earned=total_earned+%s WHERE id=%s""", (prize, prize, winner_id))
+
+    # Credita prémio e estatísticas do vencedor
+    cur.execute("""
+        UPDATE users
+        SET balance      = balance + %s,
+            games_played = games_played + 1,
+            wins         = wins + 1,
+            total_earned = total_earned + %s
+        WHERE id = %s
+    """, (prize, prize, winner_id))
+
+    # Estatísticas dos perdedores (aposta já debitada antes)
     for lid in loser_ids:
-        cur.execute("UPDATE users SET games_played=games_played+1,losses=losses+1 WHERE id=%s", (lid,))
+        if lid > 0:   # ignora IDs de admin/bot
+            cur.execute("""
+                UPDATE users
+                SET games_played = games_played + 1,
+                    losses       = losses + 1
+                WHERE id = %s
+            """, (lid,))
+
+    # Histórico da partida
     all_players = [winner_id] + list(loser_ids)
-    cur.execute("INSERT INTO game_history(room_id,players,winner_id,bet,prize,rounds) VALUES(%s,%s,%s,%s,%s,%s)",
-                (room_id, json.dumps(all_players), winner_id, bet, prize, rounds))
+    cur.execute("""
+        INSERT INTO game_history(room_id, players, winner_id, bet, prize, rounds)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (room_id, json.dumps(all_players), winner_id, bet, prize, rounds))
+
     c.commit(); cur.close(); c.close()
 
 def add_tx(uid, t, amount, desc):
     c = _c(); cur = c.cursor()
-    cur.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-                (uid, t, amount, desc))
+    cur.execute(
+        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
+        (uid, t, amount, desc))
     c.commit(); cur.close(); c.close()
 
 def get_transactions(uid, limit=40):
     c = _c(); cur = c.cursor()
-    cur.execute("SELECT * FROM transactions WHERE user_id=%s ORDER BY created_at DESC LIMIT %s", (uid, limit))
+    cur.execute(
+        "SELECT * FROM transactions WHERE user_id=%s ORDER BY created_at DESC LIMIT %s",
+        (uid, limit))
     rows = cur.fetchall(); cur.close(); c.close()
     return [dict(r) for r in rows]
 
 def get_user_games(uid, limit=30):
     c = _c(); cur = c.cursor()
-    cur.execute("SELECT * FROM game_history WHERE players LIKE %s ORDER BY played_at DESC LIMIT %s",
-                (f'%{uid}%', limit))
+    cur.execute(
+        "SELECT * FROM game_history WHERE players LIKE %s ORDER BY played_at DESC LIMIT %s",
+        (f'%{uid}%', limit))
     rows = cur.fetchall(); cur.close(); c.close()
     out = []
     for r in rows:
@@ -303,11 +386,25 @@ def get_user_games(uid, limit=30):
         out.append(d)
     return out
 
-# --- DEPOSITOS ---
+# ── DEPÓSITOS ────────────────────────────────────────────────────────
 def create_deposit(uid, amount, ref, payer_name=""):
+    # Limite diário de depósito: 100.000 Kz
+    DAILY_LIMIT = 100000
+    from datetime import date
+    today = date.today().isoformat()
     c = _c(); cur = c.cursor()
-    cur.execute("INSERT INTO deposits(user_id,amount,express_ref,payer_name) VALUES(%s,%s,%s,%s) RETURNING id",
-                (uid, amount, ref, payer_name))
+    cur.execute(
+        "SELECT COALESCE(SUM(amount),0) AS total FROM deposits WHERE user_id=%s AND status='approved' AND created_at LIKE %s",
+        (uid, today + '%'))
+    deposited_today = float(cur.fetchone()['total'] or 0)
+    if deposited_today + amount > DAILY_LIMIT:
+        cur.close(); c.close()
+        remaining = DAILY_LIMIT - deposited_today
+        raise ValueError(f"Limite diário atingido. Podes depositar mais {remaining:,.0f} Kz hoje.")
+
+    cur.execute(
+        "INSERT INTO deposits(user_id,amount,express_ref,payer_name) VALUES(%s,%s,%s,%s) RETURNING id",
+        (uid, amount, ref, payer_name))
     did = cur.fetchone()['id']
     c.commit(); cur.close(); c.close()
     u = get_user(uid)
@@ -324,9 +421,12 @@ def approve_deposit(did, note=""):
     dep = dict(dep)
     cur.execute("UPDATE deposits SET status='approved',note=%s WHERE id=%s", (note, did))
     cur.execute("UPDATE users SET balance=balance+%s WHERE id=%s", (dep['amount'], dep['user_id']))
-    cur.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-                (dep['user_id'], 'deposit', dep['amount'], f"Depósito aprovado (ref:{dep['express_ref']})"))
-    c.commit(); cur.close(); c.close(); return True
+    cur.execute(
+        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
+        (dep['user_id'], 'deposit', dep['amount'],
+         f"Depósito aprovado (ref:{dep['express_ref']})"))
+    c.commit(); cur.close(); c.close()
+    return True
 
 def reject_deposit(did, note=""):
     c = _c(); cur = c.cursor()
@@ -335,58 +435,86 @@ def reject_deposit(did, note=""):
 
 def get_pending_deposits():
     c = _c(); cur = c.cursor()
-    cur.execute("""SELECT d.*,u.name,u.phone,u.balance FROM deposits d
+    cur.execute("""
+        SELECT d.*,u.name,u.phone,u.balance FROM deposits d
         JOIN users u ON u.id=d.user_id
-        WHERE d.status='pending' ORDER BY d.created_at DESC""")
+        WHERE d.status='pending' ORDER BY d.created_at DESC
+    """)
     rows = cur.fetchall(); cur.close(); c.close()
     return [dict(r) for r in rows]
 
 def get_user_deposits(uid, limit=15):
     c = _c(); cur = c.cursor()
-    cur.execute("SELECT * FROM deposits WHERE user_id=%s ORDER BY created_at DESC LIMIT %s", (uid, limit))
+    cur.execute(
+        "SELECT * FROM deposits WHERE user_id=%s ORDER BY created_at DESC LIMIT %s",
+        (uid, limit))
     rows = cur.fetchall(); cur.close(); c.close()
     return [dict(r) for r in rows]
 
-# --- LEVANTAMENTOS ---
+# ── LEVANTAMENTOS ────────────────────────────────────────────────────
 def create_withdrawal(uid, amount, express_num, account_name):
-    if amount < 1000: return None, "Minimo 1.000 Kz"
+    """
+    Taxa: 10% para a plataforma.
+    Limite diário: 50.000 Kz.
+    Sem restrições de bónus — o jogador pode sacar livremente
+    (apenas respeitando o limite diário e o saldo disponível).
+    """
+    DAILY_LIMIT  = 50000
+    MIN_AMOUNT   = 1000
+
+    if amount < MIN_AMOUNT:
+        return None, f"Mínimo {MIN_AMOUNT:,} Kz."
+    if amount > DAILY_LIMIT:
+        return None, f"Máximo {DAILY_LIMIT:,} Kz por dia."
     if not account_name or len(account_name.strip()) < 3:
-        return None, "Nome da conta obrigatorio para verificacao."
-    taxa_casa = round(amount * 0.05, 2)
-    taxa_afiliado = round(amount * 0.05, 2)
-    net = round(amount - taxa_casa - taxa_afiliado, 2)
+        return None, "Nome da conta obrigatório para verificação."
+
+    net = round(amount * (1 - PLATFORM_FEE), 2)   # 90% para o jogador
+
+    from datetime import date
+    today = date.today().isoformat()
+
     c = _c(); cur = c.cursor()
-    cur.execute("SELECT balance, name, referred_by FROM users WHERE id=%s", (uid,))
-    row = cur.fetchone()
-    if not row or row['balance'] < amount: cur.close(); c.close(); return None, "Saldo insuficiente"
+
+    # Verifica limite diário de saque
     cur.execute(
-        "SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE user_id=%s AND type IN ('daily_bonus', 'promo', 'referral_bonus')",
-        (uid,))
-    total_bonus = cur.fetchone()['total'] or 0
-    if total_bonus > 0:
-        cur.execute("SELECT COUNT(*) as n FROM referrals WHERE referrer_id=%s", (uid,))
-        total_referidos = cur.fetchone()['n']
-        if total_referidos < 5:
-            cur.close(); c.close()
-            return None, f"Para sacar com bonus precisas de convidar 5 pessoas. Tens {total_referidos}/5."
+        "SELECT COALESCE(SUM(amount),0) AS total FROM withdrawals WHERE user_id=%s AND status IN ('pending','completed') AND created_at LIKE %s",
+        (uid, today + '%'))
+    withdrawn_today = float(cur.fetchone()['total'] or 0)
+    if withdrawn_today + amount > DAILY_LIMIT:
+        remaining = DAILY_LIMIT - withdrawn_today
+        cur.close(); c.close()
+        return None, f"Limite diário atingido. Podes sacar mais {remaining:,.0f} Kz hoje."
+
+    # Verifica saldo
+    cur.execute("SELECT balance FROM users WHERE id=%s FOR UPDATE", (uid,))
+    row = cur.fetchone()
+    if not row or float(row['balance']) < amount:
+        cur.close(); c.close()
+        return None, "Saldo insuficiente."
+
+    # Debita o valor total do saldo
     cur.execute("UPDATE users SET balance=balance-%s WHERE id=%s", (amount, uid))
-    cur.execute("INSERT INTO withdrawals(user_id,amount,net_amount,express_number,account_name) VALUES(%s,%s,%s,%s,%s) RETURNING id",
-                (uid, amount, net, express_num, account_name))
+
+    # Regista o levantamento
+    cur.execute(
+        "INSERT INTO withdrawals(user_id,amount,net_amount,express_number,account_name) VALUES(%s,%s,%s,%s,%s) RETURNING id",
+        (uid, amount, net, express_num, account_name))
     wid = cur.fetchone()['id']
-    cur.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-                (uid, 'withdrawal_pending', -amount, f"Pedido levantamento -> {express_num}"))
-    referrer_id = row['referred_by']
-    if referrer_id:
-        cur.execute("UPDATE users SET balance=balance+%s WHERE id=%s", (taxa_afiliado, referrer_id))
-        cur.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-                    (referrer_id, 'affiliate_bonus', taxa_afiliado,
-                     f"Comissao afiliado 5% do levantamento de uid {uid}"))
+
+    # Transação de registo
+    cur.execute(
+        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
+        (uid, 'withdrawal_pending', -amount,
+         f"Pedido levantamento → {express_num} ({account_name})"))
+
     c.commit(); cur.close(); c.close()
+
     u = get_user(uid)
     add_admin_notif("withdrawal_request",
-        f"LEVANTAMENTO: {u['name']} quer sacar {amount:,.0f} Kz -> {express_num} ({account_name})",
-        {"uid": uid, "amount": amount, "net": net, "express": express_num,
-         "account_name": account_name, "wid": wid})
+        f"LEVANTAMENTO: {u['name']} quer sacar {amount:,.0f} Kz → {express_num} ({account_name})",
+        {"uid": uid, "amount": amount, "net": net,
+         "express": express_num, "account_name": account_name, "wid": wid})
     return wid, None
 
 def complete_withdrawal(wid, note=""):
@@ -396,9 +524,12 @@ def complete_withdrawal(wid, note=""):
     if not w: cur.close(); c.close(); return False
     w = dict(w)
     cur.execute("UPDATE withdrawals SET status='completed',note=%s WHERE id=%s", (note, wid))
-    cur.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-                (w['user_id'], 'withdrawal', -w['amount'], f"Levantamento enviado → {w['express_number']}"))
-    c.commit(); cur.close(); c.close(); return True
+    cur.execute(
+        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
+        (w['user_id'], 'withdrawal', -w['amount'],
+         f"Levantamento enviado → {w['express_number']}"))
+    c.commit(); cur.close(); c.close()
+    return True
 
 def reject_withdrawal(wid, note=""):
     c = _c(); cur = c.cursor()
@@ -406,59 +537,35 @@ def reject_withdrawal(wid, note=""):
     w = cur.fetchone()
     if not w: cur.close(); c.close(); return False
     w = dict(w)
+    # Devolve o saldo ao utilizador
     cur.execute("UPDATE users SET balance=balance+%s WHERE id=%s", (w['amount'], w['user_id']))
     cur.execute("UPDATE withdrawals SET status='rejected',note=%s WHERE id=%s", (note, wid))
-    cur.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-                (w['user_id'], 'refund', w['amount'], "Levantamento rejeitado - saldo devolvido"))
-    c.commit(); cur.close(); c.close(); return True
+    cur.execute(
+        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
+        (w['user_id'], 'refund', w['amount'],
+         "Levantamento rejeitado — saldo devolvido"))
+    c.commit(); cur.close(); c.close()
+    return True
 
 def get_pending_withdrawals():
     c = _c(); cur = c.cursor()
-    cur.execute("""SELECT w.*,u.name,u.phone FROM withdrawals w
+    cur.execute("""
+        SELECT w.*,u.name,u.phone FROM withdrawals w
         JOIN users u ON u.id=w.user_id
-        WHERE w.status='pending' ORDER BY w.created_at DESC""")
+        WHERE w.status='pending' ORDER BY w.created_at DESC
+    """)
     rows = cur.fetchall(); cur.close(); c.close()
     return [dict(r) for r in rows]
 
 def get_user_withdrawals(uid, limit=15):
     c = _c(); cur = c.cursor()
-    cur.execute("SELECT * FROM withdrawals WHERE user_id=%s ORDER BY created_at DESC LIMIT %s", (uid, limit))
+    cur.execute(
+        "SELECT * FROM withdrawals WHERE user_id=%s ORDER BY created_at DESC LIMIT %s",
+        (uid, limit))
     rows = cur.fetchall(); cur.close(); c.close()
     return [dict(r) for r in rows]
 
-# --- NOTIFICACOES ADMIN ---
-def add_admin_notif(ntype, message, data=None):
-    c = _c(); cur = c.cursor()
-    cur.execute("INSERT INTO admin_notifications(type,message,data) VALUES(%s,%s,%s)",
-                (ntype, message, json.dumps(data or {})))
-    c.commit(); cur.close(); c.close()
-
-def get_admin_notifs(unread_only=False, limit=50):
-    c = _c(); cur = c.cursor()
-    q = "SELECT * FROM admin_notifications"
-    if unread_only: q += " WHERE read=0"
-    q += " ORDER BY created_at DESC LIMIT %s"
-    cur.execute(q, (limit,)); rows = cur.fetchall(); cur.close(); c.close()
-    out = []
-    for r in rows:
-        d = dict(r)
-        try: d['data'] = json.loads(d['data'])
-        except: d['data'] = {}
-        out.append(d)
-    return out
-
-def mark_notifs_read():
-    c = _c(); cur = c.cursor()
-    cur.execute("UPDATE admin_notifications SET read=1")
-    c.commit(); cur.close(); c.close()
-
-def get_all_users(limit=100):
-    c = _c(); cur = c.cursor()
-    cur.execute("SELECT * FROM users ORDER BY created_at DESC LIMIT %s", (limit,))
-    rows = cur.fetchall(); cur.close(); c.close()
-    return [dict(r) for r in rows]
-
-# ── REFERIDOS ──────────────────────────────────────────
+# ── REFERIDOS ────────────────────────────────────────────────────────
 def gen_ref_code():
     return "".join(random.choices(_string.ascii_uppercase + _string.digits, k=8))
 
@@ -476,32 +583,58 @@ def get_user_by_refcode(code):
     return dict(r) if r else None
 
 def register_referral(referrer_id, referred_id):
-    REFERRAL_BONUS = 500
+    """
+    Regista o referido. O bónus de 500 Kz é pago apenas
+    quando o referidor completar um grupo de 5 referidos.
+    """
     c = _c(); cur = c.cursor()
+
+    # Evita duplicados
     cur.execute("SELECT id FROM referrals WHERE referred_id=%s", (referred_id,))
-    if cur.fetchone(): cur.close(); c.close(); return
-    cur.execute("INSERT INTO referrals(referrer_id,referred_id) VALUES(%s,%s)", (referrer_id, referred_id))
-    cur.execute("UPDATE users SET balance=balance+%s WHERE id=%s", (REFERRAL_BONUS, referrer_id))
-    cur.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-                (referrer_id,'referral_bonus', REFERRAL_BONUS, "Bónus referido: novo utilizador"))
-    cur.execute("UPDATE referrals SET bonus_paid=1 WHERE referred_id=%s", (referred_id,))
+    if cur.fetchone():
+        cur.close(); c.close(); return
+
+    # Regista o referido (sem pagar bónus ainda)
+    cur.execute(
+        "INSERT INTO referrals(referrer_id,referred_id,bonus_paid) VALUES(%s,%s,0)",
+        (referrer_id, referred_id))
+
+    # Conta quantos referidos (não pagos em grupo) o referidor tem
+    cur.execute(
+        "SELECT COUNT(*) AS n FROM referrals WHERE referrer_id=%s",
+        (referrer_id,))
+    total = int(cur.fetchone()['n'])
+
+    # Paga bónus a cada grupo de 5 completo
+    if total % REFERRAL_GROUP_SIZE == 0:
+        cur.execute(
+            "UPDATE users SET balance=balance+%s WHERE id=%s",
+            (REFERRAL_BONUS_PER_GROUP, referrer_id))
+        cur.execute(
+            "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
+            (referrer_id, 'referral_bonus', REFERRAL_BONUS_PER_GROUP,
+             f"Bónus referidos: grupo de {REFERRAL_GROUP_SIZE} completado ({total} no total)"))
+
     c.commit(); cur.close(); c.close()
 
 def get_referrals(uid):
     c = _c(); cur = c.cursor()
-    cur.execute("""SELECT r.*,u.name,u.created_at as uc FROM referrals r
-        JOIN users u ON u.id=r.referred_id WHERE r.referrer_id=%s
-        ORDER BY r.created_at DESC""", (uid,))
+    cur.execute("""
+        SELECT r.*,u.name,u.created_at AS uc FROM referrals r
+        JOIN users u ON u.id=r.referred_id
+        WHERE r.referrer_id=%s ORDER BY r.created_at DESC
+    """, (uid,))
     rows = cur.fetchall(); cur.close(); c.close()
     return [dict(r) for r in rows]
 
-# ── PROMO CODES ──────────────────────────────────────
+# ── PROMO CODES ──────────────────────────────────────────────────────
 def create_promo(code, amount, max_uses=100, expires=""):
     c = _c(); cur = c.cursor()
-    cur.execute("""INSERT INTO promo_codes(code,bonus_amount,max_uses,expires_at) VALUES(%s,%s,%s,%s)
+    cur.execute("""
+        INSERT INTO promo_codes(code,bonus_amount,max_uses,expires_at) VALUES(%s,%s,%s,%s)
         ON CONFLICT(code) DO UPDATE SET bonus_amount=EXCLUDED.bonus_amount,
-        max_uses=EXCLUDED.max_uses, expires_at=EXCLUDED.expires_at""",
-        (code.upper().strip(), amount, max_uses, expires))
+        max_uses=EXCLUDED.max_uses, expires_at=EXCLUDED.expires_at
+    """, (code.upper().strip(), amount, max_uses, expires))
     c.commit(); cur.close(); c.close()
 
 def use_promo(uid, code):
@@ -511,17 +644,21 @@ def use_promo(uid, code):
     row = cur.fetchone()
     if not row: cur.close(); c.close(); return False, "Código inválido ou expirado."
     row = dict(row)
-    if row['uses'] >= row['max_uses']: cur.close(); c.close(); return False, "Código esgotado."
+    if row['uses'] >= row['max_uses']:
+        cur.close(); c.close(); return False, "Código esgotado."
     if row['expires_at'] and row['expires_at'] < datetime.now().isoformat():
         cur.close(); c.close(); return False, "Código expirado."
-    cur.execute("SELECT id FROM transactions WHERE user_id=%s AND description LIKE %s",
-                (uid, f"%PROMO:{code.upper()}%"))
-    if cur.fetchone(): cur.close(); c.close(); return False, "Já usaste este código."
+    cur.execute(
+        "SELECT id FROM transactions WHERE user_id=%s AND description LIKE %s",
+        (uid, f"%PROMO:{code.upper()}%"))
+    if cur.fetchone():
+        cur.close(); c.close(); return False, "Já usaste este código."
     amt = row['bonus_amount']
     cur.execute("UPDATE promo_codes SET uses=uses+1 WHERE code=%s", (code.upper().strip(),))
     cur.execute("UPDATE users SET balance=balance+%s WHERE id=%s", (amt, uid))
-    cur.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-                (uid,'promo', amt, f"Bónus código PROMO:{code.upper()}"))
+    cur.execute(
+        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
+        (uid, 'promo', amt, f"Bónus código PROMO:{code.upper()}"))
     c.commit(); cur.close(); c.close()
     return True, amt
 
@@ -531,12 +668,12 @@ def get_all_promos():
     rows = cur.fetchall(); cur.close(); c.close()
     return [dict(r) for r in rows]
 
-# ── BÓNUS DIÁRIO ──────────────────────────────────────
+# ── BÓNUS DIÁRIO (mantido para compatibilidade interna) ───────────────
 DAILY_BONUSES = [500, 750, 1000, 1500, 2000, 2500, 5000]
 
 def claim_daily(uid):
     from datetime import datetime, date, timedelta
-    today = date.today().isoformat()
+    today     = date.today().isoformat()
     yesterday = (date.today() - timedelta(days=1)).isoformat()
     c = _c(); cur = c.cursor()
     cur.execute("SELECT * FROM daily_bonus WHERE user_id=%s", (uid,))
@@ -547,35 +684,73 @@ def claim_daily(uid):
             cur.close(); c.close(); return False, "Já recebeste o bónus hoje. Volta amanhã!"
         streak = row['streak'] + 1 if row['last_claim'] == yesterday else 1
         streak = min(streak, 7)
-        cur.execute("UPDATE daily_bonus SET last_claim=%s,streak=%s WHERE user_id=%s", (today, streak, uid))
+        cur.execute(
+            "UPDATE daily_bonus SET last_claim=%s,streak=%s WHERE user_id=%s",
+            (today, streak, uid))
     else:
         streak = 1
-        cur.execute("INSERT INTO daily_bonus(user_id,last_claim,streak) VALUES(%s,%s,1)", (uid, today))
-    amt = DAILY_BONUSES[min(streak-1, 6)]
+        cur.execute(
+            "INSERT INTO daily_bonus(user_id,last_claim,streak) VALUES(%s,%s,1)",
+            (uid, today))
+    amt = DAILY_BONUSES[min(streak - 1, 6)]
     cur.execute("UPDATE users SET balance=balance+%s WHERE id=%s", (amt, uid))
-    cur.execute("INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
-                (uid,'daily_bonus', amt, f"Bónus diário — Dia {streak}"))
+    cur.execute(
+        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
+        (uid, 'daily_bonus', amt, f"Bónus diário — Dia {streak}"))
     c.commit(); cur.close(); c.close()
     return True, {"amount": amt, "streak": streak}
 
 def get_daily_status(uid):
     from datetime import date, timedelta
-    today = date.today().isoformat()
+    today     = date.today().isoformat()
     yesterday = (date.today() - timedelta(days=1)).isoformat()
     c = _c(); cur = c.cursor()
     cur.execute("SELECT * FROM daily_bonus WHERE user_id=%s", (uid,))
     row = cur.fetchone(); cur.close(); c.close()
-    if not row: return {"claimed": False, "streak": 0, "next": DAILY_BONUSES[0]}
+    if not row:
+        return {"claimed": False, "streak": 0, "next": DAILY_BONUSES[0]}
     row = dict(row)
-    claimed = row['last_claim'] == today
-    streak = row['streak'] if row['last_claim'] in [today, yesterday] else 0
-    next_streak = min(streak + (0 if claimed else 1), 7)
-    return {"claimed": claimed, "streak": streak, "next": DAILY_BONUSES[max(next_streak-1,0)]}
+    claimed      = row['last_claim'] == today
+    streak       = row['streak'] if row['last_claim'] in [today, yesterday] else 0
+    next_streak  = min(streak + (0 if claimed else 1), 7)
+    return {"claimed": claimed, "streak": streak,
+            "next": DAILY_BONUSES[max(next_streak - 1, 0)]}
 
-# ── SUPORTE ──────────────────────────────────────────
+# ── BÓNUS 10 PARTIDAS ────────────────────────────────────────────────
+def claim_ten_games_bonus(uid):
+    """
+    Credita 2.000 Kz ao jogador que completou 10 partidas.
+    Sem restrições de saque além do limite diário.
+    """
+    u = get_user(uid)
+    if not u:
+        return False, "Utilizador não encontrado."
+    if u.get('ten_games_bonus_claimed'):
+        return False, "Bónus já recebido."
+    if (u.get('games_played') or 0) < 10:
+        remaining = 10 - (u.get('games_played') or 0)
+        return False, f"Faltam {remaining} partidas para desbloquear este bónus."
+
+    c = _c(); cur = c.cursor()
+    cur.execute("""
+        UPDATE users
+        SET balance = balance + %s,
+            ten_games_bonus_claimed = TRUE
+        WHERE id = %s
+    """, (TEN_GAMES_BONUS, uid))
+    cur.execute(
+        "INSERT INTO transactions(user_id,type,amount,description) VALUES(%s,%s,%s,%s)",
+        (uid, 'ten_games_bonus', TEN_GAMES_BONUS, "Bónus 10 partidas"))
+    c.commit(); cur.close(); c.close()
+    u = get_user(uid)
+    return True, {"amount": TEN_GAMES_BONUS, "balance": u['balance']}
+
+# ── SUPORTE ──────────────────────────────────────────────────────────
 def create_ticket(uid, message):
     c = _c(); cur = c.cursor()
-    cur.execute("INSERT INTO support_tickets(user_id,message) VALUES(%s,%s) RETURNING id", (uid, message))
+    cur.execute(
+        "INSERT INTO support_tickets(user_id,message) VALUES(%s,%s) RETURNING id",
+        (uid, message))
     tid = cur.fetchone()['id']
     c.commit(); cur.close(); c.close()
     u = get_user(uid)
@@ -586,20 +761,60 @@ def create_ticket(uid, message):
 
 def reply_ticket(tid, reply):
     c = _c(); cur = c.cursor()
-    cur.execute("UPDATE support_tickets SET reply=%s,status='closed' WHERE id=%s", (reply, tid))
+    cur.execute(
+        "UPDATE support_tickets SET reply=%s,status='closed' WHERE id=%s",
+        (reply, tid))
     cur.execute("SELECT * FROM support_tickets WHERE id=%s", (tid,))
     row = cur.fetchone(); c.commit(); cur.close(); c.close()
     return dict(row) if row else None
 
 def get_user_tickets(uid):
     c = _c(); cur = c.cursor()
-    cur.execute("SELECT * FROM support_tickets WHERE user_id=%s ORDER BY created_at DESC LIMIT 10", (uid,))
+    cur.execute(
+        "SELECT * FROM support_tickets WHERE user_id=%s ORDER BY created_at DESC LIMIT 10",
+        (uid,))
     rows = cur.fetchall(); cur.close(); c.close()
     return [dict(r) for r in rows]
 
 def get_all_tickets():
     c = _c(); cur = c.cursor()
-    cur.execute("""SELECT t.*,u.name,u.phone FROM support_tickets t
-        JOIN users u ON u.id=t.user_id ORDER BY t.created_at DESC""")
+    cur.execute("""
+        SELECT t.*,u.name,u.phone FROM support_tickets t
+        JOIN users u ON u.id=t.user_id ORDER BY t.created_at DESC
+    """)
+    rows = cur.fetchall(); cur.close(); c.close()
+    return [dict(r) for r in rows]
+
+# ── NOTIFICAÇÕES ADMIN ───────────────────────────────────────────────
+def add_admin_notif(ntype, message, data=None):
+    c = _c(); cur = c.cursor()
+    cur.execute(
+        "INSERT INTO admin_notifications(type,message,data) VALUES(%s,%s,%s)",
+        (ntype, message, json.dumps(data or {})))
+    c.commit(); cur.close(); c.close()
+
+def get_admin_notifs(unread_only=False, limit=50):
+    c = _c(); cur = c.cursor()
+    q = "SELECT * FROM admin_notifications"
+    if unread_only: q += " WHERE read=0"
+    q += " ORDER BY created_at DESC LIMIT %s"
+    cur.execute(q, (limit,))
+    rows = cur.fetchall(); cur.close(); c.close()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:   d['data'] = json.loads(d['data'])
+        except: d['data'] = {}
+        out.append(d)
+    return out
+
+def mark_notifs_read():
+    c = _c(); cur = c.cursor()
+    cur.execute("UPDATE admin_notifications SET read=1")
+    c.commit(); cur.close(); c.close()
+
+def get_all_users(limit=100):
+    c = _c(); cur = c.cursor()
+    cur.execute("SELECT * FROM users ORDER BY created_at DESC LIMIT %s", (limit,))
     rows = cur.fetchall(); cur.close(); c.close()
     return [dict(r) for r in rows]
