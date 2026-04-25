@@ -313,7 +313,23 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
             <input id="lp-phone" type="tel" placeholder="9XX XXX XXX" style="flex:1" onkeydown="if(event.key==='Enter')document.getElementById('lp-pw').focus()">
           </div>
         </div>
-        <div class="fl"><label>Senha</label><input id="lp-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div class="fl">
+  <label>Senha</label>
+  <div style="position:relative;">
+    <input id="lp-pw" 
+           type="password" 
+           placeholder="••••••••" 
+           style="width:100%; padding-right:45px;"
+           onkeydown="if(event.key==='Enter')doLogin()">
+    
+    <!-- Botão de ver senha -->
+    <span onclick="togglePassword('lp-pw')" 
+          style="position:absolute; right:12px; top:50%; transform:translateY(-50%); 
+                 cursor:pointer; font-size:18px; color:#888; user-select:none;">
+      👁️
+    </span>
+  </div>
+</div>
         <div class="errt" id="lerr"></div>
         <button class="btn bg bfw" id="btn-login" onclick="doLogin()" style="margin-top:6px;font-size:15px">Entrar</button>
         <div style="text-align:center;margin-top:13px">
@@ -1675,6 +1691,25 @@ window.coinRain=coinRain;
     jkBanner.style.cursor='pointer';
   }
 })();
+  
+</script>
+
+<!-- === FUNÇÃO PARA MOSTRAR/ESCONDER SENHA === -->
+<script>
+function togglePassword(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  
+  const icon = input.parentElement.querySelector('span');
+  
+  if (input.type === "password") {
+    input.type = "text";
+    if (icon) icon.textContent = "🙈";
+  } else {
+    input.type = "password";
+    if (icon) icon.textContent = "👁️";
+  }
+}
 </script>
 
 <script src="/static/ludo_board_v2.js"></script>
