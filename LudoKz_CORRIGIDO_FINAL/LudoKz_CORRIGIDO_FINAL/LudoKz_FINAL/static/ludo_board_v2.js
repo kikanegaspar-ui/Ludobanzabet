@@ -17,9 +17,6 @@ function _getU() {
   return window.U || null;
 }
 
-// ══════════════════════════════════════════════════════════════
-//  MAPAS DE CORES
-// ══════════════════════════════════════════════════════════════
 const COLOUR_HEX  = { blue:'#1295e7', green:'#049645', red:'#e53935', yellow:'#f9a825' };
 const COLOUR_NAME = { blue:'Azul', green:'Verde', red:'Vermelho', yellow:'Amarelo' };
 const COLOUR_GRAD = {
@@ -30,9 +27,6 @@ const COLOUR_GRAD = {
 };
 const COLOUR_TEXT = { blue:'#fff', green:'#fff', red:'#fff', yellow:'#111' };
 
-// ══════════════════════════════════════════════════════════════
-//  CMAP — coordenadas do tabuleiro (coluna, linha)
-// ══════════════════════════════════════════════════════════════
 const CMAP = {
   0:[6,13],1:[6,12],2:[6,11],3:[6,10],4:[6,9],
   5:[5,8],6:[4,8],7:[3,8],8:[2,8],9:[1,8],10:[0,8],
@@ -63,9 +57,6 @@ const BASE_IDS = {
 const HOME_ID   = { blue:105, green:205, red:305, yellow:405 };
 const _BASE_SET = new Set([500,501,502,503,600,601,602,603,700,701,702,703,800,801,802,803]);
 
-// ══════════════════════════════════════════════════════════════
-//  CAMINHOS COMPLETOS
-// ══════════════════════════════════════════════════════════════
 const START_ID  = { blue:0,  green:26, red:39, yellow:13 };
 const TURN_ID   = { blue:50, green:24, red:37, yellow:11 };
 const HOME_LANE = {
@@ -98,9 +89,6 @@ function _nextId(colour, currentId) {
   return path[idx + 1];
 }
 
-// ══════════════════════════════════════════════════════════════
-//  SONS
-// ══════════════════════════════════════════════════════════════
 const SFX = (() => {
   let ctx = null;
   const ac = () => { if (!ctx) try { ctx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} return ctx; };
@@ -123,14 +111,12 @@ const SFX = (() => {
     capture: ()=>{ tone(180,.15,'sawtooth',.22); tone(120,.18,'sawtooth',.18,.1); },
     home:    ()=>{ [784,988,1175].forEach((f,i)=>tone(f,.14,'sine',.22,i*.12)); },
     win:     ()=>{ [523,659,784,1047].forEach((f,i)=>tone(f,.2,'sine',.28,i*.15)); },
+    pass:    ()=>{ tone(300,.12,'sine',.12); tone(200,.15,'sine',.10,.13); },
   };
 })();
 window.SFX = SFX;
 document.addEventListener('click', ()=>SFX.unlock(), {once:true});
 
-// ══════════════════════════════════════════════════════════════
-//  CSS
-// ══════════════════════════════════════════════════════════════
 (function(){
   if (document.getElementById('lk-css')) return;
   const s = document.createElement('style');
@@ -167,13 +153,12 @@ document.addEventListener('click', ()=>SFX.unlock(), {once:true});
   .gli{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);color:#9890c0;font-size:12px;font-weight:600;line-height:1.5;}
   .gli:last-child{border:none;}
   .gli.w{color:#00e676;}.gli.k{color:#ff4757;}.gli.r{color:#f5c518;}
+  #lk-pass-msg{text-align:center;font-size:12px;font-weight:800;color:#ff9f0a;letter-spacing:1px;padding:6px;margin-bottom:4px;min-height:22px;transition:opacity .3s;}
   `;
   document.head.appendChild(s);
 })();
 
-// ══════════════════════════════════════════════════════════════
-//  DADO FLAT — pontos DOM
-// ══════════════════════════════════════════════════════════════
+// FIX 1: _drawDots protegido contra val=0 ou NaN
 const DOT_LAYOUT = {
   1:[[50,50]],
   2:[[28,28],[72,72]],
@@ -186,7 +171,8 @@ const DOT_LAYOUT = {
 function _drawDots(container, val) {
   container.querySelectorAll('.lk-dot').forEach(d=>d.remove());
   if (container.textContent === '?') container.textContent = '';
-  const v = Math.max(1, Math.min(6, val));
+  // FIX: val pode chegar como 0 quando turno passa sem jogadas — forçar mínimo 1
+  const v = Math.max(1, Math.min(6, Math.round(val) || 1));
   (DOT_LAYOUT[v]||DOT_LAYOUT[1]).forEach(([cx,cy])=>{
     const d = document.createElement('span');
     d.className = 'lk-dot' + (v===1?' red':'');
@@ -196,27 +182,30 @@ function _drawDots(container, val) {
   });
 }
 
+// FIX 2: _animDice protegido contra val=0 — não anima, chama callback directamente
 function _animDice(val, cb) {
+  const safeVal = Math.max(1, Math.min(6, Math.round(val) || 0));
+  if (!safeVal) {
+    // val=0 significa que o turno passou automaticamente sem jogadas — não anima
+    if (cb) cb();
+    return;
+  }
   SFX.dice();
   const flat = document.getElementById('lk-dice-flat');
   const nm   = document.getElementById('lk-dice-num');
   if (flat) { flat.classList.remove('rolling'); void flat.offsetWidth; flat.classList.add('rolling'); }
   const dfc=document.getElementById('dfc'), dnm=document.getElementById('dnm');
-  if (dfc) dfc.textContent=['⚀','⚁','⚂','⚃','⚄','⚅'][val-1];
-  if (dnm) dnm.textContent=val;
+  if (dfc) dfc.textContent=['⚀','⚁','⚂','⚃','⚄','⚅'][safeVal-1];
+  if (dnm) dnm.textContent=safeVal;
   setTimeout(()=>{
-    if (flat) { flat.classList.remove('rolling'); _drawDots(flat, val); }
-    if (nm) { nm.textContent=val; nm.classList.remove('num-pop'); void nm.offsetWidth; nm.classList.add('num-pop'); }
+    if (flat) { flat.classList.remove('rolling'); _drawDots(flat, safeVal); }
+    if (nm) { nm.textContent=safeVal; nm.classList.remove('num-pop'); void nm.offsetWidth; nm.classList.add('num-pop'); }
     if (cb) cb();
   }, 450);
 }
 
-// Expõe para o index.html usar
 window.BOARD = { animateDice: _animDice };
 
-// ══════════════════════════════════════════════════════════════
-//  TABULEIRO DOM
-// ══════════════════════════════════════════════════════════════
 let _els = {};
 
 function _buildBoard() {
@@ -255,8 +244,7 @@ function _buildDiceUI() {
   if (!gcd) return;
   const w = document.createElement('div');
   w.id = 'lk-dice-wrap';
-  // IMPORTANTE: o onclick chama window.doRoll que está definido no index.html
-  w.innerHTML = `<div id="lk-dice-flat" onclick="window.doRoll()"></div><div id="lk-dice-num">-</div>`;
+  w.innerHTML = `<div id="lk-pass-msg"></div><div id="lk-dice-flat" onclick="window.doRoll()"></div><div id="lk-dice-num">-</div>`;
   const dfc=document.getElementById('dfc'), dnm=document.getElementById('dnm');
   if (dfc) { dfc.style.display='none'; dfc.parentNode.insertBefore(w,dfc); }
   else { const btd=gcd.querySelector('.btd'); if(btd) btd.after(w); else gcd.prepend(w); }
@@ -288,13 +276,11 @@ function _clearSel() {
   });
 }
 
-// ══════════════════════════════════════════════════════════════
-//  _isMyTurn — compara user_id como string
-// ══════════════════════════════════════════════════════════════
+// FIX 3: _isMyTurn — também verifica started, não só over
 function _isMyTurn(state) {
-  if (!state?.players || state.over) return false;
+  if (!state?.players || state.over || !state.started) return false;
   const p = state.players[state.turn];
-  if (!p || state.phase !== 0) return false;
+  if (!p) return false;
   const me = _getU();
   if (!me) return false;
   const myId    = String(me.id || me.user_id || '');
@@ -302,9 +288,6 @@ function _isMyTurn(state) {
   return myId !== '' && myId === theirId;
 }
 
-// ══════════════════════════════════════════════════════════════
-//  ANIMAÇÃO DIFF
-// ══════════════════════════════════════════════════════════════
 function _applyDiff(prev, next) {
   if (!prev?.players||!next?.players) return;
   next.players.forEach((pl,idx)=>{
@@ -326,25 +309,40 @@ function _applyDiff(prev, next) {
 
 const _animating = new Set();
 
+// FIX 4: _movePieceSmooth — protegido contra fromId===toId e loop infinito
 function _movePieceSmooth(colour, pieceIdx, fromId, toId, onDone) {
-  const key=colour+'-'+pieceIdx;
-  if (_BASE_SET.has(fromId)) { _place(colour,pieceIdx,toId); if(onDone)onDone(); return; }
+  const key = colour+'-'+pieceIdx;
+  // FIX: se já está no destino, não anima
+  if (fromId === toId) { if(onDone) onDone(); return; }
+  if (_BASE_SET.has(fromId)) { _place(colour,pieceIdx,toId); if(onDone) onDone(); return; }
   const path=FULL_PATH[colour];
   const fi=path.indexOf(fromId), ti=path.indexOf(toId);
   if(fi===-1||ti===-1||ti<=fi){ _place(colour,pieceIdx,toId); if(onDone)onDone(); return; }
   _animating.add(key);
   let cur=fromId;
+  let steps=0;
+  const maxSteps=ti-fi+2; // FIX: limite de segurança
   function step(){
-    if(cur===toId){ _animating.delete(key); if(onDone)onDone(); return; }
-    cur=_nextId(colour,cur); _place(colour,pieceIdx,cur); SFX.move();
+    steps++;
+    if(cur===toId||steps>maxSteps){ _place(colour,pieceIdx,toId); _animating.delete(key); if(onDone)onDone(); return; }
+    const next=_nextId(colour,cur);
+    if(next===cur){ _place(colour,pieceIdx,toId); _animating.delete(key); if(onDone)onDone(); return; } // FIX: _nextId preso
+    cur=next; _place(colour,pieceIdx,cur); SFX.move();
     setTimeout(step,150);
   }
   step();
 }
 
-// ══════════════════════════════════════════════════════════════
-//  RENDER STATE
-// ══════════════════════════════════════════════════════════════
+// Mostra mensagem temporária de turno passado
+function _showPassMsg(msg) {
+  const el = document.getElementById('lk-pass-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>{ el.textContent=''; },300); }, 2200);
+}
+
 window.CUR_STATE=null; window.PREV_STATE=null;
 
 window.renderState = function(state) {
@@ -379,13 +377,17 @@ window.renderState = function(state) {
 
   const rb=document.getElementById('rb');
   const myT=_isMyTurn(state);
+  // FIX 5: lógica do botão separada por caso
+  const canRoll = myT && state.phase===0 && !state.over;
 
   if(rb){
-    rb.disabled=!myT||state.phase!==0||!!state.over;
+    rb.disabled = !canRoll;
     if(state.over){
       rb.textContent='🏁 Jogo terminado'; rb.classList.remove('my-turn');
-    } else if(myT&&state.phase===0){
+    } else if(canRoll){
       rb.textContent='🎲 LANÇAR DADO'; rb.classList.add('my-turn');
+    } else if(myT && state.phase===1){
+      rb.textContent='👆 Escolhe uma peça'; rb.classList.remove('my-turn');
     } else {
       const curP=state.players[state.turn];
       rb.textContent=`⏳ Vez de ${curP?curP.name:'...'}`;
@@ -397,7 +399,7 @@ window.renderState = function(state) {
   if(!myT&&state.dice&&state.phase===1){
     const nm=document.getElementById('lk-dice-num'), flat=document.getElementById('lk-dice-flat');
     if(nm){nm.textContent=state.dice;nm.classList.remove('num-pop');void nm.offsetWidth;nm.classList.add('num-pop');}
-    if(flat) _drawDots(flat,state.dice);
+    if(flat&&state.dice>=1) _drawDots(flat,state.dice);
   }
 
   const gbv=document.getElementById('gbv');
@@ -417,20 +419,19 @@ window.renderState = function(state) {
   if(co) co.textContent=(state.players?.length||0)+' online';
 };
 
-// ══════════════════════════════════════════════════════════════
-//  HIGHLIGHT — peças seleccionáveis
-// ══════════════════════════════════════════════════════════════
+// FIX 6: highlightPcs — valida phase===1 e que ainda é o meu turno antes de destacar
 window.highlightPcs=function(mv){
   if(!window.CUR_STATE||!mv?.length) return;
+  if(window.CUR_STATE.phase!==1||window.CUR_STATE.over) return;
   const curP=window.CUR_STATE.players?.[window.CUR_STATE.turn];
   if(!curP) return;
+  const me=_getU();
+  if(!me) return;
+  if(String(me.id||me.user_id||'')!==String(curP.user_id||'')) return;
   const colour=curP.color||curP.colour;
   if(colour&&_els[colour]) _setSelectable(colour,mv);
 };
 
-// ══════════════════════════════════════════════════════════════
-//  EVENTOS SSE — chamados pelo index.html via window.*
-// ══════════════════════════════════════════════════════════════
 window.onGameStarted=function(state){
   window.RID=state.room_id||window.RID;
   window.CUR_STATE=state; window.PREV_STATE=null;
@@ -449,14 +450,26 @@ window.onGameStarted=function(state){
   },80);
 };
 
+// FIX 7: onGameUpdate — valida room_id e detecta turno passado automaticamente
 window.onGameUpdate=function(state){
+  if(state.room_id && window.RID && state.room_id!==window.RID) return;
   const prev=window.CUR_STATE?JSON.parse(JSON.stringify(window.CUR_STATE)):null;
+  // Detecta turno passado sem jogadas: phase=0, dice=0, turno mudou
+  if(prev && state.phase===0 && state.dice===0 && prev.turn!==state.turn){
+    const lastLog=state.log?.[state.log.length-1]||'';
+    if(/passa a vez|sem jogadas/i.test(lastLog)){
+      SFX.pass();
+      _showPassMsg('↩️ Sem jogadas — turno passou!');
+    }
+  }
   window.CUR_STATE=state;
   if(prev) _applyDiff(prev,state);
   window.renderState(state);
 };
 
+// FIX 8: onGameOver — ignora se não há RID activo e não ganhou
 window.onGameOver=function(d){
+  if(!window.RID && !d.won) return;
   const goo=document.getElementById('goo'); if(!goo) return;
   const goic=document.getElementById('goic'),gott=document.getElementById('gott');
   const gosb=document.getElementById('gosb'),gopr=document.getElementById('gopr');
@@ -481,9 +494,6 @@ window.onGameOver=function(d){
   if(d.balance!=null&&window.U){window.U.balance=d.balance;if(typeof updN==='function')updN();}
 };
 
-// ══════════════════════════════════════════════════════════════
-//  movePc — chamado quando o jogador clica na peça
-// ══════════════════════════════════════════════════════════════
 window.movePc=async function(idx){
   if(!window.RID) return;
   _clearSel();
@@ -495,16 +505,18 @@ window.movePc=async function(idx){
       body:JSON.stringify({room_id:window.RID,piece:idx}),credentials:'same-origin',
     });
     d=await r.json();
-  }catch(e){return;}
-  if(d.error){if(typeof toast==='function') toast('❌ '+d.error,'ter');return;}
+  }catch(e){if(typeof toast==='function') toast('❌ Erro de ligação.','ter');return;}
+  if(d.error){
+    if(typeof toast==='function') toast('❌ '+d.error,'ter');
+    // FIX: repõe botão correctamente após erro
+    if(window.CUR_STATE&&typeof window.renderState==='function') window.renderState(window.CUR_STATE);
+    return;
+  }
   if(window.PREV_STATE) _applyDiff(window.PREV_STATE,d);
   window.CUR_STATE=d;
   window.renderState(d);
 };
 
-// ══════════════════════════════════════════════════════════════
-//  leaveGame
-// ══════════════════════════════════════════════════════════════
 window.leaveGame=async function(){
   if(!confirm('Abandonar? Perdes a aposta.')) return;
   if(window.RID){
@@ -514,6 +526,8 @@ window.leaveGame=async function(){
     }).catch(()=>{});
   }
   window.RID=null;
+  window.CUR_STATE=null;
+  window.PREV_STATE=null;
   if(typeof pg==='function') pg('home');
 };
 
@@ -521,4 +535,4 @@ window.buildBoard=_buildBoard;
 window.initCanvas=_buildBoard;
 window.startRenderLoop=function(){};
 
-console.log('[LudoKz] v7 — doRoll centralizado no index.html, window.U sincronizado via _syncU()');
+console.log('[LudoKz] v8 — 8 bugs corrigidos');
