@@ -176,7 +176,7 @@ class GameManager:
                 "reached_home": False,
             })
         self.players.append({
-            "user_id": str(user_id),   # SEMPRE STRING
+            "user_id": str(user_id),
             "name":    name,
             "colour":  colour,
             "idx":     idx,
@@ -275,6 +275,7 @@ class GameManager:
     def _do_move(self, player, piece_idx):
         token  = player["tokens"][piece_idx]
         colour = player["colour"]
+        # FIX: guardar dice antes de o repor a 0
         dice   = self.dice
 
         if token["locked"]:
@@ -282,12 +283,20 @@ class GameManager:
             token["pos_id"]  = start_id
             token["locked"]  = False
             self._log(f"🚀 {player['name']}: peca {piece_idx+1} saiu da base!")
+            # FIX: repor phase e dice ANTES de _check_capture
+            # para que o estado enviado ao cliente seja sempre consistente
+            self.phase = 0
+            self.dice  = 0
             self._check_capture(player, start_id)
+            self._next_turn(dice == UNLOCK_DICE)
         else:
             nid = _next_pos(colour, token["pos_id"], dice)
             if nid is None:
                 return
             token["pos_id"] = nid
+            # FIX: repor phase e dice ANTES de qualquer log ou captura
+            self.phase = 0
+            self.dice  = 0
             if nid == HOME_ID[colour]:
                 token["reached_home"] = True
                 player["fin"] += 1
@@ -298,10 +307,7 @@ class GameManager:
             else:
                 self._log(f"♟️ {player['name']} moveu peca {piece_idx+1}")
                 self._check_capture(player, nid)
-
-        self.phase = 0
-        self.dice  = 0
-        self._next_turn(dice == UNLOCK_DICE)
+            self._next_turn(dice == UNLOCK_DICE)
 
     def _check_capture(self, moving_player, pos_id):
         if _is_safe(pos_id):
@@ -370,7 +376,7 @@ class GameManager:
             pos_list  = [t["pos_id"] for t in p["tokens"]]
             base_list = [1 if t["locked"] else 0 for t in p["tokens"]]
             players_out.append({
-                "user_id": p["user_id"],   # string
+                "user_id": p["user_id"],
                 "name":    p["name"],
                 "color":   p["colour"],
                 "colour":  p["colour"],
