@@ -853,7 +853,14 @@ function connectSSE(){
   SSE=new EventSource("/api/events",{withCredentials:true});
   SSE.addEventListener("game_started",e=>{if(typeof onGameStarted==="function")onGameStarted(JSON.parse(e.data));});
   SSE.addEventListener("game_update",e=>{if(typeof onGameUpdate==="function")onGameUpdate(JSON.parse(e.data));});
-  SSE.addEventListener("game_over",e=>{if(typeof onGameOver==="function")onGameOver(JSON.parse(e.data));});
+
+  // FIX: valida RID antes de mostrar game_over — evita ecrã falso de salas antigas
+  SSE.addEventListener("game_over",e=>{
+    const d=JSON.parse(e.data);
+    if(!window.RID && !d.won) return;
+    if(typeof onGameOver==="function") onGameOver(d);
+  });
+
   SSE.addEventListener("player_joined",e=>{
     const d=JSON.parse(e.data);
     toast("👥 "+d.name+" entrou! ("+d.players+"/"+d.max+")","tin");
@@ -887,7 +894,7 @@ async function doLogin(){
   btn.disabled=false;btn.textContent="Entrar";
   if(d.error){err.textContent="❌ "+d.error;return;}
   U=d.user;
-  if(window._syncU) window._syncU(U); /* ✅ PATCH 1 */
+  if(window._syncU) window._syncU(U);
   connectSSE();showApp();coinRain();
 }
 async function enviarOTP(){
@@ -952,7 +959,7 @@ async function doReg(){
   const d=await api("/api/register","POST",{name,phone:REG_PHONE,password:pw,ref_code:ref,age_confirmed:true,terms_accepted:true});
   if(d.error){err.textContent="❌ "+d.error;return;}
   U=d.user;
-  if(window._syncU) window._syncU(U); /* ✅ PATCH 2 */
+  if(window._syncU) window._syncU(U);
   connectSSE();showApp();
   toast("🎉 Bem-vindo! Recebeste 1.000 Kz de bónus de boas-vindas!","tok");
   coinBurst();
@@ -1111,7 +1118,14 @@ async function cancelWait(){
 }
 
 /* GAME OVER */
-function closeGO(){document.getElementById("goo").classList.add("hidden");RID=null;pg("home");}
+function closeGO(){
+  document.getElementById("goo").classList.add("hidden");
+  // FIX: limpa RID e estado do jogo ao fechar
+  RID=null;
+  window.CUR_STATE=null;
+  window.PREV_STATE=null;
+  pg("home");
+}
 
 /* CHAT */
 function addChat(name,text,sys=false){
@@ -1349,29 +1363,36 @@ function toast(msg,cls="tin"){
   setTimeout(()=>el.classList.remove("show"),3600);
 }
 
-/* ══════════════════════════════════════════════════════════════
-   GAME FUNCTIONS
-   ✅ PATCH 4: doRoll centralizado aqui com animação correcta
-   leaveGame e movePc vivem no ludo_board_v2.js
-══════════════════════════════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════
+//  doRoll — VERSÃO CORRIGIDA v8
+//  CORRECÇÕES:
+//  1. Usa o dice retornado pelo servidor (não state.dice que pode ser 0)
+//  2. Se diceVal === 0 (turno passou automaticamente), não anima dado
+//     e renderiza o estado directamente sem travar o botão
+//  3. Repõe botão correctamente após qualquer erro
+// ══════════════════════════════════════════════════════════════
 window.doRoll = async function(){
   if(!RID) return;
   const rb = document.getElementById("rb");
-  if(rb){ rb.disabled=true; rb.classList.remove("my-turn"); }
+  if(rb){ rb.disabled=true; rb.classList.remove("my-turn"); rb.textContent="⏳ A lançar..."; }
 
   const d = await api("/api/game/roll","POST",{room_id:RID});
 
   if(d.error){
     toast("❌ "+d.error,"ter");
-    // Repõe o estado correto do botão via renderState
+    // FIX: repõe botão ao estado correcto sem bloquear o jogo
     if(window.CUR_STATE && typeof window.renderState==="function")
       window.renderState(window.CUR_STATE);
     return;
   }
 
-  if(window.BOARD && window.BOARD.animateDice){
-    // ✅ Usa a animação do dado do board
-    window.BOARD.animateDice(d.dice, async function(){
+  // FIX PRINCIPAL: d.dice é o valor REAL do lançamento (1-6), retornado pelo servidor
+  // como {**state, "dice": dice}. Quando não há jogadas, state.dice é 0 mas d.dice
+  // ainda contém o valor real — usado para a animação.
+  const diceVal = d.dice;
+
+  if(diceVal && diceVal >= 1 && window.BOARD && window.BOARD.animateDice){
+    window.BOARD.animateDice(diceVal, async function(){
       if(typeof window.renderState==="function") window.renderState(d);
       if(d.phase===1){
         try{
@@ -1382,25 +1403,21 @@ window.doRoll = async function(){
       }
     });
   } else {
-    // Fallback sem board carregado
-    const faces=["⚀","⚁","⚂","⚃","⚄","⚅"];
-    const dfc=document.getElementById("dfc");
-    if(dfc) dfc.textContent=faces[(d.dice||1)-1];
-    const dnm=document.getElementById("dnm");
-    if(dnm) dnm.textContent=d.dice;
+    // diceVal=0: turno passou automaticamente sem peças para mover
     if(typeof window.renderState==="function") window.renderState(d);
+    if(!diceVal || diceVal < 1) toast("↩️ Sem peças para mover — turno passou!","tin");
   }
 };
 
 window.coinBurst=coinBurst;
 window.coinRain=coinRain;
 
-/* INIT ✅ PATCH 3: sincroniza window.U na sessão existente */
+/* INIT */
 (async()=>{
   const d=await api("/api/me");
   if(d.user){
     U=d.user;
-    if(window._syncU) window._syncU(U); /* ✅ PATCH 3 */
+    if(window._syncU) window._syncU(U);
     connectSSE();showApp();
   }
 })();
@@ -1483,7 +1500,7 @@ window.coinRain=coinRain;
   }
 
   function spawnGlint(cx,cy,count=6){
-    const colors=['#ffd700','#ffdb4d','#00e676','#bf5af2','#ff9f0a','#fff','#0a84ff'];
+    const colors=['#ffd700','#ffdb4d','#fff8b0','#00e676','#bf5af2','#ff9f0a','#fff','#0a84ff'];
     for(let i=0;i<count;i++){
       const el=document.createElement('div');
       const angle=Math.random()*Math.PI*2,dist=20+Math.random()*80;
@@ -1597,7 +1614,7 @@ window.coinRain=coinRain;
   const _origOnGO=window.onGameOver;
   window.onGameOver=function(d){
     if(_origOnGO)_origOnGO.call(this,d);
-    if(d&&d.winner_id){
+    if(d&&d.won){
       setTimeout(()=>{
         if(window.coinBurst){
           window.coinBurst(window.innerWidth*.28,window.innerHeight*.42);
