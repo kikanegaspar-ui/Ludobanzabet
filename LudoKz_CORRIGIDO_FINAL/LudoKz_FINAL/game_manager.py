@@ -1,10 +1,13 @@
 """
-game_manager.py — LudoKz FINAL
-- user_id sempre string (consistente com frontend)
-- Pecas saem com dado 6
-- state_dict inclui in_base[]
-- roll_dice nao auto-move
-- _isMyTurn funciona com comparacao de string
+game_manager.py — LudoKz v9 CORRIGIDO
+CORREÇÕES:
+1. Cores únicas por jogador (nunca repete)
+2. user_id sempre string
+3. roll_dice não auto-move
+4. state_dict completo com in_base[]
+5. _isMyTurn funciona com string comparison
+6. _movePieceSmooth seguro contra loops
+7. Lógica de fim de jogo robusta
 """
 
 import random
@@ -48,6 +51,9 @@ _BASE_ID_SET = set([
     800,801,802,803,
 ])
 
+# Todas as cores disponíveis — nunca se repetem na mesma sala
+ALL_COLOURS = ["blue", "red", "green", "yellow"]
+
 
 def _build_path(colour):
     start   = START_POS_ID[colour]
@@ -63,7 +69,7 @@ def _build_path(colour):
     return main + lane
 
 
-FULL_PATH = {c: _build_path(c) for c in ["blue","green","red","yellow"]}
+FULL_PATH = {c: _build_path(c) for c in ALL_COLOURS}
 
 
 def _next_pos(colour, current_id, steps):
@@ -146,8 +152,6 @@ def _bot_pick(player, dice, all_players):
 
 class GameManager:
 
-    COLOURS = ["blue", "red", "green", "yellow"]
-
     def __init__(self, room_id, bet, max_players, host_user_id, host_name):
         self.room_id     = room_id
         self.bet         = bet
@@ -162,11 +166,23 @@ class GameManager:
         self.log         = []
         self.consec_six  = 0
         self.started     = False
+        # CORREÇÃO: rastrear cores já usadas
+        self._used_colours = []
         self._add_player(host_user_id, host_name)
 
+    def _next_colour(self):
+        """Retorna a próxima cor disponível que ainda não foi atribuída."""
+        for c in ALL_COLOURS:
+            if c not in self._used_colours:
+                return c
+        # Fallback seguro (não deve acontecer com max 4 jogadores)
+        return ALL_COLOURS[len(self.players) % len(ALL_COLOURS)]
+
     def _add_player(self, user_id, name):
+        # CORREÇÃO: cor única por jogador
+        colour = self._next_colour()
+        self._used_colours.append(colour)
         idx    = len(self.players)
-        colour = self.COLOURS[idx % len(self.COLOURS)]
         tokens = []
         for i in range(4):
             tokens.append({
@@ -193,12 +209,19 @@ class GameManager:
         uid = str(user_id)
         if any(p["user_id"] == uid for p in self.players):
             return False, "Ja estas na sala."
+        # CORREÇÃO: verificar se há cores disponíveis
+        if len(self._used_colours) >= len(ALL_COLOURS):
+            return False, "Sem cores disponiveis."
         self._add_player(uid, name)
         return True, None
 
     def remove_player(self, user_id):
         uid = str(user_id)
+        removed = next((p for p in self.players if p["user_id"] == uid), None)
         self.players = [p for p in self.players if p["user_id"] != uid]
+        # CORREÇÃO: libertar a cor ao remover jogador
+        if removed and removed["colour"] in self._used_colours:
+            self._used_colours.remove(removed["colour"])
 
     def player_count(self):
         return len(self.players)
@@ -275,7 +298,6 @@ class GameManager:
     def _do_move(self, player, piece_idx):
         token  = player["tokens"][piece_idx]
         colour = player["colour"]
-        # FIX: guardar dice antes de o repor a 0
         dice   = self.dice
 
         if token["locked"]:
@@ -283,8 +305,6 @@ class GameManager:
             token["pos_id"]  = start_id
             token["locked"]  = False
             self._log(f"🚀 {player['name']}: peca {piece_idx+1} saiu da base!")
-            # FIX: repor phase e dice ANTES de _check_capture
-            # para que o estado enviado ao cliente seja sempre consistente
             self.phase = 0
             self.dice  = 0
             self._check_capture(player, start_id)
@@ -294,7 +314,6 @@ class GameManager:
             if nid is None:
                 return
             token["pos_id"] = nid
-            # FIX: repor phase e dice ANTES de qualquer log ou captura
             self.phase = 0
             self.dice  = 0
             if nid == HOME_ID[colour]:
@@ -330,7 +349,6 @@ class GameManager:
                 self.consec_six = 0
                 self._log("⚠️ Tres seis seguidos — perde a vez!")
                 self._advance_turn()
-            # senao mantem turno (joga novamente)
         else:
             self.consec_six = 0
             self._advance_turn()
@@ -375,16 +393,18 @@ class GameManager:
         for p in self.players:
             pos_list  = [t["pos_id"] for t in p["tokens"]]
             base_list = [1 if t["locked"] else 0 for t in p["tokens"]]
+            home_list = [1 if t["reached_home"] else 0 for t in p["tokens"]]
             players_out.append({
-                "user_id": p["user_id"],
-                "name":    p["name"],
-                "color":   p["colour"],
-                "colour":  p["colour"],
-                "idx":     p["idx"],
-                "fin":     p["fin"],
-                "is_bot":  p["is_bot"],
-                "pos":     pos_list,
-                "in_base": base_list,
+                "user_id":      p["user_id"],
+                "name":         p["name"],
+                "color":        p["colour"],
+                "colour":       p["colour"],
+                "idx":          p["idx"],
+                "fin":          p["fin"],
+                "is_bot":       p["is_bot"],
+                "pos":          pos_list,
+                "in_base":      base_list,
+                "reached_home": home_list,
             })
         return {
             "room_id": self.room_id,
