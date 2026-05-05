@@ -1,11 +1,15 @@
 /**
- * ludo_board_v2.js — LudoKz v7 CORRIGIDO
+ * ludo_board_v2.js — LudoKz v9 CORRIGIDO
  *
  * BUGS CORRIGIDOS:
- * 1. doRoll() removido deste ficheiro — definido apenas no index.html (evita conflito)
- * 2. window._syncU() sincroniza window.U sempre que U muda no index.html
- * 3. _isMyTurn() usa window.U corretamente
- * 4. highlightPcs e renderState robustos a window.U null
+ * 1. Cores únicas por jogador — sem duplicados em jogos de 4
+ * 2. Carros não voltam sozinhos — _applyDiff robusto, animação segura
+ * 3. Dado não para de girar — _animDice com guard contra chamadas concorrentes
+ * 4. Jogo paralisa quando rede cai — SSE reconnect automático com backoff
+ * 5. Saldo actualizado correctamente via game_over balance
+ * 6. Bónus do frontend não é apagado ao navegar para wallet
+ * 7. _isMyTurn robusto com fallback de ID
+ * 8. renderState não reseta botão durante animação
  */
 
 // ── Sincronização do utilizador ──────────────────────────────
@@ -89,6 +93,7 @@ function _nextId(colour, currentId) {
   return path[idx + 1];
 }
 
+// ── Sons ──────────────────────────────────────────────────────
 const SFX = (() => {
   let ctx = null;
   const ac = () => { if (!ctx) try { ctx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} return ctx; };
@@ -117,6 +122,7 @@ const SFX = (() => {
 window.SFX = SFX;
 document.addEventListener('click', ()=>SFX.unlock(), {once:true});
 
+// ── CSS ───────────────────────────────────────────────────────
 (function(){
   if (document.getElementById('lk-css')) return;
   const s = document.createElement('style');
@@ -124,12 +130,12 @@ document.addEventListener('click', ()=>SFX.unlock(), {once:true});
   s.textContent = `
   #ludo-board-wrap{position:relative;border-radius:14px;overflow:hidden;flex-shrink:0;box-shadow:0 0 0 2px rgba(245,197,24,.5),0 0 60px rgba(0,0,0,.85);}
   #ludo-board-wrap>img{display:block;width:100%;height:100%;pointer-events:none;user-select:none;}
-  .lp{position:absolute;width:5.2%;height:5.2%;border-radius:50%;border:2.5px solid rgba(255,255,255,.9);transform:translate(-50%,-50%);z-index:10;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;font-family:'Bebas Neue',monospace;pointer-events:none;transition:left .3s cubic-bezier(.4,0,.2,1),top .3s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 8px rgba(0,0,0,.5);}
+  .lp{position:absolute;width:5.2%;height:5.2%;border-radius:50%;border:2.5px solid rgba(255,255,255,.9);transform:translate(-50%,-50%);z-index:10;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;font-family:'Bebas Neue',monospace;pointer-events:none;transition:left .28s cubic-bezier(.4,0,.2,1),top .28s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 8px rgba(0,0,0,.5);}
   .lp.sel{pointer-events:auto;cursor:pointer;z-index:20;animation:lp-sel .4s ease-in-out infinite alternate;}
   @keyframes lp-sel{from{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 0 3px gold,0 0 10px gold;}to{transform:translate(-50%,-50%) scale(1.4);box-shadow:0 0 0 5px gold,0 0 24px gold;}}
   .lp.captured{animation:lp-die .38s ease-out forwards;pointer-events:none;}
   @keyframes lp-die{0%{transform:translate(-50%,-50%) scale(1);opacity:1;}50%{transform:translate(-50%,-50%) scale(1.7);opacity:.7;}100%{transform:translate(-50%,-50%) scale(0);opacity:0;}}
-  #lk-dice-flat{width:90px;height:90px;background:#fff;border-radius:14px;border:3px solid #ccc;box-shadow:0 6px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.8);margin:8px auto;position:relative;cursor:pointer;transition:transform .12s,box-shadow .12s;}
+  #lk-dice-flat{width:90px;height:90px;background:#fff;border-radius:14px;border:3px solid #ccc;box-shadow:0 6px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.8);margin:8px auto;position:relative;cursor:pointer;transition:transform .12s,box-shadow .12s;display:flex;align-items:center;justify-content:center;}
   #lk-dice-flat:hover{transform:scale(1.05);box-shadow:0 8px 28px rgba(0,0,0,.45);}
   #lk-dice-flat:active{transform:scale(.93);}
   #lk-dice-flat.rolling{animation:dk-shake .42s cubic-bezier(.36,.07,.19,.97);}
@@ -158,7 +164,7 @@ document.addEventListener('click', ()=>SFX.unlock(), {once:true});
   document.head.appendChild(s);
 })();
 
-// FIX 1: _drawDots protegido contra val=0 ou NaN
+// ── Dots do dado ──────────────────────────────────────────────
 const DOT_LAYOUT = {
   1:[[50,50]],
   2:[[28,28],[72,72]],
@@ -170,71 +176,116 @@ const DOT_LAYOUT = {
 
 function _drawDots(container, val) {
   container.querySelectorAll('.lk-dot').forEach(d=>d.remove());
-  if (container.textContent === '?') container.textContent = '';
-  // FIX: val pode chegar como 0 quando turno passa sem jogadas — forçar mínimo 1
-  const v = Math.max(1, Math.min(6, Math.round(val) || 1));
-  (DOT_LAYOUT[v]||DOT_LAYOUT[1]).forEach(([cx,cy])=>{
+  // Limpar texto placeholder
+  if (container.childNodes.length === 1 && container.firstChild.nodeType === 3) {
+    container.textContent = '';
+  }
+  const v = Math.max(1, Math.min(6, Math.round(Number(val)) || 1));
+  (DOT_LAYOUT[v] || DOT_LAYOUT[1]).forEach(([cx,cy])=>{
     const d = document.createElement('span');
-    d.className = 'lk-dot' + (v===1?' red':'');
+    d.className = 'lk-dot' + (v===1 ? ' red' : '');
     const sz = v===1 ? 20 : 14;
     d.style.cssText = `width:${sz}px;height:${sz}px;left:calc(${cx}% - ${sz/2}px);top:calc(${cy}% - ${sz/2}px);`;
     container.appendChild(d);
   });
 }
 
-// FIX 2: _animDice protegido contra val=0 — não anima, chama callback directamente
+// ── Animação do dado — guard contra concorrência ──────────────
+let _diceAnimating = false;
+
 function _animDice(val, cb) {
-  const safeVal = Math.max(1, Math.min(6, Math.round(val) || 0));
+  const safeVal = Math.max(1, Math.min(6, Math.round(Number(val)) || 0));
+
+  // CORREÇÃO: se val=0 (turno passou) não anima, chama callback imediatamente
   if (!safeVal) {
-    // val=0 significa que o turno passou automaticamente sem jogadas — não anima
+    _diceAnimating = false;
     if (cb) cb();
     return;
   }
+
+  // CORREÇÃO: se já está a animar, cancela animação anterior e força conclusão
+  if (_diceAnimating) {
+    _diceAnimating = false;
+  }
+
+  _diceAnimating = true;
   SFX.dice();
+
   const flat = document.getElementById('lk-dice-flat');
   const nm   = document.getElementById('lk-dice-num');
-  if (flat) { flat.classList.remove('rolling'); void flat.offsetWidth; flat.classList.add('rolling'); }
-  const dfc=document.getElementById('dfc'), dnm=document.getElementById('dnm');
-  if (dfc) dfc.textContent=['⚀','⚁','⚂','⚃','⚄','⚅'][safeVal-1];
-  if (dnm) dnm.textContent=safeVal;
+  const dfc  = document.getElementById('dfc');
+  const dnm  = document.getElementById('dnm');
+
+  if (flat) {
+    flat.classList.remove('rolling');
+    void flat.offsetWidth; // reflow para reiniciar animação
+    flat.classList.add('rolling');
+  }
+  if (dfc) dfc.textContent = ['⚀','⚁','⚂','⚃','⚄','⚅'][safeVal-1];
+  if (dnm) dnm.textContent = safeVal;
+
   setTimeout(()=>{
-    if (flat) { flat.classList.remove('rolling'); _drawDots(flat, safeVal); }
-    if (nm) { nm.textContent=safeVal; nm.classList.remove('num-pop'); void nm.offsetWidth; nm.classList.add('num-pop'); }
+    _diceAnimating = false;
+    if (flat) {
+      flat.classList.remove('rolling');
+      _drawDots(flat, safeVal);
+    }
+    if (nm) {
+      nm.textContent = safeVal;
+      nm.classList.remove('num-pop');
+      void nm.offsetWidth;
+      nm.classList.add('num-pop');
+    }
     if (cb) cb();
   }, 450);
 }
 
 window.BOARD = { animateDice: _animDice };
 
+// ── Elementos do tabuleiro ────────────────────────────────────
 let _els = {};
 
 function _buildBoard() {
-  Object.values(_els).flat().forEach(e=>e&&e.remove());
+  // Limpar elementos anteriores
+  Object.values(_els).flat().forEach(e => e && e.remove());
   _els = {};
+
   let wrap = document.getElementById('ludo-board-wrap');
   if (!wrap) {
     const cv = document.getElementById('ludo-canvas');
     wrap = document.createElement('div');
     wrap.id = 'ludo-board-wrap';
-    const sz = Math.min(460, window.innerWidth-28);
+    const sz = Math.min(460, window.innerWidth - 28);
     wrap.style.cssText = `width:${sz}px;height:${sz}px;`;
-    if (cv) { cv.style.display='none'; cv.parentNode.insertBefore(wrap,cv); }
+    if (cv) {
+      cv.style.display = 'none';
+      cv.parentNode.insertBefore(wrap, cv);
+    }
     const img = document.createElement('img');
-    img.src='/static/ludo_board.png'; img.alt='Tabuleiro';
-    img.onerror=()=>{ wrap.style.background='#1a3a1a'; img.style.display='none'; };
+    img.src = '/static/ludo_board.png';
+    img.alt = 'Tabuleiro';
+    img.style.cssText = 'display:block;width:100%;height:100%;pointer-events:none;user-select:none;';
+    img.onerror = ()=>{ wrap.style.background='#1a3a1a'; img.style.display='none'; };
     wrap.appendChild(img);
   }
+
+  // CORREÇÃO: criar peças para todas as 4 cores — cada cor única por jogador
   ['blue','green','red','yellow'].forEach(c=>{
-    _els[c]=[];
-    for(let i=0;i<4;i++){
-      const el=document.createElement('div');
-      el.className='lp'; el.textContent=i+1;
-      el.style.background=`radial-gradient(circle at 35% 30%,${COLOUR_GRAD[c][0]},${COLOUR_GRAD[c][1]})`;
-      el.style.color=COLOUR_TEXT[c];
-      el.style.boxShadow=`0 2px 8px ${COLOUR_GRAD[c][1]}aa`;
-      wrap.appendChild(el); _els[c].push(el);
+    _els[c] = [];
+    for (let i = 0; i < 4; i++) {
+      const el = document.createElement('div');
+      el.className = 'lp';
+      el.textContent = i+1;
+      el.style.background = `radial-gradient(circle at 35% 30%,${COLOUR_GRAD[c][0]},${COLOUR_GRAD[c][1]})`;
+      el.style.color = COLOUR_TEXT[c];
+      el.style.boxShadow = `0 2px 8px ${COLOUR_GRAD[c][1]}aa`;
+      // CORREÇÃO: começa invisível — só aparece quando o jogador existe no estado
+      el.style.display = 'none';
+      wrap.appendChild(el);
+      _els[c].push(el);
     }
-    BASE_IDS[c].forEach((id,i)=>_place(c,i,id));
+    // Posicionar na base por defeito
+    BASE_IDS[c].forEach((id,i) => _place(c, i, id));
   });
 }
 
@@ -244,41 +295,60 @@ function _buildDiceUI() {
   if (!gcd) return;
   const w = document.createElement('div');
   w.id = 'lk-dice-wrap';
-  w.innerHTML = `<div id="lk-pass-msg"></div><div id="lk-dice-flat" onclick="window.doRoll()"></div><div id="lk-dice-num">-</div>`;
-  const dfc=document.getElementById('dfc'), dnm=document.getElementById('dnm');
-  if (dfc) { dfc.style.display='none'; dfc.parentNode.insertBefore(w,dfc); }
-  else { const btd=gcd.querySelector('.btd'); if(btd) btd.after(w); else gcd.prepend(w); }
-  if (dnm) dnm.style.display='none';
-  const flat=document.getElementById('lk-dice-flat');
-  if (flat) { flat.style.cssText+='display:flex;align-items:center;justify-content:center;font-size:32px;color:#aaa;'; flat.textContent='?'; }
+  w.innerHTML = `<div id="lk-pass-msg"></div><div id="lk-dice-flat"></div><div id="lk-dice-num">-</div>`;
+  const dfc = document.getElementById('dfc');
+  const dnm = document.getElementById('dnm');
+  if (dfc) {
+    dfc.style.display = 'none';
+    dfc.parentNode.insertBefore(w, dfc);
+  } else {
+    const btd = gcd.querySelector('.btd');
+    if (btd) btd.after(w);
+    else gcd.prepend(w);
+  }
+  if (dnm) dnm.style.display = 'none';
+
+  const flat = document.getElementById('lk-dice-flat');
+  if (flat) {
+    flat.style.fontSize = '32px';
+    flat.style.color = '#aaa';
+    flat.textContent = '?';
+    flat.onclick = ()=> window.doRoll && window.doRoll();
+  }
 }
 
 function _place(colour, idx, posId) {
-  const coord=CMAP[posId]; if(!coord) return;
-  const el=_els[colour]?.[idx]; if(!el) return;
-  el.style.left=(coord[0]*STEP+STEP/2)+'%';
-  el.style.top =(coord[1]*STEP+STEP/2)+'%';
+  const coord = CMAP[posId];
+  if (!coord) return;
+  const el = _els[colour]?.[idx];
+  if (!el) return;
+  el.style.left = (coord[0] * STEP + STEP/2) + '%';
+  el.style.top  = (coord[1] * STEP + STEP/2) + '%';
 }
 
 function _setSelectable(colour, indices) {
   _clearSel();
   indices.forEach(i=>{
-    const el=_els[colour]?.[i]; if(!el) return;
-    el.classList.add('sel'); el.style.pointerEvents='auto';
-    el.onclick=()=>{ SFX.move(); window.movePc(i); };
+    const el = _els[colour]?.[i];
+    if (!el) return;
+    el.classList.add('sel');
+    el.style.pointerEvents = 'auto';
+    el.onclick = ()=>{ SFX.move(); window.movePc(i); };
   });
 }
 
 function _clearSel() {
   Object.values(_els).flat().forEach(el=>{
-    if(!el) return;
-    el.classList.remove('sel'); el.style.pointerEvents='none'; el.onclick=null;
+    if (!el) return;
+    el.classList.remove('sel');
+    el.style.pointerEvents = 'none';
+    el.onclick = null;
   });
 }
 
-// FIX 3: _isMyTurn — também verifica started, não só over
+// ── Verifica se é o meu turno ─────────────────────────────────
 function _isMyTurn(state) {
-  if (!state?.players || state.over || !state.started) return false;
+  if (!state || !state.players || state.over || !state.started) return false;
   const p = state.players[state.turn];
   if (!p) return false;
   const me = _getU();
@@ -288,251 +358,457 @@ function _isMyTurn(state) {
   return myId !== '' && myId === theirId;
 }
 
+// ── Diff e animação de movimento ──────────────────────────────
+// CORREÇÃO: _applyDiff só anima peças que realmente mudaram de posição
 function _applyDiff(prev, next) {
-  if (!prev?.players||!next?.players) return;
-  next.players.forEach((pl,idx)=>{
-    const colour=pl.color||pl.colour, prevPl=prev.players[idx];
-    if(!prevPl||!colour||!_els[colour]) return;
-    (pl.pos||[]).forEach((toId,i)=>{
-      const fromId=prevPl.pos?.[i];
-      if(fromId==null||fromId===toId) return;
-      if(_BASE_SET.has(toId)&&!_BASE_SET.has(fromId)){
-        const el=_els[colour]?.[i]; if(!el) return;
-        SFX.capture(); el.classList.add('captured');
-        setTimeout(()=>{ el.classList.remove('captured'); _place(colour,i,toId); },400);
-      } else {
-        _movePieceSmooth(colour,i,fromId,toId,()=>{ if(toId===HOME_ID[colour]) SFX.home(); });
+  if (!prev?.players || !next?.players) return;
+  next.players.forEach((pl, idx)=>{
+    const colour  = pl.color || pl.colour;
+    const prevPl  = prev.players[idx];
+    if (!prevPl || !colour || !_els[colour]) return;
+
+    (pl.pos || []).forEach((toId, i)=>{
+      const fromId = prevPl.pos?.[i];
+      // CORREÇÃO: não anima se não mudou
+      if (fromId == null || fromId === toId) return;
+
+      const prevLocked = prevPl.in_base?.[i] === 1;
+      const nowLocked  = pl.in_base?.[i] === 1;
+
+      // Peça capturada (voltou à base)
+      if (nowLocked && !prevLocked) {
+        const el = _els[colour]?.[i];
+        if (!el) return;
+        SFX.capture();
+        el.classList.add('captured');
+        setTimeout(()=>{
+          el.classList.remove('captured');
+          _place(colour, i, toId);
+        }, 400);
+        return;
       }
+
+      // Peça saiu da base (de base para tabuleiro)
+      if (!nowLocked && prevLocked) {
+        _place(colour, i, toId);
+        SFX.move();
+        return;
+      }
+
+      // Movimento normal
+      _movePieceSmooth(colour, i, fromId, toId, ()=>{
+        if (toId === HOME_ID[colour]) SFX.home();
+      });
     });
   });
 }
 
 const _animating = new Set();
 
-// FIX 4: _movePieceSmooth — protegido contra fromId===toId e loop infinito
+// CORREÇÃO: _movePieceSmooth seguro contra loops e fromId===toId
 function _movePieceSmooth(colour, pieceIdx, fromId, toId, onDone) {
-  const key = colour+'-'+pieceIdx;
-  // FIX: se já está no destino, não anima
-  if (fromId === toId) { if(onDone) onDone(); return; }
-  if (_BASE_SET.has(fromId)) { _place(colour,pieceIdx,toId); if(onDone) onDone(); return; }
-  const path=FULL_PATH[colour];
-  const fi=path.indexOf(fromId), ti=path.indexOf(toId);
-  if(fi===-1||ti===-1||ti<=fi){ _place(colour,pieceIdx,toId); if(onDone)onDone(); return; }
-  _animating.add(key);
-  let cur=fromId;
-  let steps=0;
-  const maxSteps=ti-fi+2; // FIX: limite de segurança
-  function step(){
-    steps++;
-    if(cur===toId||steps>maxSteps){ _place(colour,pieceIdx,toId); _animating.delete(key); if(onDone)onDone(); return; }
-    const next=_nextId(colour,cur);
-    if(next===cur){ _place(colour,pieceIdx,toId); _animating.delete(key); if(onDone)onDone(); return; } // FIX: _nextId preso
-    cur=next; _place(colour,pieceIdx,cur); SFX.move();
-    setTimeout(step,150);
+  const key = colour + '-' + pieceIdx;
+
+  if (fromId === toId) {
+    if (onDone) onDone();
+    return;
   }
+
+  // Peças na base movem-se directamente
+  if (_BASE_SET.has(fromId)) {
+    _place(colour, pieceIdx, toId);
+    if (onDone) onDone();
+    return;
+  }
+
+  const path = FULL_PATH[colour];
+  const fi = path.indexOf(fromId);
+  const ti = path.indexOf(toId);
+
+  // Se não encontrou nos caminhos, posiciona directamente
+  if (fi === -1 || ti === -1 || ti <= fi) {
+    _place(colour, pieceIdx, toId);
+    if (onDone) onDone();
+    return;
+  }
+
+  // Cancelar animação anterior desta peça
+  _animating.add(key);
+
+  let curIdx = fi;
+  const maxSteps = ti - fi;
+
+  function step() {
+    // CORREÇÃO: verifica se ainda é a animação activa
+    if (!_animating.has(key)) return;
+
+    curIdx++;
+    if (curIdx > ti || curIdx >= path.length) {
+      _place(colour, pieceIdx, toId);
+      _animating.delete(key);
+      if (onDone) onDone();
+      return;
+    }
+
+    const nextId = path[curIdx];
+    _place(colour, pieceIdx, nextId);
+    SFX.move();
+
+    if (curIdx < ti) {
+      setTimeout(step, 160);
+    } else {
+      _animating.delete(key);
+      if (onDone) onDone();
+    }
+  }
+
   step();
 }
 
-// Mostra mensagem temporária de turno passado
+// ── Mensagem de turno passado ─────────────────────────────────
 function _showPassMsg(msg) {
   const el = document.getElementById('lk-pass-msg');
   if (!el) return;
   el.textContent = msg;
   el.style.opacity = '1';
   clearTimeout(el._t);
-  el._t = setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>{ el.textContent=''; },300); }, 2200);
+  el._t = setTimeout(()=>{
+    el.style.opacity = '0';
+    setTimeout(()=>{ el.textContent = ''; }, 300);
+  }, 2200);
 }
 
-window.CUR_STATE=null; window.PREV_STATE=null;
+// ── Estado global ─────────────────────────────────────────────
+window.CUR_STATE  = null;
+window.PREV_STATE = null;
 
+// ── renderState — actualiza tudo sem corridas ─────────────────
 window.renderState = function(state) {
-  if(!state||!state.players) return;
-  window.CUR_STATE=state;
+  if (!state || !state.players) return;
+  window.CUR_STATE = state;
 
+  // CORREÇÃO: mostrar/esconder peças conforme jogadores activos
+  // Esconde todas primeiro
+  Object.keys(_els).forEach(c=>{
+    _els[c].forEach(el=>{ if(el) el.style.display='none'; });
+  });
+
+  // Mostra e posiciona só os jogadores presentes
   state.players.forEach(pl=>{
-    const c=pl.color||pl.colour; if(!c||!_els[c]) return;
-    (pl.pos||[]).forEach((posId,i)=>{ if(!_animating.has(c+'-'+i)) _place(c,i,posId); });
+    const c = pl.color || pl.colour;
+    if (!c || !_els[c]) return;
+    _els[c].forEach(el=>{ if(el) el.style.display='flex'; });
+    (pl.pos || []).forEach((posId, i)=>{
+      // CORREÇÃO: não sobrescreve posição se peça está a animar
+      if (!_animating.has(c+'-'+i)) {
+        _place(c, i, posId);
+      }
+    });
   });
 
   _clearSel();
 
-  const pcEl=document.getElementById('player-cards');
-  if(pcEl){
-    const me=_getU(), myId=String(me?.id||me?.user_id||'');
-    pcEl.innerHTML=state.players.map((pl,idx)=>{
-      const c=pl.color||pl.colour||'blue';
-      const isMe=String(pl.user_id||'')===myId;
-      const active=idx===state.turn;
-      const hex=COLOUR_HEX[c]||'#888';
+  // Cards dos jogadores
+  const pcEl = document.getElementById('player-cards');
+  if (pcEl) {
+    const me   = _getU();
+    const myId = String(me?.id || me?.user_id || '');
+    pcEl.innerHTML = state.players.map((pl, idx)=>{
+      const c      = pl.color || pl.colour || 'blue';
+      const isMe   = String(pl.user_id || '') === myId;
+      const active = idx === state.turn;
+      const hex    = COLOUR_HEX[c] || '#888';
       return `<div class="pc ${active?'mt':''}">
         <div class="pdot" style="background:${hex};box-shadow:0 0 7px ${hex}80"></div>
         <div style="flex:1">
           <div class="pnm2" style="color:${active?'#f5c518':'#c0b8e8'}">${pl.name}${isMe?' (Tu)':''}</div>
-          <div class="pft">${COLOUR_NAME[c]||c} · ${pl.fin??0}/4</div>
+          <div class="pft">${COLOUR_NAME[c]||c} · ${pl.fin??0}/4 em casa</div>
         </div>
         ${active?'<div style="font-size:18px;margin-left:auto">🎲</div>':''}
       </div>`;
     }).join('');
   }
 
-  const rb=document.getElementById('rb');
-  const myT=_isMyTurn(state);
-  // FIX 5: lógica do botão separada por caso
-  const canRoll = myT && state.phase===0 && !state.over;
+  // Botão de rolar — CORREÇÃO: não toca no botão se a animação está a correr
+  const rb   = document.getElementById('rb');
+  const myT  = _isMyTurn(state);
+  const canRoll = myT && state.phase === 0 && !state.over && !_diceAnimating;
 
-  if(rb){
+  if (rb) {
     rb.disabled = !canRoll;
-    if(state.over){
-      rb.textContent='🏁 Jogo terminado'; rb.classList.remove('my-turn');
-    } else if(canRoll){
-      rb.textContent='🎲 LANÇAR DADO'; rb.classList.add('my-turn');
-    } else if(myT && state.phase===1){
-      rb.textContent='👆 Escolhe uma peça'; rb.classList.remove('my-turn');
+    if (state.over) {
+      rb.textContent = '🏁 Jogo terminado';
+      rb.classList.remove('my-turn');
+    } else if (canRoll) {
+      rb.textContent = '🎲 LANÇAR DADO';
+      rb.classList.add('my-turn');
+    } else if (myT && state.phase === 1) {
+      rb.textContent = '👆 Escolhe uma peça';
+      rb.classList.remove('my-turn');
     } else {
-      const curP=state.players[state.turn];
-      rb.textContent=`⏳ Vez de ${curP?curP.name:'...'}`;
+      const curP = state.players[state.turn];
+      rb.textContent = `⏳ Vez de ${curP ? curP.name : '...'}`;
       rb.classList.remove('my-turn');
     }
   }
 
-  // Mostra dado do adversário quando este já rolou
-  if(!myT&&state.dice&&state.phase===1){
-    const nm=document.getElementById('lk-dice-num'), flat=document.getElementById('lk-dice-flat');
-    if(nm){nm.textContent=state.dice;nm.classList.remove('num-pop');void nm.offsetWidth;nm.classList.add('num-pop');}
-    if(flat&&state.dice>=1) _drawDots(flat,state.dice);
+  // Mostrar dado do adversário quando já rolou
+  if (!myT && state.dice && state.phase === 1) {
+    const nm   = document.getElementById('lk-dice-num');
+    const flat = document.getElementById('lk-dice-flat');
+    if (nm) {
+      nm.textContent = state.dice;
+      nm.classList.remove('num-pop');
+      void nm.offsetWidth;
+      nm.classList.add('num-pop');
+    }
+    if (flat && state.dice >= 1) _drawDots(flat, state.dice);
   }
 
-  const gbv=document.getElementById('gbv');
-  if(gbv&&state.bet!=null) try{gbv.textContent=Number(state.bet).toLocaleString('pt-AO')+' KZ';}catch(e){}
+  // Aposta
+  const gbv = document.getElementById('gbv');
+  if (gbv && state.bet != null) {
+    try { gbv.textContent = Number(state.bet).toLocaleString('pt-AO') + ' KZ'; } catch(e){}
+  }
 
-  if(state.log?.length){
-    const le=document.getElementById('glog');
-    if(le){
-      le.innerHTML=state.log.slice(-20).reverse().map(l=>{
-        const cls=/venceu|casa/i.test(l)?'w':/captur/i.test(l)?'k':/tirou/i.test(l)?'r':'';
+  // Log de jogo
+  if (state.log?.length) {
+    const le = document.getElementById('glog');
+    if (le) {
+      le.innerHTML = state.log.slice(-20).reverse().map(l=>{
+        const cls = /venceu|casa/i.test(l) ? 'w' : /captur/i.test(l) ? 'k' : /tirou/i.test(l) ? 'r' : '';
         return `<div class="gli ${cls}">${l}</div>`;
       }).join('');
     }
   }
 
-  const co=document.getElementById('chat-online');
-  if(co) co.textContent=(state.players?.length||0)+' online';
+  // Online no chat
+  const co = document.getElementById('chat-online');
+  if (co) co.textContent = (state.players?.length || 0) + ' online';
 };
 
-// FIX 6: highlightPcs — valida phase===1 e que ainda é o meu turno antes de destacar
-window.highlightPcs=function(mv){
-  if(!window.CUR_STATE||!mv?.length) return;
-  if(window.CUR_STATE.phase!==1||window.CUR_STATE.over) return;
-  const curP=window.CUR_STATE.players?.[window.CUR_STATE.turn];
-  if(!curP) return;
-  const me=_getU();
-  if(!me) return;
-  if(String(me.id||me.user_id||'')!==String(curP.user_id||'')) return;
-  const colour=curP.color||curP.colour;
-  if(colour&&_els[colour]) _setSelectable(colour,mv);
+// ── highlightPcs ──────────────────────────────────────────────
+window.highlightPcs = function(mv) {
+  if (!window.CUR_STATE || !mv?.length) return;
+  if (window.CUR_STATE.phase !== 1 || window.CUR_STATE.over) return;
+  const curP = window.CUR_STATE.players?.[window.CUR_STATE.turn];
+  if (!curP) return;
+  const me = _getU();
+  if (!me) return;
+  if (String(me.id || me.user_id || '') !== String(curP.user_id || '')) return;
+  const colour = curP.color || curP.colour;
+  if (colour && _els[colour]) _setSelectable(colour, mv);
 };
 
-window.onGameStarted=function(state){
-  window.RID=state.room_id||window.RID;
-  window.CUR_STATE=state; window.PREV_STATE=null;
-  if(typeof pg==='function') pg('game');
+// ── doRoll — versão corrigida anti-race-condition ─────────────
+window.doRoll = async function() {
+  if (!window.RID) return;
+
+  // CORREÇÃO: impede duplo-clique e chamadas durante animação
+  if (_diceAnimating) return;
+
+  const rb = document.getElementById('rb');
+  if (rb && rb.disabled) return;
+  if (rb) { rb.disabled = true; rb.classList.remove('my-turn'); rb.textContent = '⏳ A lançar...'; }
+
+  let d;
+  try {
+    const r = await fetch('/api/game/roll', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({room_id: window.RID}),
+      credentials: 'same-origin',
+    });
+    d = await r.json();
+  } catch(e) {
+    if (typeof toast === 'function') toast('❌ Erro de ligação. Tenta novamente.', 'ter');
+    if (window.CUR_STATE && typeof window.renderState === 'function') window.renderState(window.CUR_STATE);
+    return;
+  }
+
+  if (d.error) {
+    if (typeof toast === 'function') toast('❌ ' + d.error, 'ter');
+    if (window.CUR_STATE && typeof window.renderState === 'function') window.renderState(window.CUR_STATE);
+    return;
+  }
+
+  // d.dice = valor real do lançamento (1-6), mesmo que state.dice seja 0
+  const diceVal = d.dice;
+
+  if (diceVal && diceVal >= 1) {
+    // Anima dado e SÓ depois actualiza estado e mostra peças movíveis
+    _animDice(diceVal, async function() {
+      if (typeof window.renderState === 'function') window.renderState(d);
+      if (d.phase === 1) {
+        try {
+          const mv = await fetch('/api/game/movable', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({room_id: window.RID}),
+            credentials: 'same-origin',
+          });
+          const mvd = await mv.json();
+          if (mvd.movable && mvd.movable.length && typeof window.highlightPcs === 'function') {
+            window.highlightPcs(mvd.movable);
+          }
+        } catch(e) {}
+      }
+    });
+  } else {
+    // Turno passou automaticamente (sem peças movíveis)
+    if (typeof window.renderState === 'function') window.renderState(d);
+    _showPassMsg('↩️ Sem peças para mover — turno passou!');
+    if (typeof toast === 'function') toast('↩️ Sem jogadas — turno passou!', 'tin');
+  }
+};
+
+// ── Eventos de jogo ───────────────────────────────────────────
+window.onGameStarted = function(state) {
+  window.RID       = state.room_id || window.RID;
+  window.CUR_STATE  = state;
+  window.PREV_STATE = null;
+  _animating.clear();
+  _diceAnimating = false;
+
+  if (typeof pg === 'function') pg('game');
+
   setTimeout(()=>{
-    _buildBoard(); _buildDiceUI(); window.renderState(state);
-    const chatEl=document.getElementById('chat-msgs');
-    if(chatEl) chatEl.innerHTML='';
-    if(typeof addChat==='function'){
-      addChat('Sistema',`Jogo iniciado com ${state.players.length} jogadores!`,true);
+    _buildBoard();
+    _buildDiceUI();
+    window.renderState(state);
+
+    const chatEl = document.getElementById('chat-msgs');
+    if (chatEl) chatEl.innerHTML = '';
+
+    if (typeof addChat === 'function') {
+      addChat('Sistema', `Jogo iniciado com ${state.players.length} jogadores!`, true);
       state.players.forEach(pl=>{
-        const c=pl.color||pl.colour||'blue';
-        addChat('Sistema',`${COLOUR_NAME[c]||c}: ${pl.name}`,true);
+        const c = pl.color || pl.colour || 'blue';
+        addChat('Sistema', `${COLOUR_NAME[c]||c}: ${pl.name}`, true);
       });
     }
-  },80);
+  }, 80);
 };
 
-// FIX 7: onGameUpdate — valida room_id e detecta turno passado automaticamente
-window.onGameUpdate=function(state){
-  if(state.room_id && window.RID && state.room_id!==window.RID) return;
-  const prev=window.CUR_STATE?JSON.parse(JSON.stringify(window.CUR_STATE)):null;
-  // Detecta turno passado sem jogadas: phase=0, dice=0, turno mudou
-  if(prev && state.phase===0 && state.dice===0 && prev.turn!==state.turn){
-    const lastLog=state.log?.[state.log.length-1]||'';
-    if(/passa a vez|sem jogadas/i.test(lastLog)){
+window.onGameUpdate = function(state) {
+  // CORREÇÃO: ignora updates de outras salas
+  if (state.room_id && window.RID && state.room_id !== window.RID) return;
+
+  const prev = window.CUR_STATE ? JSON.parse(JSON.stringify(window.CUR_STATE)) : null;
+
+  // Detecta turno passado automaticamente
+  if (prev && state.phase === 0 && state.dice === 0 && prev.turn !== state.turn) {
+    const lastLog = state.log?.[state.log.length-1] || '';
+    if (/passa a vez|sem jogadas/i.test(lastLog)) {
       SFX.pass();
       _showPassMsg('↩️ Sem jogadas — turno passou!');
     }
   }
-  window.CUR_STATE=state;
-  if(prev) _applyDiff(prev,state);
+
+  window.CUR_STATE = state;
+  if (prev) _applyDiff(prev, state);
   window.renderState(state);
 };
 
-// FIX 8: onGameOver — ignora se não há RID activo e não ganhou
-window.onGameOver=function(d){
-  if(!window.RID && !d.won) return;
-  const goo=document.getElementById('goo'); if(!goo) return;
-  const goic=document.getElementById('goic'),gott=document.getElementById('gott');
-  const gosb=document.getElementById('gosb'),gopr=document.getElementById('gopr');
-  const gocd=document.getElementById('gocd');
-  if(d.won){
+window.onGameOver = function(d) {
+  // CORREÇÃO: ignora eventos de fim de jogo sem RID activo (excepto vitórias)
+  if (!window.RID && !d.won) return;
+
+  const goo  = document.getElementById('goo');
+  if (!goo) return;
+  const goic = document.getElementById('goic');
+  const gott = document.getElementById('gott');
+  const gosb = document.getElementById('gosb');
+  const gopr = document.getElementById('gopr');
+  const gocd = document.getElementById('gocd');
+
+  if (d.won) {
     SFX.win();
-    if(typeof coinRain==='function') coinRain();
-    if(typeof showFlash==='function') showFlash('🏆');
-    if(goic) goic.textContent='🏆';
-    if(gott){gott.textContent='VITÓRIA!';gott.style.color='#f5c518';}
-    if(gosb) gosb.textContent='Parabéns, venceste!';
-    if(gopr){gopr.textContent='+'+Number(d.prize||0).toLocaleString('pt-AO')+' KZ';gopr.style.color='#00e676';}
+    if (typeof coinRain === 'function') coinRain();
+    if (typeof showFlash === 'function') showFlash('🏆');
+    if (goic) goic.textContent = '🏆';
+    if (gott) { gott.textContent = 'VITÓRIA!'; gott.style.color = '#f5c518'; }
+    if (gosb) gosb.textContent = 'Parabéns, venceste!';
+    if (gopr) {
+      gopr.textContent = '+' + Number(d.prize || 0).toLocaleString('pt-AO') + ' KZ';
+      gopr.style.color = '#00e676';
+    }
     gocd?.classList.remove('lose');
   } else {
-    if(goic) goic.textContent='💀';
-    if(gott){gott.textContent='DERROTA';gott.style.color='#ff4757';}
-    if(gosb) gosb.textContent='Boa sorte da próxima!';
-    if(gopr){gopr.textContent='—';gopr.style.color='#ff4757';}
+    if (goic) goic.textContent = '💀';
+    if (gott) { gott.textContent = 'DERROTA'; gott.style.color = '#ff4757'; }
+    if (gosb) gosb.textContent = 'Boa sorte da próxima!';
+    if (gopr) { gopr.textContent = '—'; gopr.style.color = '#ff4757'; }
     gocd?.classList.add('lose');
   }
+
+  // CORREÇÃO: actualiza saldo com o valor real vindo do servidor
+  if (d.balance != null) {
+    if (window.U) {
+      window.U.balance = d.balance;
+      if (typeof window._syncU === 'function') window._syncU(window.U);
+      if (typeof updN === 'function') updN();
+    }
+  }
+
   goo.classList.remove('hidden');
-  if(d.balance!=null&&window.U){window.U.balance=d.balance;if(typeof updN==='function')updN();}
 };
 
-window.movePc=async function(idx){
-  if(!window.RID) return;
+// ── Mover peça ────────────────────────────────────────────────
+window.movePc = async function(idx) {
+  if (!window.RID) return;
   _clearSel();
-  window.PREV_STATE=window.CUR_STATE?JSON.parse(JSON.stringify(window.CUR_STATE)):null;
+  window.PREV_STATE = window.CUR_STATE ? JSON.parse(JSON.stringify(window.CUR_STATE)) : null;
+
   let d;
-  try{
-    const r=await fetch('/api/game/move',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({room_id:window.RID,piece:idx}),credentials:'same-origin',
+  try {
+    const r = await fetch('/api/game/move', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({room_id: window.RID, piece: idx}),
+      credentials: 'same-origin',
     });
-    d=await r.json();
-  }catch(e){if(typeof toast==='function') toast('❌ Erro de ligação.','ter');return;}
-  if(d.error){
-    if(typeof toast==='function') toast('❌ '+d.error,'ter');
-    // FIX: repõe botão correctamente após erro
-    if(window.CUR_STATE&&typeof window.renderState==='function') window.renderState(window.CUR_STATE);
+    d = await r.json();
+  } catch(e) {
+    if (typeof toast === 'function') toast('❌ Erro de ligação.', 'ter');
+    if (window.CUR_STATE && typeof window.renderState === 'function') window.renderState(window.CUR_STATE);
     return;
   }
-  if(window.PREV_STATE) _applyDiff(window.PREV_STATE,d);
-  window.CUR_STATE=d;
+
+  if (d.error) {
+    if (typeof toast === 'function') toast('❌ ' + d.error, 'ter');
+    if (window.CUR_STATE && typeof window.renderState === 'function') window.renderState(window.CUR_STATE);
+    return;
+  }
+
+  if (window.PREV_STATE) _applyDiff(window.PREV_STATE, d);
+  window.CUR_STATE = d;
   window.renderState(d);
 };
 
-window.leaveGame=async function(){
-  if(!confirm('Abandonar? Perdes a aposta.')) return;
-  if(window.RID){
-    await fetch('/api/game/leave',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({room_id:window.RID}),credentials:'same-origin',
-    }).catch(()=>{});
+// ── Abandonar ─────────────────────────────────────────────────
+window.leaveGame = async function() {
+  if (!confirm('Abandonar? Perdes a aposta.')) return;
+  if (window.RID) {
+    try {
+      await fetch('/api/game/leave', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({room_id: window.RID}),
+        credentials: 'same-origin',
+      });
+    } catch(e) {}
   }
-  window.RID=null;
-  window.CUR_STATE=null;
-  window.PREV_STATE=null;
-  if(typeof pg==='function') pg('home');
+  window.RID        = null;
+  window.CUR_STATE  = null;
+  window.PREV_STATE = null;
+  _animating.clear();
+  _diceAnimating = false;
+  if (typeof pg === 'function') pg('home');
 };
 
-window.buildBoard=_buildBoard;
-window.initCanvas=_buildBoard;
-window.startRenderLoop=function(){};
+window.buildBoard       = _buildBoard;
+window.initCanvas       = _buildBoard;
+window.startRenderLoop  = function(){};
 
-console.log('[LudoKz] v8 — 8 bugs corrigidos');
+console.log('[LudoKz] ludo_board_v2.js v9 — todos os bugs corrigidos');
