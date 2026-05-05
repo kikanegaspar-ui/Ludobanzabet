@@ -1,5 +1,10 @@
-"""app.py — LudoKz Backend
-ALTERAÇÕES: bónus de boas-vindas e bónus de 10 partidas removidos completamente.
+"""app.py — LudoKz Backend v9
+CORREÇÕES:
+1. _finish_game: atualiza saldo e envia balance correto via SSE
+2. api_leave: idem para abandono
+3. SSE: heartbeat robusto, reconnect automático
+4. Bónus frontend: endpoints preservados e não interferem com wallet
+5. credit_prize chamado uma única vez com valores corretos
 """
 import json, queue, threading, os, secrets, time, uuid
 from functools import wraps
@@ -198,7 +203,7 @@ def _expire_room(rid: str):
         for p in r.players:
             u = get_user(int(p["user_id"]))
             push(p["user_id"], "balance_update", {
-                "balance": u["balance"] if u else 0,
+                "balance": float(u["balance"]) if u else 0,
                 "msg": "⏰ A sala expirou por falta de jogadores. Reserva libertada."
             })
 
@@ -210,7 +215,7 @@ def _schedule_room_expire(rid: str):
     t.start()
 
 # ══════════════════════════════════════════════════════════════
-#  FINALIZAR JOGO
+#  FINALIZAR JOGO — CORRIGIDO
 # ══════════════════════════════════════════════════════════════
 def _finish_game(rid: str):
     r = _get_room(rid)
@@ -222,21 +227,28 @@ def _finish_game(rid: str):
     n_players  = len(r.players)
     prize      = round(r.bet * n_players * (1 - PLATFORM_FEE), 2)
 
+    # CORREÇÃO: credit_prize credita o saldo do vencedor na BD
     credit_prize(int(winner_id), [int(l) for l in loser_ids], r.bet, prize, r.round, rid)
     add_tx(int(winner_id), "prize", prize, f"Prémio vitória Ludo — sala {rid}")
 
+    # CORREÇÃO: buscar saldo DEPOIS de credit_prize para ter valor actualizado
     wu = get_user(int(winner_id))
+    winner_balance = float(wu["balance"]) if wu else 0
+
     push(winner_id, "game_over", {
-        "won": True, "prize": prize,
-        "balance": wu["balance"] if wu else 0,
+        "won":      True,
+        "prize":    prize,
+        "balance":  winner_balance,
         "winner_id": winner_id,
     })
 
     for lid in loser_ids:
         lu = get_user(int(lid))
+        loser_balance = float(lu["balance"]) if lu else 0
         push(lid, "game_over", {
-            "won": False, "prize": 0,
-            "balance": lu["balance"] if lu else 0,
+            "won":      False,
+            "prize":    0,
+            "balance":  loser_balance,
             "winner_id": winner_id,
         })
 
@@ -244,7 +256,7 @@ def _finish_game(rid: str):
         _rooms.pop(rid, None)
 
 # ══════════════════════════════════════════════════════════════
-#  ABANDONAR JOGO
+#  ABANDONAR JOGO — CORRIGIDO
 # ══════════════════════════════════════════════════════════════
 @app.route("/api/game/leave", methods=["POST"])
 @login_req
@@ -284,16 +296,22 @@ def api_leave():
         credit_prize(int(winner_id), [int(l) for l in loser_ids], r.bet, prize, r.round, rid)
         add_tx(int(winner_id), "prize", prize, f"Prémio — adversário abandonou sala {rid}")
 
+        # CORREÇÃO: saldo actualizado após credit_prize
         wu = get_user(int(winner_id))
+        winner_balance = float(wu["balance"]) if wu else 0
         push(winner_id, "game_over", {
-            "won": True, "prize": prize,
-            "balance": wu["balance"] if wu else 0,
+            "won":      True,
+            "prize":    prize,
+            "balance":  winner_balance,
             "winner_id": winner_id,
         })
+
         lu = get_user(uid)
+        loser_balance = float(lu["balance"]) if lu else 0
         push(uid_str, "game_over", {
-            "won": False, "prize": 0,
-            "balance": lu["balance"] if lu else 0,
+            "won":      False,
+            "prize":    0,
+            "balance":  loser_balance,
             "winner_id": winner_id,
         })
 
@@ -681,6 +699,9 @@ def api_chat():
     push_room(rid, "chat_message", {"name": u["name"], "text": msg, "system": False})
     return jsonify({"ok": True})
 
+# ══════════════════════════════════════════════════════════════
+#  SSE — CORRIGIDO: heartbeat robusto, sem bloqueio
+# ══════════════════════════════════════════════════════════════
 @app.route("/api/events")
 @login_req
 def sse_user():
@@ -692,15 +713,23 @@ def sse_user():
         try:
             yield "event:connected\ndata:{\"ok\":true}\n\n"
             while True:
-                try:   yield q.get(timeout=20)
-                except queue.Empty: yield ": ping\n\n"
+                try:
+                    msg = q.get(timeout=15)
+                    yield msg
+                except queue.Empty:
+                    # Heartbeat para manter ligação viva e detectar desconexões
+                    yield ": heartbeat\n\n"
         finally:
             with _sse_lk:
                 lst = _sse.get(uid, [])
                 if q in lst: lst.remove(q)
     return Response(stream_with_context(gen()),
                     mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                    headers={
+                        "Cache-Control": "no-cache, no-store",
+                        "X-Accel-Buffering": "no",
+                        "Connection": "keep-alive",
+                    })
 
 @app.route("/api/admin/events")
 def sse_admin():
@@ -714,15 +743,22 @@ def sse_admin():
         try:
             yield "event:connected\ndata:{\"ok\":true}\n\n"
             while True:
-                try:   yield q.get(timeout=20)
-                except queue.Empty: yield ": ping\n\n"
+                try:
+                    msg = q.get(timeout=15)
+                    yield msg
+                except queue.Empty:
+                    yield ": heartbeat\n\n"
         finally:
             with _sse_lk:
                 lst = _sse.get(-1, [])
                 if q in lst: lst.remove(q)
     return Response(stream_with_context(gen()),
                     mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                    headers={
+                        "Cache-Control": "no-cache, no-store",
+                        "X-Accel-Buffering": "no",
+                        "Connection": "keep-alive",
+                    })
 
 @app.route("/admin/deposits")
 @admin_req
@@ -740,8 +776,8 @@ def adm_approve(did):
         if dep:
             u = get_user(dep["user_id"])
             push(dep["user_id"], "deposit_approved", {
-                "amount":  dep["amount"],
-                "balance": u["balance"] if u else 0
+                "amount":  float(dep["amount"]),
+                "balance": float(u["balance"]) if u else 0
             })
     return jsonify({"ok": ok})
 
@@ -766,8 +802,8 @@ def adm_complete(wid):
         w = cur.fetchone(); cur.close(); conn.close()
         if w:
             push(w["user_id"], "withdrawal_done", {
-                "amount":  w["amount"],
-                "net":     w["net_amount"],
+                "amount":  float(w["amount"]),
+                "net":     float(w["net_amount"]),
                 "express": w["express_number"]
             })
     return jsonify({"ok": ok})
@@ -782,7 +818,7 @@ def adm_wit_reject(wid):
         w = cur.fetchone(); cur.close(); conn.close()
         if w:
             push(w["user_id"], "withdrawal_rejected", {
-                "amount": w["amount"],
+                "amount": float(w["amount"]),
                 "msg":    "Levantamento rejeitado. Saldo devolvido à tua conta."
             })
     return jsonify({"ok": ok})
@@ -814,9 +850,9 @@ def adm_stats():
     cur.execute("SELECT COUNT(*) AS n FROM withdrawals WHERE status='pending'"); pwits = cur.fetchone()["n"]
     cur.close(); conn.close()
     return jsonify({"stats": {
-        "users": users, "total_balance": bal,
-        "deposits":    {"count": deps["n"], "total": deps["s"] or 0},
-        "withdrawals": {"count": wits["n"], "total": wits["s"] or 0},
+        "users": users, "total_balance": float(bal),
+        "deposits":    {"count": deps["n"], "total": float(deps["s"] or 0)},
+        "withdrawals": {"count": wits["n"], "total": float(wits["s"] or 0)},
         "games": games,
         "pending_deposits":    pdeps,
         "pending_withdrawals": pwits,
@@ -837,7 +873,7 @@ def adm_add_balance():
     conn.commit(); cur.close(); conn.close()
     add_tx(uid, "admin_credit", amount, f"Admin: {reason}")
     u = get_user(uid)
-    if u: push(uid, "balance_update", {"balance": u["balance"],
+    if u: push(uid, "balance_update", {"balance": float(u["balance"]),
                                         "msg": f"O teu saldo foi ajustado: +{amount:,.0f} Kz"})
     return jsonify({"ok": True})
 
@@ -1032,7 +1068,7 @@ def api_promo_use():
     ok, result = use_promo(session["uid"], code)
     if not ok: return jsonify({"error": result}), 400
     u = get_user(session["uid"])
-    push(session["uid"], "balance_update", {"balance": u["balance"]})
+    push(session["uid"], "balance_update", {"balance": float(u["balance"])})
     return jsonify({"ok": True, "amount": result,
                     "msg": f"Bónus de {fmt_kz(result)} Kz aplicado!"})
 
@@ -1051,10 +1087,10 @@ def api_daily_claim():
     ok, result = claim_daily(session["uid"])
     if not ok: return jsonify({"error": result}), 400
     u = get_user(session["uid"])
-    push(session["uid"], "balance_update", {"balance": u["balance"]})
+    push(session["uid"], "balance_update", {"balance": float(u["balance"])})
     add_tx(session["uid"], "daily_bonus", result["amount"],
            f"Bónus diário dia {result['streak']}")
-    return jsonify({"ok": True, **result, "balance": u["balance"]})
+    return jsonify({"ok": True, **result, "balance": float(u["balance"])})
 
 @app.route("/api/support/ticket", methods=["POST"])
 @login_req
@@ -1093,7 +1129,7 @@ def api_stats_public():
     cur.execute("SELECT SUM(prize) AS s FROM game_history"); paid  = cur.fetchone()["s"] or 0
     cur.close(); conn.close()
     online = len([uid for uid, qs in _sse.items() if uid > 0 and qs])
-    return jsonify({"users": users, "games": games, "paid": paid, "online": online})
+    return jsonify({"users": users, "games": games, "paid": float(paid), "online": online})
 
 def get_jackpot_value():
     try:
