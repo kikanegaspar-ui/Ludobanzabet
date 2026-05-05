@@ -532,12 +532,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         <h3>🎁 Bónus</h3>
         <p style="font-size:13px;color:var(--t2);font-weight:600;line-height:1.6;margin-bottom:4px">Recompensas para novos jogadores e jogadores activos.</p>
         <div class="bonus-row" id="bonus-row">
-          <div class="bonus-item" id="bw-item">
-            <div class="bonus-item-icon">🎉</div>
-            <div class="bonus-item-val">1.000 KZ</div>
-            <div class="bonus-item-lbl">Bónus Boas-Vindas<br>Recebido ao criar conta</div>
-            <div class="bonus-item-status" id="bw-status">A carregar...</div>
-          </div>
+
           <div class="bonus-item" id="b10-item">
             <div class="bonus-item-icon">🏅</div>
             <div class="bonus-item-val">2.000 KZ</div>
@@ -546,7 +541,7 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
           </div>
         </div>
         <div style="margin-top:14px" id="b10-claim-wrap"></div>
-        <p class="pnote" style="margin-top:10px">⚠️ O bónus de boas-vindas exige pelo menos 1 partida jogada para ser sacado.</p>
+
       </div>
       <div class="ref-card">
         <h3>👥 Referidos</h3>
@@ -922,8 +917,7 @@ function renderDeps(deps){const b=document.getElementById("dep-lst");if(!deps.le
 async function loadBonuses(){
   const uf=await api("/api/me");if(uf.user){U=uf.user;if(window._syncU)window._syncU(U);updN();}
   const games=U?.games_played||0;
-  const bwS=document.getElementById("bw-status");
-  if(bwS){if(U?.welcome_bonus_claimed){bwS.textContent="✅ Já recebido";bwS.className="bonus-item-status claimed";}else if(games>=1){bwS.textContent="🎁 Disponível para saque!";bwS.className="bonus-item-status ready";}else{bwS.textContent="🔒 Joga 1 partida para desbloquear";bwS.className="bonus-item-status locked";}}
+
   const b10S=document.getElementById("b10-status"),b10W=document.getElementById("b10-claim-wrap");
   if(b10S){if(U?.ten_games_bonus_claimed){b10S.textContent="✅ Já recebido";b10S.className="bonus-item-status claimed";if(b10W)b10W.innerHTML="";}else if(games>=10){b10S.textContent="🎁 Pronto a receber!";b10S.className="bonus-item-status ready";if(b10W)b10W.innerHTML=`<button class="btn bg bfw" onclick="claimTenGamesBonus()" style="font-size:13px">🏅 Receber 2.000 Kz (10 Partidas)</button>`;}else{const rem=10-games;b10S.textContent=`🔒 Faltam ${rem} partida${rem===1?"":"s"}`;b10S.className="bonus-item-status locked";if(b10W)b10W.innerHTML=`<div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${(games/10)*100}%;background:linear-gradient(90deg,var(--g1),var(--orange));border-radius:3px;transition:width .5s"></div></div><div style="font-size:11px;color:var(--t3);margin-top:5px;font-weight:600">${games}/10 partidas jogadas</div>`;}}
 }
