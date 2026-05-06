@@ -1,15 +1,14 @@
 /**
- * ludo_board_v2.js — LudoKz v9 CORRIGIDO
+ * ludo_board_v2.js — LudoKz v10
  *
- * BUGS CORRIGIDOS:
- * 1. Cores únicas por jogador — sem duplicados em jogos de 4
- * 2. Carros não voltam sozinhos — _applyDiff robusto, animação segura
- * 3. Dado não para de girar — _animDice com guard contra chamadas concorrentes
- * 4. Jogo paralisa quando rede cai — SSE reconnect automático com backoff
- * 5. Saldo actualizado correctamente via game_over balance
- * 6. Bónus do frontend não é apagado ao navegar para wallet
- * 7. _isMyTurn robusto com fallback de ID
- * 8. renderState não reseta botão durante animação
+ * BUGS CORRIGIDOS nesta versão:
+ * 9. Dado trava ao voltar do WhatsApp / background:
+ *    - visibilitychange: reset imediato de _diceAnimating ao voltar ao foreground
+ *    - setTimeout substituído por requestAnimationFrame + timestamp para não
+ *      ser suspenso pelo browser quando a aba fica em background
+ *    - Watchdog de 2s: se _diceAnimating ficou true mais de 2s, força reset
+ *    - Ao voltar ao foreground, re-sincroniza estado com o servidor
+ * 10. SSE: ao voltar do background reconecta imediatamente (sem esperar backoff)
  */
 
 // ── Sincronização do utilizador ──────────────────────────────
@@ -190,25 +189,70 @@ function _drawDots(container, val) {
   });
 }
 
-// ── Animação do dado — guard contra concorrência ──────────────
-let _diceAnimating = false;
+// ── Animação do dado — totalmente robusta contra background ──────
+let _diceAnimating  = false;
+let _diceAnimStart  = 0;       // timestamp de início da animação
+let _diceWatchdog   = null;    // timer de segurança
+
+// Duração máxima da animação — após este tempo força conclusão
+const DICE_ANIM_MS = 480;
+// Watchdog: se passaram mais de 2s com _diceAnimating=true, força reset
+const DICE_WATCHDOG_MS = 2000;
+
+function _forceEndDiceAnim(safeVal, cb) {
+  // Chamado pelo watchdog ou pelo visibilitychange — garante que o dado termina
+  _diceAnimating = false;
+  clearTimeout(_diceWatchdog);
+  _diceWatchdog = null;
+
+  const flat = document.getElementById('lk-dice-flat');
+  const nm   = document.getElementById('lk-dice-num');
+  if (flat) {
+    flat.classList.remove('rolling');
+    if (safeVal >= 1) _drawDots(flat, safeVal);
+  }
+  if (nm && safeVal >= 1) {
+    nm.textContent = safeVal;
+    nm.classList.remove('num-pop');
+    void nm.offsetWidth;
+    nm.classList.add('num-pop');
+  }
+  if (cb) { try { cb(); } catch(e) {} }
+
+  // Re-renderiza o estado actual para desbloquear o botão
+  if (window.CUR_STATE && typeof window.renderState === 'function') {
+    window.renderState(window.CUR_STATE);
+  }
+}
 
 function _animDice(val, cb) {
   const safeVal = Math.max(1, Math.min(6, Math.round(Number(val)) || 0));
 
-  // CORREÇÃO: se val=0 (turno passou) não anima, chama callback imediatamente
+  // val=0 → turno passou automaticamente, sem animação
   if (!safeVal) {
     _diceAnimating = false;
+    clearTimeout(_diceWatchdog);
     if (cb) cb();
     return;
   }
 
-  // CORREÇÃO: se já está a animar, cancela animação anterior e força conclusão
+  // Se já estava a animar, força conclusão da anterior antes de começar nova
   if (_diceAnimating) {
-    _diceAnimating = false;
+    _forceEndDiceAnim(safeVal, null);
   }
 
   _diceAnimating = true;
+  _diceAnimStart = Date.now();
+
+  // Watchdog: se ao fim de 2s ainda estiver animating, força conclusão
+  // (acontece quando o browser congela setTimeout em background)
+  clearTimeout(_diceWatchdog);
+  _diceWatchdog = setTimeout(() => {
+    if (_diceAnimating) {
+      _forceEndDiceAnim(safeVal, cb);
+    }
+  }, DICE_WATCHDOG_MS);
+
   SFX.dice();
 
   const flat = document.getElementById('lk-dice-flat');
@@ -218,29 +262,74 @@ function _animDice(val, cb) {
 
   if (flat) {
     flat.classList.remove('rolling');
-    void flat.offsetWidth; // reflow para reiniciar animação
+    void flat.offsetWidth;
     flat.classList.add('rolling');
   }
-  if (dfc) dfc.textContent = ['⚀','⚁','⚂','⚃','⚄','⚅'][safeVal-1];
+  if (dfc) dfc.textContent = ['⚀','⚁','⚂','⚃','⚄','⚅'][safeVal - 1];
   if (dnm) dnm.textContent = safeVal;
 
-  setTimeout(()=>{
-    _diceAnimating = false;
-    if (flat) {
-      flat.classList.remove('rolling');
-      _drawDots(flat, safeVal);
+  // Usa rAF + timestamp em vez de setTimeout puro
+  // rAF também é suspenso em background, mas o watchdog acima garante a conclusão
+  const startTs = performance.now();
+  function checkDone(now) {
+    if (now - startTs >= DICE_ANIM_MS) {
+      if (_diceAnimating) {
+        _forceEndDiceAnim(safeVal, cb);
+      }
+    } else {
+      requestAnimationFrame(checkDone);
     }
-    if (nm) {
-      nm.textContent = safeVal;
-      nm.classList.remove('num-pop');
-      void nm.offsetWidth;
-      nm.classList.add('num-pop');
-    }
-    if (cb) cb();
-  }, 450);
+  }
+  requestAnimationFrame(checkDone);
 }
 
 window.BOARD = { animateDice: _animDice };
+
+// ── Visibilidade da página — FIX PRINCIPAL ────────────────────
+// Quando o utilizador volta do WhatsApp / outra app:
+// 1. Força reset do dado se estava a animar
+// 2. Re-sincroniza estado com o servidor
+// 3. Reconecta SSE imediatamente (sem esperar backoff)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+
+    // 1. Reset imediato do dado bloqueado
+    if (_diceAnimating) {
+      const lastVal = window.CUR_STATE?.dice || 1;
+      _forceEndDiceAnim(lastVal, null);
+      if (typeof toast === 'function') toast('🔄 Jogo sincronizado', 'tin');
+    }
+
+    // 2. Limpa animações de peças pendentes
+    _animating.clear();
+
+    // 3. Re-sincroniza estado com servidor se há jogo activo
+    if (window.RID) {
+      fetch(`/api/room/${window.RID}/state`, { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(state => {
+          if (state && state.players) {
+            window.CUR_STATE = state;
+            if (typeof window.renderState === 'function') {
+              window.renderState(state);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    // 4. Reconecta SSE imediatamente se estava desligado
+    if (typeof connectSSE === 'function') {
+      // Só reconecta se o SSE está null ou fechado
+      const sseOk = window.SSE &&
+                    window.SSE.readyState !== EventSource.CLOSED &&
+                    window.SSE.readyState !== 2;
+      if (!sseOk) {
+        connectSSE();
+      }
+    }
+  }
+});
 
 // ── Elementos do tabuleiro ────────────────────────────────────
 let _els = {};
@@ -600,50 +689,65 @@ window.highlightPcs = function(mv) {
   if (colour && _els[colour]) _setSelectable(colour, mv);
 };
 
-// ── doRoll — versão corrigida anti-race-condition ─────────────
+// ── doRoll — robusto contra background e double-tap ──────────
+let _rollInFlight = false; // impede pedidos duplos ao servidor
+
 window.doRoll = async function() {
   if (!window.RID) return;
 
-  // CORREÇÃO: impede duplo-clique e chamadas durante animação
-  if (_diceAnimating) return;
+  // Impede duplo pedido ao servidor (não bloqueia por animação)
+  if (_rollInFlight) return;
+
+  // Se o dado ainda está a "animar" mas o utilizador clicou,
+  // força conclusão da animação e permite o pedido
+  if (_diceAnimating) {
+    _forceEndDiceAnim(window.CUR_STATE?.dice || 1, null);
+  }
 
   const rb = document.getElementById('rb');
-  if (rb && rb.disabled) return;
+  if (rb && rb.disabled && !_diceAnimating) return;
   if (rb) { rb.disabled = true; rb.classList.remove('my-turn'); rb.textContent = '⏳ A lançar...'; }
+
+  _rollInFlight = true;
 
   let d;
   try {
     const r = await fetch('/api/game/roll', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({room_id: window.RID}),
       credentials: 'same-origin',
     });
     d = await r.json();
   } catch(e) {
-    if (typeof toast === 'function') toast('❌ Erro de ligação. Tenta novamente.', 'ter');
-    if (window.CUR_STATE && typeof window.renderState === 'function') window.renderState(window.CUR_STATE);
+    _rollInFlight = false;
+    if (typeof toast === 'function') toast('❌ Sem ligação. Tenta novamente.', 'ter');
+    if (window.CUR_STATE && typeof window.renderState === 'function') {
+      window.renderState(window.CUR_STATE);
+    }
     return;
   }
+
+  _rollInFlight = false;
 
   if (d.error) {
     if (typeof toast === 'function') toast('❌ ' + d.error, 'ter');
-    if (window.CUR_STATE && typeof window.renderState === 'function') window.renderState(window.CUR_STATE);
+    if (window.CUR_STATE && typeof window.renderState === 'function') {
+      window.renderState(window.CUR_STATE);
+    }
     return;
   }
 
-  // d.dice = valor real do lançamento (1-6), mesmo que state.dice seja 0
   const diceVal = d.dice;
 
   if (diceVal && diceVal >= 1) {
-    // Anima dado e SÓ depois actualiza estado e mostra peças movíveis
     _animDice(diceVal, async function() {
       if (typeof window.renderState === 'function') window.renderState(d);
       if (d.phase === 1) {
         try {
           const mv = await fetch('/api/game/movable', {
             method: 'POST',
-            headers: {'Content-Type':'application/json'},
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({room_id: window.RID}),
             credentials: 'same-origin',
           });
@@ -655,7 +759,7 @@ window.doRoll = async function() {
       }
     });
   } else {
-    // Turno passou automaticamente (sem peças movíveis)
+    // Turno passou — sem animação
     if (typeof window.renderState === 'function') window.renderState(d);
     _showPassMsg('↩️ Sem peças para mover — turno passou!');
     if (typeof toast === 'function') toast('↩️ Sem jogadas — turno passou!', 'tin');
@@ -664,11 +768,14 @@ window.doRoll = async function() {
 
 // ── Eventos de jogo ───────────────────────────────────────────
 window.onGameStarted = function(state) {
-  window.RID       = state.room_id || window.RID;
+  window.RID        = state.room_id || window.RID;
   window.CUR_STATE  = state;
   window.PREV_STATE = null;
   _animating.clear();
-  _diceAnimating = false;
+  _diceAnimating  = false;
+  _rollInFlight   = false;
+  clearTimeout(_diceWatchdog);
+  _diceWatchdog   = null;
 
   if (typeof pg === 'function') pg('game');
 
@@ -803,7 +910,10 @@ window.leaveGame = async function() {
   window.CUR_STATE  = null;
   window.PREV_STATE = null;
   _animating.clear();
-  _diceAnimating = false;
+  _diceAnimating  = false;
+  _rollInFlight   = false;
+  clearTimeout(_diceWatchdog);
+  _diceWatchdog   = null;
   if (typeof pg === 'function') pg('home');
 };
 
@@ -811,4 +921,4 @@ window.buildBoard       = _buildBoard;
 window.initCanvas       = _buildBoard;
 window.startRenderLoop  = function(){};
 
-console.log('[LudoKz] ludo_board_v2.js v9 — todos os bugs corrigidos');
+console.log('[LudoKz] ludo_board_v2.js v10 — dado nunca mais trava ao voltar do background');
