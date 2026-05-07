@@ -1,1155 +1,924 @@
-"""app.py — LudoKz Backend v9
-CORREÇÕES:
-1. _finish_game: atualiza saldo e envia balance correto via SSE
-2. api_leave: idem para abandono
-3. SSE: heartbeat robusto, reconnect automático
-4. Bónus frontend: endpoints preservados e não interferem com wallet
-5. credit_prize chamado uma única vez com valores corretos
-"""
-import json, queue, threading, os, secrets, time, uuid
-from functools import wraps
-from flask import (Flask, render_template, request, jsonify,
-                   session, Response, stream_with_context)
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from database import *
-from sms_service import formatar_numero_angola, enviar_sms_simulado, operadora
-from game_manager import GameManager
+/**
+ * ludo_board_v2.js — LudoKz v10
+ *
+ * BUGS CORRIGIDOS nesta versão:
+ * 9. Dado trava ao voltar do WhatsApp / background:
+ *    - visibilitychange: reset imediato de _diceAnimating ao voltar ao foreground
+ *    - setTimeout substituído por requestAnimationFrame + timestamp para não
+ *      ser suspenso pelo browser quando a aba fica em background
+ *    - Watchdog de 2s: se _diceAnimating ficou true mais de 2s, força reset
+ *    - Ao voltar ao foreground, re-sincroniza estado com o servidor
+ * 10. SSE: ao voltar do background reconecta imediatamente (sem esperar backoff)
+ */
 
-app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
-PLATFORM_EXPRESS = os.environ.get("PLATFORM_EXPRESS", "922 745 946")
-ADMIN_KEY        = os.environ.get("ADMIN_KEY", "ludokz2025")
+// ── Sincronização do utilizador ──────────────────────────────
+window._syncU = function(u) {
+  window.U = u;
+};
 
-ROOM_TIMEOUT_SECS = 300
-PLATFORM_FEE = 0.10
+function _getU() {
+  return window.U || null;
+}
 
-init_db()
+const COLOUR_HEX  = { blue:'#1295e7', green:'#049645', red:'#e53935', yellow:'#f9a825' };
+const COLOUR_NAME = { blue:'Azul', green:'Verde', red:'Vermelho', yellow:'Amarelo' };
+const COLOUR_GRAD = {
+  blue:   ['#90caf9','#0d47a1'],
+  green:  ['#a5d6a7','#1b5e20'],
+  red:    ['#ef9a9a','#b71c1c'],
+  yellow: ['#fff59d','#f57f17'],
+};
+const COLOUR_TEXT = { blue:'#fff', green:'#fff', red:'#fff', yellow:'#111' };
 
-@app.after_request
-def add_godot_headers(response):
-    response.headers["Cross-Origin-Opener-Policy"]   = "same-origin"
-    response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
-    return response
+const CMAP = {
+  0:[6,13],1:[6,12],2:[6,11],3:[6,10],4:[6,9],
+  5:[5,8],6:[4,8],7:[3,8],8:[2,8],9:[1,8],10:[0,8],
+  11:[0,7],12:[0,6],13:[1,6],14:[2,6],15:[3,6],16:[4,6],17:[5,6],
+  18:[6,5],19:[6,4],20:[6,3],21:[6,2],22:[6,1],23:[6,0],
+  24:[7,0],25:[8,0],
+  26:[8,1],27:[8,2],28:[8,3],29:[8,4],30:[8,5],
+  31:[9,6],32:[10,6],33:[11,6],34:[12,6],35:[13,6],36:[14,6],
+  37:[14,7],38:[14,8],
+  39:[13,8],40:[12,8],41:[11,8],42:[10,8],43:[9,8],
+  44:[8,9],45:[8,10],46:[8,11],47:[8,12],48:[8,13],49:[8,14],
+  50:[7,14],51:[6,14],
+  100:[7,13],101:[7,12],102:[7,11],103:[7,10],104:[7,9],105:[7,8],
+  200:[7,1],201:[7,2],202:[7,3],203:[7,4],204:[7,5],205:[7,6],
+  300:[13,7],301:[12,7],302:[11,7],303:[10,7],304:[9,7],305:[8,7],
+  400:[1,7],401:[2,7],402:[3,7],403:[4,7],404:[5,7],405:[6,7],
+  500:[1.5,10.58],501:[3.57,10.58],502:[1.5,12.43],503:[3.57,12.43],
+  600:[10.5,1.58],601:[12.54,1.58],602:[10.5,3.45],603:[12.54,3.45],
+  700:[10.5,10.58],701:[12.57,10.58],702:[10.5,12.43],703:[12.57,12.43],
+  800:[1.5,1.58],801:[3.57,1.58],802:[1.5,3.45],803:[3.55,3.45],
+};
+const STEP = 6.6667;
 
-@app.after_request
-def add_cors(response):
-    response.headers["Access-Control-Allow-Origin"]      = "*"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Headers"]     = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"]     = "GET,POST,OPTIONS"
-    return response
+const BASE_IDS = {
+  blue:[500,501,502,503], green:[600,601,602,603],
+  red:[700,701,702,703],  yellow:[800,801,802,803],
+};
+const HOME_ID   = { blue:105, green:205, red:305, yellow:405 };
+const _BASE_SET = new Set([500,501,502,503,600,601,602,603,700,701,702,703,800,801,802,803]);
 
-@app.route("/api/<path:path>", methods=["OPTIONS"])
-def options_handler(path):
-    return "", 204
+const START_ID  = { blue:0,  green:26, red:39, yellow:13 };
+const TURN_ID   = { blue:50, green:24, red:37, yellow:11 };
+const HOME_LANE = {
+  blue:   [100,101,102,103,104,105],
+  green:  [200,201,202,203,204,205],
+  red:    [300,301,302,303,304,305],
+  yellow: [400,401,402,403,404,405],
+};
 
-def get_pg():
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+function _buildPath(colour) {
+  const start = START_ID[colour], turn = TURN_ID[colour];
+  const main = []; let pos = start;
+  for (let i = 0; i <= 52; i++) {
+    main.push(pos);
+    if (pos === turn) break;
+    pos = (pos + 1) % 52;
+  }
+  return main.concat(HOME_LANE[colour]);
+}
 
-_rooms: dict = {}
-_rooms_lk = threading.Lock()
+const FULL_PATH = {
+  blue: _buildPath('blue'), green: _buildPath('green'),
+  red:  _buildPath('red'),  yellow: _buildPath('yellow'),
+};
 
-BET_TIERS = {1000: "Bronze", 5000: "Prata", 10000: "Ouro", 50000: "VIP"}
+function _nextId(colour, currentId) {
+  const path = FULL_PATH[colour];
+  const idx  = path.indexOf(currentId);
+  if (idx === -1 || idx >= path.length - 1) return currentId;
+  return path[idx + 1];
+}
 
-def _get_room(rid: str):
-    return _rooms.get(rid)
+// ── Sons ──────────────────────────────────────────────────────
+const SFX = (() => {
+  let ctx = null;
+  const ac = () => { if (!ctx) try { ctx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} return ctx; };
+  const tone = (f,d,t,v,dt) => {
+    try {
+      const c=ac(); if(!c) return;
+      const o=c.createOscillator(), g=c.createGain();
+      o.connect(g); g.connect(c.destination);
+      o.type=t||'sine'; o.frequency.value=f;
+      const st=c.currentTime+(dt||0);
+      g.gain.setValueAtTime(v||0.2,st);
+      g.gain.exponentialRampToValueAtTime(0.001,st+d);
+      o.start(st); o.stop(st+d);
+    } catch(e){}
+  };
+  return {
+    unlock:  ()=>ac(),
+    dice:    ()=>{ tone(200,.05,'square',.15); tone(400,.07,'square',.15,.07); tone(600,.1,'square',.15,.14); },
+    move:    ()=>{ tone(660,.07,'sine',.18); tone(880,.06,'sine',.14,.08); },
+    capture: ()=>{ tone(180,.15,'sawtooth',.22); tone(120,.18,'sawtooth',.18,.1); },
+    home:    ()=>{ [784,988,1175].forEach((f,i)=>tone(f,.14,'sine',.22,i*.12)); },
+    win:     ()=>{ [523,659,784,1047].forEach((f,i)=>tone(f,.2,'sine',.28,i*.15)); },
+    pass:    ()=>{ tone(300,.12,'sine',.12); tone(200,.15,'sine',.10,.13); },
+  };
+})();
+window.SFX = SFX;
+document.addEventListener('click', ()=>SFX.unlock(), {once:true});
 
-def _make_rid() -> str:
-    return str(uuid.uuid4())[:8].upper()
+// ── CSS ───────────────────────────────────────────────────────
+(function(){
+  if (document.getElementById('lk-css')) return;
+  const s = document.createElement('style');
+  s.id = 'lk-css';
+  s.textContent = `
+  #ludo-board-wrap{position:relative;border-radius:14px;overflow:hidden;flex-shrink:0;box-shadow:0 0 0 2px rgba(245,197,24,.5),0 0 60px rgba(0,0,0,.85);}
+  #ludo-board-wrap>img{display:block;width:100%;height:100%;pointer-events:none;user-select:none;}
+  .lp{position:absolute;width:5.2%;height:5.2%;border-radius:50%;border:2.5px solid rgba(255,255,255,.9);transform:translate(-50%,-50%);z-index:10;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;font-family:'Bebas Neue',monospace;pointer-events:none;transition:left .28s cubic-bezier(.4,0,.2,1),top .28s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 8px rgba(0,0,0,.5);}
+  .lp.sel{pointer-events:auto;cursor:pointer;z-index:20;animation:lp-sel .4s ease-in-out infinite alternate;}
+  @keyframes lp-sel{from{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 0 3px gold,0 0 10px gold;}to{transform:translate(-50%,-50%) scale(1.4);box-shadow:0 0 0 5px gold,0 0 24px gold;}}
+  .lp.captured{animation:lp-die .38s ease-out forwards;pointer-events:none;}
+  @keyframes lp-die{0%{transform:translate(-50%,-50%) scale(1);opacity:1;}50%{transform:translate(-50%,-50%) scale(1.7);opacity:.7;}100%{transform:translate(-50%,-50%) scale(0);opacity:0;}}
+  #lk-dice-flat{width:90px;height:90px;background:#fff;border-radius:14px;border:3px solid #ccc;box-shadow:0 6px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.8);margin:8px auto;position:relative;cursor:pointer;transition:transform .12s,box-shadow .12s;display:flex;align-items:center;justify-content:center;}
+  #lk-dice-flat:hover{transform:scale(1.05);box-shadow:0 8px 28px rgba(0,0,0,.45);}
+  #lk-dice-flat:active{transform:scale(.93);}
+  #lk-dice-flat.rolling{animation:dk-shake .42s cubic-bezier(.36,.07,.19,.97);}
+  @keyframes dk-shake{0%,100%{transform:rotate(0) scale(1);}15%{transform:rotate(-20deg) scale(1.18);}30%{transform:rotate(18deg) scale(1.12);}45%{transform:rotate(-15deg) scale(1.14);}60%{transform:rotate(12deg) scale(1.09);}75%{transform:rotate(-8deg) scale(1.05);}90%{transform:rotate(5deg) scale(1.02);}}
+  .lk-dot{position:absolute;border-radius:50%;background:#111;box-shadow:inset 0 1px 3px rgba(0,0,0,.5);}
+  .lk-dot.red{background:radial-gradient(circle at 35% 30%,#ff5252,#b71c1c);box-shadow:0 0 8px rgba(183,28,28,.6);}
+  #lk-dice-num{font-family:'Bebas Neue',sans-serif;font-size:46px;color:#f5c518;letter-spacing:3px;text-align:center;text-shadow:0 0 18px rgba(245,197,24,.8);margin:2px 0 10px;min-height:54px;line-height:1;}
+  @keyframes num-pop{0%{transform:scale(.3);opacity:0;}65%{transform:scale(1.35);opacity:1;}100%{transform:scale(1);opacity:1;}}
+  .num-pop{animation:num-pop .28s cubic-bezier(.34,1.56,.64,1);}
+  #rb{width:100%;padding:14px;background:linear-gradient(135deg,#ffdb4d,#f5c518,#e6a800);border:none;border-radius:12px;font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1.5px;color:#0a0800;cursor:pointer;box-shadow:0 6px 20px rgba(245,197,24,.4);transition:all .18s;}
+  #rb:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 28px rgba(245,197,24,.6);}
+  #rb:active:not(:disabled){transform:scale(.97);}
+  #rb:disabled{opacity:.35;cursor:not-allowed;background:#333;box-shadow:none;color:#888;}
+  #rb.my-turn{animation:rb-pulse 1s ease-in-out infinite;}
+  @keyframes rb-pulse{0%,100%{box-shadow:0 6px 20px rgba(245,197,24,.4);}50%{box-shadow:0 6px 20px rgba(245,197,24,.4),0 0 0 6px rgba(245,197,24,.2);}}
+  .pc{display:flex;align-items:center;gap:10px;background:rgba(12,9,32,.85);border:1.5px solid rgba(255,255,255,.07);border-radius:13px;padding:10px 14px;transition:all .3s;flex:1;min-width:140px;}
+  .pc.mt{border-color:rgba(245,197,24,.7);background:rgba(245,197,24,.07);box-shadow:0 0 20px rgba(245,197,24,.18);}
+  .pdot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+  .pnm2{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.5px;}
+  .pft{font-size:10px;color:#4a4470;font-weight:700;margin-top:1px;}
+  .gli{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);color:#9890c0;font-size:12px;font-weight:600;line-height:1.5;}
+  .gli:last-child{border:none;}
+  .gli.w{color:#00e676;}.gli.k{color:#ff4757;}.gli.r{color:#f5c518;}
+  #lk-pass-msg{text-align:center;font-size:12px;font-weight:800;color:#ff9f0a;letter-spacing:1px;padding:6px;margin-bottom:4px;min-height:22px;transition:opacity .3s;}
+  `;
+  document.head.appendChild(s);
+})();
 
-_sse: dict = {}
-_sse_lk = threading.Lock()
+// ── Dots do dado ──────────────────────────────────────────────
+const DOT_LAYOUT = {
+  1:[[50,50]],
+  2:[[28,28],[72,72]],
+  3:[[28,28],[50,50],[72,72]],
+  4:[[28,28],[72,28],[28,72],[72,72]],
+  5:[[28,28],[72,28],[50,50],[28,72],[72,72]],
+  6:[[27,20],[73,20],[27,50],[73,50],[27,80],[73,80]],
+};
 
-_otp_rate: dict = {}
-_otp_rate_lk = threading.Lock()
+function _drawDots(container, val) {
+  container.querySelectorAll('.lk-dot').forEach(d=>d.remove());
+  // Limpar texto placeholder
+  if (container.childNodes.length === 1 && container.firstChild.nodeType === 3) {
+    container.textContent = '';
+  }
+  const v = Math.max(1, Math.min(6, Math.round(Number(val)) || 1));
+  (DOT_LAYOUT[v] || DOT_LAYOUT[1]).forEach(([cx,cy])=>{
+    const d = document.createElement('span');
+    d.className = 'lk-dot' + (v===1 ? ' red' : '');
+    const sz = v===1 ? 20 : 14;
+    d.style.cssText = `width:${sz}px;height:${sz}px;left:calc(${cx}% - ${sz/2}px);top:calc(${cy}% - ${sz/2}px);`;
+    container.appendChild(d);
+  });
+}
 
-def _otp_permitido(phone: str, max_por_minuto: int = 2) -> bool:
-    agora = time.time()
-    with _otp_rate_lk:
-        contagem, reset_em = _otp_rate.get(phone, (0, agora + 60))
-        if agora > reset_em:
-            contagem, reset_em = 0, agora + 60
-        if contagem >= max_por_minuto:
-            return False
-        _otp_rate[phone] = (contagem + 1, reset_em)
-        return True
+// ── Animação do dado — totalmente robusta contra background ──────
+let _diceAnimating  = false;
+let _diceAnimStart  = 0;       // timestamp de início da animação
+let _diceWatchdog   = null;    // timer de segurança
 
-def push(uid, event: str, data: dict):
-    try:
-        uid_key = int(uid)
-    except (ValueError, TypeError):
-        uid_key = uid
-    msg = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-    with _sse_lk:
-        for q in _sse.get(uid_key, []):
-            try:
-                if q.full():
-                    try: q.get_nowait()
-                    except: pass
-                q.put_nowait(msg)
-            except Exception:
-                pass
+// Duração máxima da animação — após este tempo força conclusão
+const DICE_ANIM_MS = 480;
+// Watchdog: se passaram mais de 2s com _diceAnimating=true, força reset
+const DICE_WATCHDOG_MS = 2000;
 
-def push_admin(event: str, data: dict):
-    push(-1, event, data)
+function _forceEndDiceAnim(safeVal, cb) {
+  // Chamado pelo watchdog ou pelo visibilitychange — garante que o dado termina
+  _diceAnimating = false;
+  clearTimeout(_diceWatchdog);
+  _diceWatchdog = null;
 
-def push_room(rid: str, event: str, data: dict):
-    r = _get_room(rid)
-    if r:
-        for p in r.players:
-            push(p["user_id"], event, data)
+  const flat = document.getElementById('lk-dice-flat');
+  const nm   = document.getElementById('lk-dice-num');
+  if (flat) {
+    flat.classList.remove('rolling');
+    if (safeVal >= 1) _drawDots(flat, safeVal);
+  }
+  if (nm && safeVal >= 1) {
+    nm.textContent = safeVal;
+    nm.classList.remove('num-pop');
+    void nm.offsetWidth;
+    nm.classList.add('num-pop');
+  }
+  if (cb) { try { cb(); } catch(e) {} }
 
-def login_req(f):
-    @wraps(f)
-    def d(*a, **kw):
-        if "uid" not in session:
-            return jsonify({"error": "Não autenticado"}), 401
-        return f(*a, **kw)
-    return d
+  // Re-renderiza o estado actual para desbloquear o botão
+  if (window.CUR_STATE && typeof window.renderState === 'function') {
+    window.renderState(window.CUR_STATE);
+  }
+}
 
-def admin_req(f):
-    @wraps(f)
-    def d(*a, **kw):
-        if request.headers.get("X-Admin-Key", "") != ADMIN_KEY:
-            return jsonify({"error": "Acesso negado"}), 403
-        return f(*a, **kw)
-    return d
+function _animDice(val, cb) {
+  const safeVal = Math.max(1, Math.min(6, Math.round(Number(val)) || 0));
 
-def safe_user(u):
-    if not u: return {}
-    return {k: u.get(k, "") for k in
-            ("id", "name", "phone", "balance", "express_number",
-             "games_played", "wins", "losses", "total_earned",
-             "phone_verified", "age_confirmed", "terms_accepted", "created_at",
-             "welcome_bonus_claimed", "ten_games_bonus_claimed")}
+  // val=0 → turno passou automaticamente, sem animação
+  if (!safeVal) {
+    _diceAnimating = false;
+    clearTimeout(_diceWatchdog);
+    if (cb) cb();
+    return;
+  }
 
-# ══════════════════════════════════════════════════════════════
-#  SISTEMA DE RESERVA TEMPORÁRIA
-# ══════════════════════════════════════════════════════════════
-_reservations: dict = {}
-_res_lk = threading.Lock()
+  // Se já estava a animar, força conclusão da anterior antes de começar nova
+  if (_diceAnimating) {
+    _forceEndDiceAnim(safeVal, null);
+  }
 
-def _reserve(rid: str, uid: int, amount: float) -> bool:
-    uid = int(uid)
-    conn = get_pg(); cur = conn.cursor()
-    cur.execute("SELECT balance FROM users WHERE id=%s", (uid,))
-    row = cur.fetchone()
-    cur.close(); conn.close()
-    if not row or float(row["balance"]) < amount:
-        return False
-    with _res_lk:
-        _reservations.setdefault(rid, {})[uid] = amount
-    return True
+  _diceAnimating = true;
+  _diceAnimStart = Date.now();
 
-def _collect_reservations(rid: str) -> bool:
-    with _res_lk:
-        res = dict(_reservations.get(rid, {}))
-    for uid, amount in res.items():
-        uid = int(uid)
-        if uid < 0:
-            continue
-        if not deduct_bet(uid, amount):
-            return False
-        tier = BET_TIERS.get(amount, str(amount))
-        add_tx(uid, "bet", -amount, f"Aposta sala {tier}")
-    with _res_lk:
-        _reservations.pop(rid, None)
-    return True
+  // Watchdog: se ao fim de 2s ainda estiver animating, força conclusão
+  // (acontece quando o browser congela setTimeout em background)
+  clearTimeout(_diceWatchdog);
+  _diceWatchdog = setTimeout(() => {
+    if (_diceAnimating) {
+      _forceEndDiceAnim(safeVal, cb);
+    }
+  }, DICE_WATCHDOG_MS);
 
-def _release_reservation(rid: str, uid=None):
-    with _res_lk:
-        if uid is not None:
-            uid = int(uid)
-            _reservations.get(rid, {}).pop(uid, None)
-        else:
-            _reservations.pop(rid, None)
+  SFX.dice();
 
-# ══════════════════════════════════════════════════════════════
-#  LIMPAR SALAS PENDENTES DO UTILIZADOR
-# ══════════════════════════════════════════════════════════════
-def _remove_user_from_pending_rooms(uid):
-    uid_str = str(uid)
-    uid_int = int(uid)
+  const flat = document.getElementById('lk-dice-flat');
+  const nm   = document.getElementById('lk-dice-num');
+  const dfc  = document.getElementById('dfc');
+  const dnm  = document.getElementById('dnm');
 
-    rids_to_clean = []
-    with _rooms_lk:
-        for rid, r in list(_rooms.items()):
-            if r.started:
-                continue
-            if any(str(p["user_id"]) == uid_str for p in r.players):
-                rids_to_clean.append(rid)
+  if (flat) {
+    flat.classList.remove('rolling');
+    void flat.offsetWidth;
+    flat.classList.add('rolling');
+  }
+  if (dfc) dfc.textContent = ['⚀','⚁','⚂','⚃','⚄','⚅'][safeVal - 1];
+  if (dnm) dnm.textContent = safeVal;
 
-    for rid in rids_to_clean:
-        _release_reservation(rid, uid_int)
-        with _rooms_lk:
-            r = _rooms.get(rid)
-            if not r:
-                continue
-            r.players = [p for p in r.players if str(p["user_id"]) != uid_str]
-            if not r.players:
-                _rooms.pop(rid, None)
-                _release_reservation(rid)
+  // Usa rAF + timestamp em vez de setTimeout puro
+  // rAF também é suspenso em background, mas o watchdog acima garante a conclusão
+  const startTs = performance.now();
+  function checkDone(now) {
+    if (now - startTs >= DICE_ANIM_MS) {
+      if (_diceAnimating) {
+        _forceEndDiceAnim(safeVal, cb);
+      }
+    } else {
+      requestAnimationFrame(checkDone);
+    }
+  }
+  requestAnimationFrame(checkDone);
+}
 
+window.BOARD = { animateDice: _animDice };
 
-def _expire_room(rid: str):
-    with _rooms_lk:
-        r = _rooms.get(rid)
-        if not r or r.started:
-            return
-        _rooms.pop(rid, None)
-    _release_reservation(rid)
-    if r:
-        for p in r.players:
-            u = get_user(int(p["user_id"]))
-            push(p["user_id"], "balance_update", {
-                "balance": float(u["balance"]) if u else 0,
-                "msg": "⏰ A sala expirou por falta de jogadores. Reserva libertada."
-            })
+// ── Visibilidade da página — FIX PRINCIPAL ────────────────────
+// Quando o utilizador volta do WhatsApp / outra app:
+// 1. Força reset do dado se estava a animar
+// 2. Re-sincroniza estado com o servidor
+// 3. Reconecta SSE imediatamente (sem esperar backoff)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
 
-def _schedule_room_expire(rid: str):
-    def _run():
-        time.sleep(ROOM_TIMEOUT_SECS)
-        _expire_room(rid)
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
+    // 1. Reset imediato do dado bloqueado
+    if (_diceAnimating) {
+      const lastVal = window.CUR_STATE?.dice || 1;
+      _forceEndDiceAnim(lastVal, null);
+      if (typeof toast === 'function') toast('🔄 Jogo sincronizado', 'tin');
+    }
 
-# ══════════════════════════════════════════════════════════════
-#  FINALIZAR JOGO — CORRIGIDO
-# ══════════════════════════════════════════════════════════════
-def _finish_game(rid: str):
-    r = _get_room(rid)
-    if not r or not r.over or not r.winner:
-        return
+    // 2. Limpa animações de peças pendentes
+    _animating.clear();
 
-    winner_id  = r.winner
-    loser_ids  = [p["user_id"] for p in r.players if p["user_id"] != winner_id]
-    n_players  = len(r.players)
-    prize      = round(r.bet * n_players * (1 - PLATFORM_FEE), 2)
-
-    # CORREÇÃO: credit_prize credita o saldo do vencedor na BD
-    credit_prize(int(winner_id), [int(l) for l in loser_ids], r.bet, prize, r.round, rid)
-    add_tx(int(winner_id), "prize", prize, f"Prémio vitória Ludo — sala {rid}")
-
-    # CORREÇÃO: buscar saldo DEPOIS de credit_prize para ter valor actualizado
-    wu = get_user(int(winner_id))
-    winner_balance = float(wu["balance"]) if wu else 0
-
-    push(winner_id, "game_over", {
-        "won":      True,
-        "prize":    prize,
-        "balance":  winner_balance,
-        "winner_id": winner_id,
-    })
-
-    for lid in loser_ids:
-        lu = get_user(int(lid))
-        loser_balance = float(lu["balance"]) if lu else 0
-        push(lid, "game_over", {
-            "won":      False,
-            "prize":    0,
-            "balance":  loser_balance,
-            "winner_id": winner_id,
+    // 3. Re-sincroniza estado com servidor se há jogo activo
+    if (window.RID) {
+      fetch(`/api/room/${window.RID}/state`, { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(state => {
+          if (state && state.players) {
+            window.CUR_STATE = state;
+            if (typeof window.renderState === 'function') {
+              window.renderState(state);
+            }
+          }
         })
-
-    with _rooms_lk:
-        _rooms.pop(rid, None)
-
-# ══════════════════════════════════════════════════════════════
-#  ABANDONAR JOGO — CORRIGIDO
-# ══════════════════════════════════════════════════════════════
-@app.route("/api/game/leave", methods=["POST"])
-@login_req
-def api_leave():
-    rid = (request.json or {}).get("room_id", "")
-    uid = session["uid"]
-    uid_str = str(uid)
-    r = _get_room(rid)
-    if not r:
-        return jsonify({"ok": True})
-
-    if not r.started:
-        _release_reservation(rid, uid)
-        with _rooms_lk:
-            if rid in _rooms:
-                _rooms[rid].players = [p for p in r.players if str(p["user_id"]) != uid_str]
-                if not _rooms[rid].players:
-                    _rooms.pop(rid, None)
-                    _release_reservation(rid)
-        return jsonify({"ok": True, "msg": "Saíste da sala. Reserva libertada."})
-
-    if r.over:
-        with _rooms_lk:
-            _rooms.pop(rid, None)
-        return jsonify({"ok": True})
-
-    remaining = [p for p in r.players if str(p["user_id"]) != uid_str]
-
-    if remaining:
-        r.over   = True
-        r.winner = remaining[0]["user_id"]
-        n_players = len(r.players)
-        prize = round(r.bet * n_players * (1 - PLATFORM_FEE), 2)
-        winner_id = r.winner
-        loser_ids = [p["user_id"] for p in r.players if p["user_id"] != winner_id]
-
-        credit_prize(int(winner_id), [int(l) for l in loser_ids], r.bet, prize, r.round, rid)
-        add_tx(int(winner_id), "prize", prize, f"Prémio — adversário abandonou sala {rid}")
-
-        # CORREÇÃO: saldo actualizado após credit_prize
-        wu = get_user(int(winner_id))
-        winner_balance = float(wu["balance"]) if wu else 0
-        push(winner_id, "game_over", {
-            "won":      True,
-            "prize":    prize,
-            "balance":  winner_balance,
-            "winner_id": winner_id,
-        })
-
-        lu = get_user(uid)
-        loser_balance = float(lu["balance"]) if lu else 0
-        push(uid_str, "game_over", {
-            "won":      False,
-            "prize":    0,
-            "balance":  loser_balance,
-            "winner_id": winner_id,
-        })
-
-        with _rooms_lk:
-            _rooms.pop(rid, None)
-    else:
-        r.over = True
-        with _rooms_lk:
-            _rooms.pop(rid, None)
-
-    return jsonify({"ok": True})
-
-# ══════════════════════════════════════════════════════════════
-
-@app.route("/")
-def index():
-    return render_template("index.html", platform_express=PLATFORM_EXPRESS)
-
-@app.route("/admin")
-def admin_page():
-    return render_template("admin.html")
-
-@app.route("/api/otp/send", methods=["POST"])
-def api_otp_send():
-    d = request.json or {}
-    raw_phone = d.get("phone", "").strip()
-    purpose   = d.get("purpose", "register")
-    name      = d.get("name", "utilizador")
-    phone, err = formatar_numero_angola(raw_phone)
-    if err: return jsonify({"error": err}), 400
-    if not _otp_permitido(phone):
-        return jsonify({"error": "Demasiados pedidos. Aguarda 1 minuto."}), 429
-    if purpose == "register" and get_user_by_phone(phone):
-        return jsonify({"error": "Número já registado. Faz login."}), 400
-    if purpose == "login" and not get_user_by_phone(phone):
-        return jsonify({"error": "Número não encontrado. Regista-te primeiro."}), 404
-    code = criar_otp(phone, purpose)
-    ok, msg = enviar_sms_simulado(phone, code, name)
-    if not ok: return jsonify({"error": "Falha ao enviar SMS. Tenta novamente."}), 500
-    op = operadora(phone)
-    return jsonify({"ok": True, "phone": phone, "operadora": op,
-                    "msg": f"Código enviado para {phone} ({op}). Válido por 2 minutos."})
-
-@app.route("/api/otp/verify", methods=["POST"])
-def api_otp_verify():
-    d       = request.json or {}
-    phone   = d.get("phone", "").strip()
-    code    = d.get("code", "").strip()
-    purpose = d.get("purpose", "register")
-    ok, msg = verificar_otp(phone, code, purpose)
-    if not ok: return jsonify({"error": msg}), 400
-    session[f"otp_ok_{purpose}"] = phone
-    return jsonify({"ok": True, "verified": True})
-
-@app.route("/api/register", methods=["POST"])
-def api_register():
-    d        = request.json or {}
-    name     = d.get("name", "").strip()
-    phone    = d.get("phone", "").strip()
-    pw       = d.get("password", "")
-    age_ok   = d.get("age_confirmed", False)
-    terms_ok = d.get("terms_accepted", False)
-    ref_code = d.get("ref_code", "").strip()
-    if not name or not phone or not pw:
-        return jsonify({"error": "Preencha todos os campos."}), 400
-    if len(pw) < 6:
-        return jsonify({"error": "Senha mínima 6 caracteres."}), 400
-    if not age_ok:
-        return jsonify({"error": "Deves confirmar que tens 18 ou mais anos."}), 400
-    if not terms_ok:
-        return jsonify({"error": "Deves aceitar os Termos e Condições."}), 400
-    otp_sessao   = session.get("otp_ok_register") == phone
-    otp_frontend = bool(d.get("phone_verified") or d.get("otp"))
-    if not otp_sessao and not otp_frontend:
-        return jsonify({"error": "Verifica o número por SMS antes de te registares."}), 400
-    try:
-        uid = create_user(phone, pw, name, age_ok, terms_ok, ref_code)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    marcar_telefone_verificado(phone)
-    session.pop("otp_ok_register", None)
-    session["uid"] = uid
-    return jsonify({"ok": True, "user": safe_user(get_user(uid))})
-
-@app.route("/api/login", methods=["POST"])
-def api_login():
-    d  = request.json or {}
-    ph = d.get("phone", "").strip()
-    pw = d.get("password", "")
-    u  = verify_user(ph, pw)
-    if not u: return jsonify({"error": "Número ou senha incorretos."}), 401
-    session["uid"] = u["id"]
-    return jsonify({"ok": True, "user": safe_user(u)})
-
-@app.route("/api/logout", methods=["POST"])
-def api_logout():
-    session.clear()
-    return jsonify({"ok": True})
-
-@app.route("/api/me")
-@login_req
-def api_me():
-    return jsonify({"user": safe_user(get_user(session["uid"]))})
-
-@app.route("/api/reset/request", methods=["POST"])
-def api_reset_req():
-    phone = (request.json or {}).get("phone", "").strip()
-    u = get_user_by_phone(phone)
-    if not u:
-        return jsonify({"ok": True, "msg": "Se o número existir, receberás um SMS."})
-    name = u.get("name", "utilizador")
-    code = criar_otp(phone, "reset")
-    ok, msg = enviar_sms_simulado(phone, code, name)
-    if not ok:
-        return jsonify({"error": "Falha ao enviar SMS. Tenta novamente."}), 500
-    push_admin("password_reset", {"phone": phone, "code": code, "name": name})
-    return jsonify({"ok": True, "msg": f"Código SMS enviado para {phone}."})
-
-@app.route("/api/reset/confirm", methods=["POST"])
-def api_reset_confirm():
-    d      = request.json or {}
-    phone  = d.get("phone", "").strip()
-    code   = d.get("code", "").strip()
-    new_pw = d.get("password", "")
-    if len(new_pw) < 6: return jsonify({"error": "Senha mínima 6 caracteres."}), 400
-    ok, msg = verificar_otp(phone, code, "reset")
-    if not ok: return jsonify({"error": msg}), 400
-    u = get_user_by_phone(phone)
-    if not u: return jsonify({"error": "Número não encontrado."}), 404
-    reset_password(u["id"], new_pw)
-    return jsonify({"ok": True})
-
-@app.route("/api/set_express", methods=["POST"])
-@login_req
-def api_set_express():
-    num = (request.json or {}).get("number", "").strip()
-    if not num: return jsonify({"error": "Número inválido."}), 400
-    set_express(session["uid"], num)
-    return jsonify({"ok": True})
-
-@app.route("/api/deposit/request", methods=["POST"])
-@login_req
-def api_dep_req():
-    d = request.json or {}
-    try:   amt = float(d.get("amount", 0))
-    except: return jsonify({"error": "Valor inválido."}), 400
-    ref   = d.get("express_ref", "").strip()
-    payer = d.get("payer_name", "").strip()
-    if amt < 500:    return jsonify({"error": "Mínimo 500 Kz."}), 400
-    if amt > 100000: return jsonify({"error": "Máximo 100.000 Kz por dia."}), 400
-    if not ref:      return jsonify({"error": "Insere a referência Express."}), 400
-    did  = create_deposit(session["uid"], amt, ref, payer)
-    deps = get_pending_deposits()
-    push_admin("new_deposit", {"deposit_id": did, "amount": amt, "ref": ref,
-                               "payer": payer, "pending_count": len(deps)})
-    return jsonify({"ok": True, "deposit_id": did})
-
-@app.route("/api/deposit/list")
-@login_req
-def api_dep_list():
-    return jsonify({"deposits": get_user_deposits(session["uid"])})
-
-@app.route("/api/withdraw/request", methods=["POST"])
-@login_req
-def api_wit_req():
-    d = request.json or {}
-    try:   amt = float(d.get("amount", 0))
-    except: return jsonify({"error": "Valor inválido."}), 400
-    num  = d.get("express_number", "").strip()
-    name = d.get("account_name", "").strip()
-    if not num:
-        u   = get_user(session["uid"])
-        num = u.get("express_number", "") or ""
-    if not num:      return jsonify({"error": "Insere o teu número Express Card."}), 400
-    if not name:     return jsonify({"error": "Insere o nome da conta Express."}), 400
-    if amt < 1000:   return jsonify({"error": "Mínimo 1.000 Kz."}), 400
-    if amt > 50000:  return jsonify({"error": "Máximo 50.000 Kz por dia."}), 400
-    wid, err = create_withdrawal(session["uid"], amt, num, name)
-    if err: return jsonify({"error": err}), 400
-    net = round(amt * 0.90, 2)
-    push_admin("new_withdrawal", {"wid": wid, "amount": amt, "net": net,
-                                   "express": num, "account_name": name})
-    return jsonify({"ok": True, "wid": wid, "net": net,
-                    "msg": f"Pedido enviado. Receberás {net:,.0f} Kz em {num}"})
-
-@app.route("/api/withdraw/list")
-@login_req
-def api_wit_list():
-    return jsonify({"withdrawals": get_user_withdrawals(session["uid"])})
-
-@app.route("/api/transactions")
-@login_req
-def api_txs():
-    return jsonify({"transactions": get_transactions(session["uid"])})
-
-@app.route("/api/games/history")
-@login_req
-def api_ghist():
-    return jsonify({"games": get_user_games(session["uid"])})
-
-# ══════════════════════════════════════════════════════════════
-#  LOBBY
-# ══════════════════════════════════════════════════════════════
-@app.route("/api/lobby")
-@login_req
-def api_lobby():
-    with _rooms_lk:
-        lobby = [
-            r.lobby_dict() for r in _rooms.values()
-            if not r.started and r.player_count() < r.max_players
-        ]
-    return jsonify({"rooms": lobby})
-
-# ══════════════════════════════════════════════════════════════
-#  CRIAR SALA
-# ══════════════════════════════════════════════════════════════
-@app.route("/api/room/create", methods=["POST"])
-@login_req
-def api_create():
-    d = request.json or {}
-    try:   bet = float(d.get("bet", 0))
-    except: return jsonify({"error": "Aposta inválida."}), 400
-    max_p = int(d.get("max_players", 2))
-    if bet not in BET_TIERS:   return jsonify({"error": "Valor inválido."}), 400
-    if max_p not in [2, 3, 4]: return jsonify({"error": "Número de jogadores inválido."}), 400
-
-    uid = session["uid"]
-    u = get_user(uid)
-
-    _remove_user_from_pending_rooms(uid)
-
-    if u["balance"] < bet:
-        return jsonify({"error": "Saldo insuficiente."}), 400
-
-    rid  = _make_rid()
-    room = GameManager(rid, bet, max_p, uid, u["name"])
-
-    if not _reserve(rid, uid, bet):
-        return jsonify({"error": "Saldo insuficiente."}), 400
-
-    with _rooms_lk:
-        _rooms[rid] = room
-
-    _schedule_room_expire(rid)
-
-    return jsonify({"ok": True, "room_id": rid,
-                    "msg": "Sala criada! Saldo reservado. Tens 5 minutos."})
-
-# ══════════════════════════════════════════════════════════════
-#  ENTRAR NA SALA
-# ══════════════════════════════════════════════════════════════
-@app.route("/api/room/join", methods=["POST"])
-@login_req
-def api_join():
-    d   = request.json or {}
-    rid = d.get("room_id", "").strip()
-    uid = session["uid"]
-    uid_str = str(uid)
-
-    _remove_user_from_pending_rooms(uid)
-
-    with _rooms_lk:
-        r = _rooms.get(rid)
-        if not r:
-            return jsonify({"error": "Sala não encontrada."}), 404
-        if r.started:
-            return jsonify({"error": "O jogo já começou."}), 400
-        if r.player_count() >= r.max_players:
-            return jsonify({"error": "Sala cheia."}), 400
-
-        if any(str(p["user_id"]) == uid_str for p in r.players):
-            return jsonify({"ok": True, "room_id": rid, "state": r.state_dict(uid_str)})
-
-        u = get_user(uid)
-        if u["balance"] < r.bet:
-            return jsonify({"error": "Saldo insuficiente."}), 400
-
-        if not _reserve(rid, uid, r.bet):
-            return jsonify({"error": "Saldo insuficiente."}), 400
-
-        ok, err = r.add_player(uid, u["name"])
-        if not ok:
-            _release_reservation(rid, uid)
-            return jsonify({"error": err}), 400
-
-    push_room(rid, "player_joined", {
-        "name":    u["name"],
-        "players": r.player_count(),
-        "max":     r.max_players,
-    })
-
-    if r.player_count() >= r.max_players:
-        ok2 = _collect_reservations(rid)
-        if not ok2:
-            _release_reservation(rid)
-            with _rooms_lk:
-                _rooms.pop(rid, None)
-            return jsonify({"error": "Erro ao processar apostas. Tenta novamente."}), 400
-
-        ok3, _ = r.start()
-        if ok3:
-            state = r.state_dict()
-            push_room(rid, "game_started", state)
-
-    return jsonify({"ok": True, "room_id": rid, "state": r.state_dict(uid_str)})
-
-@app.route("/api/room/start", methods=["POST"])
-@login_req
-def api_start():
-    rid = (request.json or {}).get("room_id", "")
-    r   = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    if str(r.players[0]["user_id"]) != str(session["uid"]):
-        return jsonify({"error": "Só o criador pode iniciar."}), 403
-    ok2 = _collect_reservations(rid)
-    if not ok2:
-        return jsonify({"error": "Erro ao processar apostas."}), 400
-    ok, err = r.start()
-    if not ok: return jsonify({"error": err}), 400
-    state = r.state_dict()
-    push_room(rid, "game_started", state)
-    return jsonify({"ok": True, "state": r.state_dict(str(session["uid"]))})
-
-@app.route("/api/room/<rid>/state")
-@login_req
-def api_state(rid):
-    r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    return jsonify(r.state_dict(str(session["uid"])))
-
-@app.route("/api/game/roll", methods=["POST"])
-@login_req
-def api_roll():
-    rid = (request.json or {}).get("room_id", "").strip()
-    if not rid: return jsonify({"error": "ID inválido."}), 400
-    r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    dice, err = r.roll_dice(str(session["uid"]))
-    if err: return jsonify({"error": err}), 400
-    state = r.state_dict(str(session["uid"]))
-    push_room(rid, "game_update", state)
-    if r.over:
-        _finish_game(rid)
-    return jsonify({**state, "dice": dice})
-
-@app.route("/api/game/move", methods=["POST"])
-@login_req
-def api_move():
-    d   = request.json or {}
-    rid = d.get("room_id", "").strip()
-    try:   piece = int(d.get("piece", 0))
-    except: return jsonify({"error": "Peça inválida."}), 400
-    r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    state, err = r.move_piece(str(session["uid"]), piece)
-    if err: return jsonify({"error": err}), 400
-    push_room(rid, "game_update", state)
-    if r.over:
-        _finish_game(rid)
-    return jsonify(state)
-
-@app.route("/api/game/movable", methods=["POST"])
-@login_req
-def api_movable():
-    rid = (request.json or {}).get("room_id", "").strip()
-    if not rid: return jsonify({"movable": []})
-    r = _get_room(rid)
-    if not r: return jsonify({"movable": []})
-    return jsonify({"movable": r.get_movable(str(session["uid"])),
-                    "dice": r.dice})
-
-@app.route("/api/game/chat", methods=["POST"])
-@login_req
-def api_chat():
-    d   = request.json or {}
-    rid = d.get("room_id", "")
-    msg = d.get("message", "").strip()[:120]
-    if not msg or not rid: return jsonify({"ok": False}), 400
-    r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    uid_str = str(session["uid"])
-    if not any(str(p["user_id"]) == uid_str for p in r.players):
-        return jsonify({"error": "Não estás nesta sala."}), 403
-    u = get_user(session["uid"])
-    push_room(rid, "chat_message", {"name": u["name"], "text": msg, "system": False})
-    return jsonify({"ok": True})
-
-# ══════════════════════════════════════════════════════════════
-#  SSE — CORRIGIDO: heartbeat robusto, sem bloqueio
-# ══════════════════════════════════════════════════════════════
-@app.route("/api/events")
-@login_req
-def sse_user():
-    uid = session["uid"]
-    q = queue.Queue(maxsize=200)
-    with _sse_lk:
-        _sse.setdefault(uid, []).append(q)
-    def gen():
-        try:
-            yield "event:connected\ndata:{\"ok\":true}\n\n"
-            while True:
-                try:
-                    msg = q.get(timeout=15)
-                    yield msg
-                except queue.Empty:
-                    # Heartbeat para manter ligação viva e detectar desconexões
-                    yield ": heartbeat\n\n"
-        finally:
-            with _sse_lk:
-                lst = _sse.get(uid, [])
-                if q in lst: lst.remove(q)
-    return Response(stream_with_context(gen()),
-                    mimetype="text/event-stream",
-                    headers={
-                        "Cache-Control": "no-cache, no-store",
-                        "X-Accel-Buffering": "no",
-                        "Connection": "keep-alive",
-                    })
-
-@app.route("/api/admin/events")
-def sse_admin():
-    k = request.args.get("key", "") or request.headers.get("X-Admin-Key", "")
-    if k != ADMIN_KEY:
-        return jsonify({"error": "Acesso negado"}), 403
-    q = queue.Queue(maxsize=200)
-    with _sse_lk:
-        _sse.setdefault(-1, []).append(q)
-    def gen():
-        try:
-            yield "event:connected\ndata:{\"ok\":true}\n\n"
-            while True:
-                try:
-                    msg = q.get(timeout=15)
-                    yield msg
-                except queue.Empty:
-                    yield ": heartbeat\n\n"
-        finally:
-            with _sse_lk:
-                lst = _sse.get(-1, [])
-                if q in lst: lst.remove(q)
-    return Response(stream_with_context(gen()),
-                    mimetype="text/event-stream",
-                    headers={
-                        "Cache-Control": "no-cache, no-store",
-                        "X-Accel-Buffering": "no",
-                        "Connection": "keep-alive",
-                    })
-
-@app.route("/admin/deposits")
-@admin_req
-def adm_deps(): return jsonify({"deposits": get_pending_deposits()})
-
-@app.route("/admin/deposits/<int:did>/approve", methods=["POST"])
-@admin_req
-def adm_approve(did):
-    note   = (request.json or {}).get("note", "")
-    ok     = approve_deposit(did, note)
-    if ok:
-        conn = get_pg(); cur = conn.cursor()
-        cur.execute("SELECT * FROM deposits WHERE id=%s", (did,))
-        dep = cur.fetchone(); cur.close(); conn.close()
-        if dep:
-            u = get_user(dep["user_id"])
-            push(dep["user_id"], "deposit_approved", {
-                "amount":  float(dep["amount"]),
-                "balance": float(u["balance"]) if u else 0
-            })
-    return jsonify({"ok": ok})
-
-@app.route("/admin/deposits/<int:did>/reject", methods=["POST"])
-@admin_req
-def adm_reject(did):
-    reject_deposit(did, (request.json or {}).get("note", ""))
-    return jsonify({"ok": True})
-
-@app.route("/admin/withdrawals")
-@admin_req
-def adm_wits(): return jsonify({"withdrawals": get_pending_withdrawals()})
-
-@app.route("/admin/withdrawals/<int:wid>/complete", methods=["POST"])
-@admin_req
-def adm_complete(wid):
-    note = (request.json or {}).get("note", "")
-    ok   = complete_withdrawal(wid, note)
-    if ok:
-        conn = get_pg(); cur = conn.cursor()
-        cur.execute("SELECT * FROM withdrawals WHERE id=%s", (wid,))
-        w = cur.fetchone(); cur.close(); conn.close()
-        if w:
-            push(w["user_id"], "withdrawal_done", {
-                "amount":  float(w["amount"]),
-                "net":     float(w["net_amount"]),
-                "express": w["express_number"]
-            })
-    return jsonify({"ok": ok})
-
-@app.route("/admin/withdrawals/<int:wid>/reject", methods=["POST"])
-@admin_req
-def adm_wit_reject(wid):
-    ok = reject_withdrawal(wid, (request.json or {}).get("note", ""))
-    if ok:
-        conn = get_pg(); cur = conn.cursor()
-        cur.execute("SELECT * FROM withdrawals WHERE id=%s", (wid,))
-        w = cur.fetchone(); cur.close(); conn.close()
-        if w:
-            push(w["user_id"], "withdrawal_rejected", {
-                "amount": float(w["amount"]),
-                "msg":    "Levantamento rejeitado. Saldo devolvido à tua conta."
-            })
-    return jsonify({"ok": ok})
-
-@app.route("/admin/notifications")
-@admin_req
-def adm_notifs():
-    unread = request.args.get("unread", "0") == "1"
-    return jsonify({"notifications": get_admin_notifs(unread_only=unread)})
-
-@app.route("/admin/notifications/read", methods=["POST"])
-@admin_req
-def adm_read(): mark_notifs_read(); return jsonify({"ok": True})
-
-@app.route("/admin/users")
-@admin_req
-def adm_users(): return jsonify({"users": get_all_users()})
-
-@app.route("/admin/stats")
-@admin_req
-def adm_stats():
-    conn = get_pg(); cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) AS n FROM users");              users = cur.fetchone()["n"]
-    cur.execute("SELECT SUM(balance) AS s FROM users");          bal   = cur.fetchone()["s"] or 0
-    cur.execute("SELECT COUNT(*) AS n, SUM(amount) AS s FROM deposits WHERE status='approved'");    deps  = cur.fetchone()
-    cur.execute("SELECT COUNT(*) AS n, SUM(amount) AS s FROM withdrawals WHERE status='completed'"); wits  = cur.fetchone()
-    cur.execute("SELECT COUNT(*) AS n FROM game_history");       games = cur.fetchone()["n"]
-    cur.execute("SELECT COUNT(*) AS n FROM deposits WHERE status='pending'");    pdeps = cur.fetchone()["n"]
-    cur.execute("SELECT COUNT(*) AS n FROM withdrawals WHERE status='pending'"); pwits = cur.fetchone()["n"]
-    cur.close(); conn.close()
-    return jsonify({"stats": {
-        "users": users, "total_balance": float(bal),
-        "deposits":    {"count": deps["n"], "total": float(deps["s"] or 0)},
-        "withdrawals": {"count": wits["n"], "total": float(wits["s"] or 0)},
-        "games": games,
-        "pending_deposits":    pdeps,
-        "pending_withdrawals": pwits,
-    }})
-
-@app.route("/admin/balance/add", methods=["POST"])
-@admin_req
-def adm_add_balance():
-    d      = request.json or {}
-    uid    = int(d.get("user_id", 0))
-    amount = float(d.get("amount", 0))
-    reason = d.get("reason", "Ajuste manual")
-    if not uid or amount == 0: return jsonify({"error": "Dados inválidos"}), 400
-    u_check = get_user(uid)
-    if not u_check: return jsonify({"error": f"Utilizador {uid} não encontrado."}), 404
-    conn = get_pg(); cur = conn.cursor()
-    cur.execute("UPDATE users SET balance=balance+%s WHERE id=%s", (amount, uid))
-    conn.commit(); cur.close(); conn.close()
-    add_tx(uid, "admin_credit", amount, f"Admin: {reason}")
-    u = get_user(uid)
-    if u: push(uid, "balance_update", {"balance": float(u["balance"]),
-                                        "msg": f"O teu saldo foi ajustado: +{amount:,.0f} Kz"})
-    return jsonify({"ok": True})
-
-@app.route("/api/admin/login", methods=["POST"])
-@admin_req
-def adm_login_as_player():
-    d     = request.json or {}
-    name  = d.get("name", "Admin").strip()
-    ADMIN_PHONE = "admin@ludokz.internal"
-    conn = get_pg(); cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE phone=%s", (ADMIN_PHONE,))
-    u = cur.fetchone()
-    if not u:
-        cur.execute("INSERT INTO users(phone,password,name,balance) VALUES(%s,%s,%s,%s)",
-                    (ADMIN_PHONE, "admin_no_login", name, 999999999))
-        conn.commit()
-        cur.execute("SELECT * FROM users WHERE phone=%s", (ADMIN_PHONE,))
-        u = cur.fetchone()
-    uid = u["id"]
-    cur.execute("UPDATE users SET name=%s WHERE id=%s", (name, uid))
-    conn.commit(); cur.close(); conn.close()
-    session["uid"]      = uid
-    session["is_admin"] = True
-    return jsonify({"ok": True, "user": {"id": uid, "name": name, "balance": 999999999,
-                                          "phone": ADMIN_PHONE, "games_played": 0,
-                                          "wins": 0, "losses": 0, "total_earned": 0,
-                                          "express_number": ""}})
-
-@app.route("/api/admin/play/create", methods=["POST"])
-@admin_req
-def adm_play_create():
-    d     = request.json or {}
-    name  = d.get("name", "Admin").strip()
-    max_p = int(d.get("max_players", 2))
-    rid   = _make_rid()
-    room  = GameManager(rid, 0, max_p, -999, name)
-    with _rooms_lk:
-        _rooms[rid] = room
-    return jsonify({"ok": True, "room_id": rid})
-
-@app.route("/api/admin/play/join", methods=["POST"])
-@admin_req
-def adm_play_join():
-    d          = request.json or {}
-    rid        = d.get("room_id", "")
-    name       = d.get("name", "Jogador").strip()
-    player_idx = int(d.get("player_idx", 1))
-    r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    if r.player_count() >= r.max_players:
-        return jsonify({"error": f"Sala cheia ({r.player_count()}/{r.max_players})."}), 400
-    if r.started:
-        return jsonify({"error": "O jogo já começou."}), 400
-    ok, err = r.add_player(-(1000 + player_idx), name)
-    if not ok: return jsonify({"error": err}), 400
-    return jsonify({"ok": True, "players": r.player_count(), "max": r.max_players})
-
-@app.route("/api/admin/play/start", methods=["POST"])
-@admin_req
-def adm_play_start():
-    rid = (request.json or {}).get("room_id", "")
-    r   = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    ok, err = r.start()
-    if not ok: return jsonify({"error": err}), 400
-    state = r.state_dict()
-    push_room(rid, "game_started", state)
-    return jsonify({"ok": True, "state": state})
-
-@app.route("/api/admin/play/roll", methods=["POST"])
-@admin_req
-def adm_play_roll():
-    d   = request.json or {}
-    rid = d.get("room_id", "")
-    uid = int(d.get("uid", -999))
-    r   = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    dice, err = r.roll_dice(str(uid))
-    if err: return jsonify({"error": err}), 400
-    state = r.state_dict()
-    push_room(rid, "game_update", state)
-    return jsonify({**state, "dice": dice})
-
-@app.route("/api/admin/play/move", methods=["POST"])
-@admin_req
-def adm_play_move():
-    d     = request.json or {}
-    rid   = d.get("room_id", "")
-    uid   = int(d.get("uid", -999))
-    piece = int(d.get("piece", 0))
-    r     = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    state, err = r.move_piece(str(uid), piece)
-    if err: return jsonify({"error": err}), 400
-    push_room(rid, "game_update", state)
-    return jsonify(state)
-
-@app.route("/api/admin/play/movable", methods=["POST"])
-@admin_req
-def adm_play_movable():
-    d   = request.json or {}
-    rid = d.get("room_id", "")
-    uid = int(d.get("uid", -999))
-    r   = _get_room(rid)
-    if not r: return jsonify({"movable": []})
-    return jsonify({"movable": r.get_movable(str(uid)), "dice": r.dice})
-
-@app.route("/api/admin/play/state/<rid>")
-@admin_req
-def adm_play_state(rid):
-    r = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    return jsonify(r.state_dict())
-
-@app.route("/api/admin/play/bot_turn", methods=["POST"])
-@admin_req
-def adm_bot_turn():
-    d   = request.json or {}
-    rid = d.get("room_id", "")
-    uid = int(d.get("uid", -1000))
-    r   = _get_room(rid)
-    if not r: return jsonify({"error": "Sala não encontrada."}), 404
-    def run():
-        state, err = r.bot_turn(str(uid))
-        if state:
-            push_room(rid, "game_update", state)
-            if r.over:
-                _finish_game(rid)
-    threading.Thread(target=run, daemon=True).start()
-    return jsonify({"ok": True})
-
-@app.route("/admin/promos", methods=["GET"])
-@admin_req
-def adm_promos(): return jsonify({"promos": get_all_promos()})
-
-@app.route("/admin/promos/create", methods=["POST"])
-@admin_req
-def adm_promo_create():
-    d        = request.json or {}
-    code     = d.get("code", "").strip().upper()
-    amount   = float(d.get("amount", 0))
-    max_uses = int(d.get("max_uses", 100))
-    expires  = d.get("expires", "")
-    if not code or amount <= 0: return jsonify({"error": "Dados inválidos"}), 400
-    create_promo(code, amount, max_uses, expires)
-    return jsonify({"ok": True})
-
-@app.route("/admin/promos/<code>/deactivate", methods=["POST"])
-@admin_req
-def adm_promo_deactivate(code):
-    conn = get_pg(); cur = conn.cursor()
-    cur.execute("UPDATE promo_codes SET active=0 WHERE code=%s", (code,))
-    conn.commit(); cur.close(); conn.close()
-    return jsonify({"ok": True})
-
-@app.route("/admin/tickets")
-@admin_req
-def adm_tickets(): return jsonify({"tickets": get_all_tickets()})
-
-@app.route("/admin/tickets/<int:tid>/reply", methods=["POST"])
-@admin_req
-def adm_ticket_reply(tid):
-    reply = (request.json or {}).get("reply", "").strip()
-    if not reply: return jsonify({"error": "Insere a resposta."}), 400
-    ticket = reply_ticket(tid, reply)
-    if ticket:
-        push(ticket["user_id"], "support_reply", {
-            "ticket_id": tid, "reply": reply,
-            "msg": f"O suporte respondeu ao teu pedido: {reply[:80]}"
-        })
-    return jsonify({"ok": True})
-
-@app.route("/api/referral/code")
-@login_req
-def api_ref_code():
-    u = get_user(session["uid"])
-    code = u.get("referral_code", "")
-    if not code:
-        code = set_referral_code(session["uid"])
-    return jsonify({"code": code, "link": request.host_url + "?ref=" + code})
-
-@app.route("/api/referral/list")
-@login_req
-def api_ref_list():
-    return jsonify({"referrals": get_referrals(session["uid"])})
-
-@app.route("/api/promo/use", methods=["POST"])
-@login_req
-def api_promo_use():
-    code = (request.json or {}).get("code", "").strip()
-    if not code: return jsonify({"error": "Insere o código."}), 400
-    ok, result = use_promo(session["uid"], code)
-    if not ok: return jsonify({"error": result}), 400
-    u = get_user(session["uid"])
-    push(session["uid"], "balance_update", {"balance": float(u["balance"])})
-    return jsonify({"ok": True, "amount": result,
-                    "msg": f"Bónus de {fmt_kz(result)} Kz aplicado!"})
-
-def fmt_kz(n):
-    try:    return f"{float(n):,.0f}".replace(",", ".")
-    except: return "0"
-
-@app.route("/api/bonus/daily/status")
-@login_req
-def api_daily_status():
-    return jsonify(get_daily_status(session["uid"]))
-
-@app.route("/api/bonus/daily/claim", methods=["POST"])
-@login_req
-def api_daily_claim():
-    ok, result = claim_daily(session["uid"])
-    if not ok: return jsonify({"error": result}), 400
-    u = get_user(session["uid"])
-    push(session["uid"], "balance_update", {"balance": float(u["balance"])})
-    add_tx(session["uid"], "daily_bonus", result["amount"],
-           f"Bónus diário dia {result['streak']}")
-    return jsonify({"ok": True, **result, "balance": float(u["balance"])})
-
-@app.route("/api/support/ticket", methods=["POST"])
-@login_req
-def api_support_send():
-    msg = (request.json or {}).get("message", "").strip()
-    if not msg or len(msg) < 5: return jsonify({"error": "Mensagem muito curta."}), 400
-    tid = create_ticket(session["uid"], msg)
-    push_admin("support_ticket", {
-        "tid": tid, "uid": session["uid"],
-        "name": get_user(session["uid"])["name"], "message": msg
-    })
-    return jsonify({"ok": True, "ticket_id": tid})
-
-@app.route("/api/support/tickets")
-@login_req
-def api_support_list():
-    return jsonify({"tickets": get_user_tickets(session["uid"])})
-
-@app.route("/api/leaderboard")
-def api_leaderboard():
-    conn = get_pg(); cur = conn.cursor()
-    cur.execute("""
-        SELECT name, wins, games_played, total_earned,
-               CASE WHEN games_played>0 THEN ROUND(wins*100.0/games_played,1) ELSE 0 END AS win_rate
-        FROM users WHERE games_played > 0
-        ORDER BY wins DESC, total_earned DESC LIMIT 10
-    """)
-    rows = cur.fetchall(); cur.close(); conn.close()
-    return jsonify({"leaderboard": [dict(r) for r in rows]})
-
-@app.route("/api/stats/public")
-def api_stats_public():
-    conn = get_pg(); cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) AS n FROM users");          users = cur.fetchone()["n"]
-    cur.execute("SELECT COUNT(*) AS n FROM game_history");   games = cur.fetchone()["n"]
-    cur.execute("SELECT SUM(prize) AS s FROM game_history"); paid  = cur.fetchone()["s"] or 0
-    cur.close(); conn.close()
-    online = len([uid for uid, qs in _sse.items() if uid > 0 and qs])
-    return jsonify({"users": users, "games": games, "paid": float(paid), "online": online})
-
-def get_jackpot_value():
-    try:
-        conn = get_pg(); cur = conn.cursor()
-        cur.execute("SELECT value FROM jackpot LIMIT 1")
-        row = cur.fetchone(); cur.close(); conn.close()
-        return float(row["value"]) if row else 245000.0
-    except Exception:
-        return 245000.0
-
-@app.route("/api/jackpot")
-def api_jackpot():
-    return jsonify({"value": get_jackpot_value()})
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    print("=" * 52)
-    print("  LudoKz — Servidor iniciado")
-    print(f"  Express : {PLATFORM_EXPRESS}")
-    print(f"  Admin   : {ADMIN_KEY}")
-    print(f"  URL     : http://0.0.0.0:{port}")
-    print("=" * 52)
-    app.run(debug=False, host="0.0.0.0", port=port, threaded=True)
+        .catch(() => {});
+    }
+
+    // 4. Reconecta SSE imediatamente se estava desligado
+    if (typeof connectSSE === 'function') {
+      // Só reconecta se o SSE está null ou fechado
+      const sseOk = window.SSE &&
+                    window.SSE.readyState !== EventSource.CLOSED &&
+                    window.SSE.readyState !== 2;
+      if (!sseOk) {
+        connectSSE();
+      }
+    }
+  }
+});
+
+// ── Elementos do tabuleiro ────────────────────────────────────
+let _els = {};
+
+function _buildBoard() {
+  // Limpar elementos anteriores
+  Object.values(_els).flat().forEach(e => e && e.remove());
+  _els = {};
+
+  let wrap = document.getElementById('ludo-board-wrap');
+  if (!wrap) {
+    const cv = document.getElementById('ludo-canvas');
+    wrap = document.createElement('div');
+    wrap.id = 'ludo-board-wrap';
+    const sz = Math.min(460, window.innerWidth - 28);
+    wrap.style.cssText = `width:${sz}px;height:${sz}px;`;
+    if (cv) {
+      cv.style.display = 'none';
+      cv.parentNode.insertBefore(wrap, cv);
+    }
+    const img = document.createElement('img');
+    img.src = '/static/ludo_board.png';
+    img.alt = 'Tabuleiro';
+    img.style.cssText = 'display:block;width:100%;height:100%;pointer-events:none;user-select:none;';
+    img.onerror = ()=>{ wrap.style.background='#1a3a1a'; img.style.display='none'; };
+    wrap.appendChild(img);
+  }
+
+  // CORREÇÃO: criar peças para todas as 4 cores — cada cor única por jogador
+  ['blue','green','red','yellow'].forEach(c=>{
+    _els[c] = [];
+    for (let i = 0; i < 4; i++) {
+      const el = document.createElement('div');
+      el.className = 'lp';
+      el.textContent = i+1;
+      el.style.background = `radial-gradient(circle at 35% 30%,${COLOUR_GRAD[c][0]},${COLOUR_GRAD[c][1]})`;
+      el.style.color = COLOUR_TEXT[c];
+      el.style.boxShadow = `0 2px 8px ${COLOUR_GRAD[c][1]}aa`;
+      // CORREÇÃO: começa invisível — só aparece quando o jogador existe no estado
+      el.style.display = 'none';
+      wrap.appendChild(el);
+      _els[c].push(el);
+    }
+    // Posicionar na base por defeito
+    BASE_IDS[c].forEach((id,i) => _place(c, i, id));
+  });
+}
+
+function _buildDiceUI() {
+  if (document.getElementById('lk-dice-wrap')) return;
+  const gcd = document.querySelector('#s-game .gcd');
+  if (!gcd) return;
+  const w = document.createElement('div');
+  w.id = 'lk-dice-wrap';
+  w.innerHTML = `<div id="lk-pass-msg"></div><div id="lk-dice-flat"></div><div id="lk-dice-num">-</div>`;
+  const dfc = document.getElementById('dfc');
+  const dnm = document.getElementById('dnm');
+  if (dfc) {
+    dfc.style.display = 'none';
+    dfc.parentNode.insertBefore(w, dfc);
+  } else {
+    const btd = gcd.querySelector('.btd');
+    if (btd) btd.after(w);
+    else gcd.prepend(w);
+  }
+  if (dnm) dnm.style.display = 'none';
+
+  const flat = document.getElementById('lk-dice-flat');
+  if (flat) {
+    flat.style.fontSize = '32px';
+    flat.style.color = '#aaa';
+    flat.textContent = '?';
+    flat.onclick = ()=> window.doRoll && window.doRoll();
+  }
+}
+
+function _place(colour, idx, posId) {
+  const coord = CMAP[posId];
+  if (!coord) return;
+  const el = _els[colour]?.[idx];
+  if (!el) return;
+  el.style.left = (coord[0] * STEP + STEP/2) + '%';
+  el.style.top  = (coord[1] * STEP + STEP/2) + '%';
+}
+
+function _setSelectable(colour, indices) {
+  _clearSel();
+  indices.forEach(i=>{
+    const el = _els[colour]?.[i];
+    if (!el) return;
+    el.classList.add('sel');
+    el.style.pointerEvents = 'auto';
+    el.onclick = ()=>{ SFX.move(); window.movePc(i); };
+  });
+}
+
+function _clearSel() {
+  Object.values(_els).flat().forEach(el=>{
+    if (!el) return;
+    el.classList.remove('sel');
+    el.style.pointerEvents = 'none';
+    el.onclick = null;
+  });
+}
+
+// ── Verifica se é o meu turno ─────────────────────────────────
+function _isMyTurn(state) {
+  if (!state || !state.players || state.over || !state.started) return false;
+  const p = state.players[state.turn];
+  if (!p) return false;
+  const me = _getU();
+  if (!me) return false;
+  const myId    = String(me.id || me.user_id || '');
+  const theirId = String(p.user_id || '');
+  return myId !== '' && myId === theirId;
+}
+
+// ── Diff e animação de movimento ──────────────────────────────
+// CORREÇÃO: _applyDiff só anima peças que realmente mudaram de posição
+function _applyDiff(prev, next) {
+  if (!prev?.players || !next?.players) return;
+  next.players.forEach((pl, idx)=>{
+    const colour  = pl.color || pl.colour;
+    const prevPl  = prev.players[idx];
+    if (!prevPl || !colour || !_els[colour]) return;
+
+    (pl.pos || []).forEach((toId, i)=>{
+      const fromId = prevPl.pos?.[i];
+      // CORREÇÃO: não anima se não mudou
+      if (fromId == null || fromId === toId) return;
+
+      const prevLocked = prevPl.in_base?.[i] === 1;
+      const nowLocked  = pl.in_base?.[i] === 1;
+
+      // Peça capturada (voltou à base)
+      if (nowLocked && !prevLocked) {
+        const el = _els[colour]?.[i];
+        if (!el) return;
+        SFX.capture();
+        el.classList.add('captured');
+        setTimeout(()=>{
+          el.classList.remove('captured');
+          _place(colour, i, toId);
+        }, 400);
+        return;
+      }
+
+      // Peça saiu da base (de base para tabuleiro)
+      if (!nowLocked && prevLocked) {
+        _place(colour, i, toId);
+        SFX.move();
+        return;
+      }
+
+      // Movimento normal
+      _movePieceSmooth(colour, i, fromId, toId, ()=>{
+        if (toId === HOME_ID[colour]) SFX.home();
+      });
+    });
+  });
+}
+
+const _animating = new Set();
+
+// CORREÇÃO: _movePieceSmooth seguro contra loops e fromId===toId
+function _movePieceSmooth(colour, pieceIdx, fromId, toId, onDone) {
+  const key = colour + '-' + pieceIdx;
+
+  if (fromId === toId) {
+    if (onDone) onDone();
+    return;
+  }
+
+  // Peças na base movem-se directamente
+  if (_BASE_SET.has(fromId)) {
+    _place(colour, pieceIdx, toId);
+    if (onDone) onDone();
+    return;
+  }
+
+  const path = FULL_PATH[colour];
+  const fi = path.indexOf(fromId);
+  const ti = path.indexOf(toId);
+
+  // Se não encontrou nos caminhos, posiciona directamente
+  if (fi === -1 || ti === -1 || ti <= fi) {
+    _place(colour, pieceIdx, toId);
+    if (onDone) onDone();
+    return;
+  }
+
+  // Cancelar animação anterior desta peça
+  _animating.add(key);
+
+  let curIdx = fi;
+  const maxSteps = ti - fi;
+
+  function step() {
+    // CORREÇÃO: verifica se ainda é a animação activa
+    if (!_animating.has(key)) return;
+
+    curIdx++;
+    if (curIdx > ti || curIdx >= path.length) {
+      _place(colour, pieceIdx, toId);
+      _animating.delete(key);
+      if (onDone) onDone();
+      return;
+    }
+
+    const nextId = path[curIdx];
+    _place(colour, pieceIdx, nextId);
+    SFX.move();
+
+    if (curIdx < ti) {
+      setTimeout(step, 160);
+    } else {
+      _animating.delete(key);
+      if (onDone) onDone();
+    }
+  }
+
+  step();
+}
+
+// ── Mensagem de turno passado ─────────────────────────────────
+function _showPassMsg(msg) {
+  const el = document.getElementById('lk-pass-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{
+    el.style.opacity = '0';
+    setTimeout(()=>{ el.textContent = ''; }, 300);
+  }, 2200);
+}
+
+// ── Estado global ─────────────────────────────────────────────
+window.CUR_STATE  = null;
+window.PREV_STATE = null;
+
+// ── renderState — actualiza tudo sem corridas ─────────────────
+window.renderState = function(state) {
+  if (!state || !state.players) return;
+  window.CUR_STATE = state;
+
+  // CORREÇÃO: mostrar/esconder peças conforme jogadores activos
+  // Esconde todas primeiro
+  Object.keys(_els).forEach(c=>{
+    _els[c].forEach(el=>{ if(el) el.style.display='none'; });
+  });
+
+  // Mostra e posiciona só os jogadores presentes
+  state.players.forEach(pl=>{
+    const c = pl.color || pl.colour;
+    if (!c || !_els[c]) return;
+    _els[c].forEach(el=>{ if(el) el.style.display='flex'; });
+    (pl.pos || []).forEach((posId, i)=>{
+      // CORREÇÃO: não sobrescreve posição se peça está a animar
+      if (!_animating.has(c+'-'+i)) {
+        _place(c, i, posId);
+      }
+    });
+  });
+
+  _clearSel();
+
+  // Cards dos jogadores
+  const pcEl = document.getElementById('player-cards');
+  if (pcEl) {
+    const me   = _getU();
+    const myId = String(me?.id || me?.user_id || '');
+    pcEl.innerHTML = state.players.map((pl, idx)=>{
+      const c      = pl.color || pl.colour || 'blue';
+      const isMe   = String(pl.user_id || '') === myId;
+      const active = idx === state.turn;
+      const hex    = COLOUR_HEX[c] || '#888';
+      return `<div class="pc ${active?'mt':''}">
+        <div class="pdot" style="background:${hex};box-shadow:0 0 7px ${hex}80"></div>
+        <div style="flex:1">
+          <div class="pnm2" style="color:${active?'#f5c518':'#c0b8e8'}">${pl.name}${isMe?' (Tu)':''}</div>
+          <div class="pft">${COLOUR_NAME[c]||c} · ${pl.fin??0}/4 em casa</div>
+        </div>
+        ${active?'<div style="font-size:18px;margin-left:auto">🎲</div>':''}
+      </div>`;
+    }).join('');
+  }
+
+  // Botão de rolar — CORREÇÃO: não toca no botão se a animação está a correr
+  const rb   = document.getElementById('rb');
+  const myT  = _isMyTurn(state);
+  const canRoll = myT && state.phase === 0 && !state.over && !_diceAnimating;
+
+  if (rb) {
+    rb.disabled = !canRoll;
+    if (state.over) {
+      rb.textContent = '🏁 Jogo terminado';
+      rb.classList.remove('my-turn');
+    } else if (canRoll) {
+      rb.textContent = '🎲 LANÇAR DADO';
+      rb.classList.add('my-turn');
+    } else if (myT && state.phase === 1) {
+      rb.textContent = '👆 Escolhe uma peça';
+      rb.classList.remove('my-turn');
+    } else {
+      const curP = state.players[state.turn];
+      rb.textContent = `⏳ Vez de ${curP ? curP.name : '...'}`;
+      rb.classList.remove('my-turn');
+    }
+  }
+
+  // Mostrar dado do adversário quando já rolou
+  if (!myT && state.dice && state.phase === 1) {
+    const nm   = document.getElementById('lk-dice-num');
+    const flat = document.getElementById('lk-dice-flat');
+    if (nm) {
+      nm.textContent = state.dice;
+      nm.classList.remove('num-pop');
+      void nm.offsetWidth;
+      nm.classList.add('num-pop');
+    }
+    if (flat && state.dice >= 1) _drawDots(flat, state.dice);
+  }
+
+  // Aposta
+  const gbv = document.getElementById('gbv');
+  if (gbv && state.bet != null) {
+    try { gbv.textContent = Number(state.bet).toLocaleString('pt-AO') + ' KZ'; } catch(e){}
+  }
+
+  // Log de jogo
+  if (state.log?.length) {
+    const le = document.getElementById('glog');
+    if (le) {
+      le.innerHTML = state.log.slice(-20).reverse().map(l=>{
+        const cls = /venceu|casa/i.test(l) ? 'w' : /captur/i.test(l) ? 'k' : /tirou/i.test(l) ? 'r' : '';
+        return `<div class="gli ${cls}">${l}</div>`;
+      }).join('');
+    }
+  }
+
+  // Online no chat
+  const co = document.getElementById('chat-online');
+  if (co) co.textContent = (state.players?.length || 0) + ' online';
+};
+
+// ── highlightPcs ──────────────────────────────────────────────
+window.highlightPcs = function(mv) {
+  if (!window.CUR_STATE || !mv?.length) return;
+  if (window.CUR_STATE.phase !== 1 || window.CUR_STATE.over) return;
+  const curP = window.CUR_STATE.players?.[window.CUR_STATE.turn];
+  if (!curP) return;
+  const me = _getU();
+  if (!me) return;
+  if (String(me.id || me.user_id || '') !== String(curP.user_id || '')) return;
+  const colour = curP.color || curP.colour;
+  if (colour && _els[colour]) _setSelectable(colour, mv);
+};
+
+// ── doRoll — robusto contra background e double-tap ──────────
+let _rollInFlight = false; // impede pedidos duplos ao servidor
+
+window.doRoll = async function() {
+  if (!window.RID) return;
+
+  // Impede duplo pedido ao servidor (não bloqueia por animação)
+  if (_rollInFlight) return;
+
+  // Se o dado ainda está a "animar" mas o utilizador clicou,
+  // força conclusão da animação e permite o pedido
+  if (_diceAnimating) {
+    _forceEndDiceAnim(window.CUR_STATE?.dice || 1, null);
+  }
+
+  const rb = document.getElementById('rb');
+  if (rb && rb.disabled && !_diceAnimating) return;
+  if (rb) { rb.disabled = true; rb.classList.remove('my-turn'); rb.textContent = '⏳ A lançar...'; }
+
+  _rollInFlight = true;
+
+  let d;
+  try {
+    const r = await fetch('/api/game/roll', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({room_id: window.RID}),
+      credentials: 'same-origin',
+    });
+    d = await r.json();
+  } catch(e) {
+    _rollInFlight = false;
+    if (typeof toast === 'function') toast('❌ Sem ligação. Tenta novamente.', 'ter');
+    if (window.CUR_STATE && typeof window.renderState === 'function') {
+      window.renderState(window.CUR_STATE);
+    }
+    return;
+  }
+
+  _rollInFlight = false;
+
+  if (d.error) {
+    if (typeof toast === 'function') toast('❌ ' + d.error, 'ter');
+    if (window.CUR_STATE && typeof window.renderState === 'function') {
+      window.renderState(window.CUR_STATE);
+    }
+    return;
+  }
+
+  const diceVal = d.dice;
+
+  if (diceVal && diceVal >= 1) {
+    _animDice(diceVal, async function() {
+      if (typeof window.renderState === 'function') window.renderState(d);
+      if (d.phase === 1) {
+        try {
+          const mv = await fetch('/api/game/movable', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({room_id: window.RID}),
+            credentials: 'same-origin',
+          });
+          const mvd = await mv.json();
+          if (mvd.movable && mvd.movable.length && typeof window.highlightPcs === 'function') {
+            window.highlightPcs(mvd.movable);
+          }
+        } catch(e) {}
+      }
+    });
+  } else {
+    // Turno passou — sem animação
+    if (typeof window.renderState === 'function') window.renderState(d);
+    _showPassMsg('↩️ Sem peças para mover — turno passou!');
+    if (typeof toast === 'function') toast('↩️ Sem jogadas — turno passou!', 'tin');
+  }
+};
+
+// ── Eventos de jogo ───────────────────────────────────────────
+window.onGameStarted = function(state) {
+  window.RID        = state.room_id || window.RID;
+  window.CUR_STATE  = state;
+  window.PREV_STATE = null;
+  _animating.clear();
+  _diceAnimating  = false;
+  _rollInFlight   = false;
+  clearTimeout(_diceWatchdog);
+  _diceWatchdog   = null;
+
+  if (typeof pg === 'function') pg('game');
+
+  setTimeout(()=>{
+    _buildBoard();
+    _buildDiceUI();
+    window.renderState(state);
+
+    const chatEl = document.getElementById('chat-msgs');
+    if (chatEl) chatEl.innerHTML = '';
+
+    if (typeof addChat === 'function') {
+      addChat('Sistema', `Jogo iniciado com ${state.players.length} jogadores!`, true);
+      state.players.forEach(pl=>{
+        const c = pl.color || pl.colour || 'blue';
+        addChat('Sistema', `${COLOUR_NAME[c]||c}: ${pl.name}`, true);
+      });
+    }
+  }, 80);
+};
+
+window.onGameUpdate = function(state) {
+  // CORREÇÃO: ignora updates de outras salas
+  if (state.room_id && window.RID && state.room_id !== window.RID) return;
+
+  const prev = window.CUR_STATE ? JSON.parse(JSON.stringify(window.CUR_STATE)) : null;
+
+  // Detecta turno passado automaticamente
+  if (prev && state.phase === 0 && state.dice === 0 && prev.turn !== state.turn) {
+    const lastLog = state.log?.[state.log.length-1] || '';
+    if (/passa a vez|sem jogadas/i.test(lastLog)) {
+      SFX.pass();
+      _showPassMsg('↩️ Sem jogadas — turno passou!');
+    }
+  }
+
+  window.CUR_STATE = state;
+  if (prev) _applyDiff(prev, state);
+  window.renderState(state);
+};
+
+window.onGameOver = function(d) {
+  // CORREÇÃO: ignora eventos de fim de jogo sem RID activo (excepto vitórias)
+  if (!window.RID && !d.won) return;
+
+  const goo  = document.getElementById('goo');
+  if (!goo) return;
+  const goic = document.getElementById('goic');
+  const gott = document.getElementById('gott');
+  const gosb = document.getElementById('gosb');
+  const gopr = document.getElementById('gopr');
+  const gocd = document.getElementById('gocd');
+
+  if (d.won) {
+    SFX.win();
+    if (typeof coinRain === 'function') coinRain();
+    if (typeof showFlash === 'function') showFlash('🏆');
+    if (goic) goic.textContent = '🏆';
+    if (gott) { gott.textContent = 'VITÓRIA!'; gott.style.color = '#f5c518'; }
+    if (gosb) gosb.textContent = 'Parabéns, venceste!';
+    if (gopr) {
+      gopr.textContent = '+' + Number(d.prize || 0).toLocaleString('pt-AO') + ' KZ';
+      gopr.style.color = '#00e676';
+    }
+    gocd?.classList.remove('lose');
+  } else {
+    if (goic) goic.textContent = '💀';
+    if (gott) { gott.textContent = 'DERROTA'; gott.style.color = '#ff4757'; }
+    if (gosb) gosb.textContent = 'Boa sorte da próxima!';
+    if (gopr) { gopr.textContent = '—'; gopr.style.color = '#ff4757'; }
+    gocd?.classList.add('lose');
+  }
+
+  // CORREÇÃO: actualiza saldo com o valor real vindo do servidor
+  if (d.balance != null) {
+    if (window.U) {
+      window.U.balance = d.balance;
+      if (typeof window._syncU === 'function') window._syncU(window.U);
+      if (typeof updN === 'function') updN();
+    }
+  }
+
+  goo.classList.remove('hidden');
+};
+
+// ── Mover peça ────────────────────────────────────────────────
+window.movePc = async function(idx) {
+  if (!window.RID) return;
+  _clearSel();
+  window.PREV_STATE = window.CUR_STATE ? JSON.parse(JSON.stringify(window.CUR_STATE)) : null;
+
+  let d;
+  try {
+    const r = await fetch('/api/game/move', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({room_id: window.RID, piece: idx}),
+      credentials: 'same-origin',
+    });
+    d = await r.json();
+  } catch(e) {
+    if (typeof toast === 'function') toast('❌ Erro de ligação.', 'ter');
+    if (window.CUR_STATE && typeof window.renderState === 'function') window.renderState(window.CUR_STATE);
+    return;
+  }
+
+  if (d.error) {
+    if (typeof toast === 'function') toast('❌ ' + d.error, 'ter');
+    if (window.CUR_STATE && typeof window.renderState === 'function') window.renderState(window.CUR_STATE);
+    return;
+  }
+
+  if (window.PREV_STATE) _applyDiff(window.PREV_STATE, d);
+  window.CUR_STATE = d;
+  window.renderState(d);
+};
+
+// ── Abandonar ─────────────────────────────────────────────────
+window.leaveGame = async function() {
+  if (!confirm('Abandonar? Perdes a aposta.')) return;
+  if (window.RID) {
+    try {
+      await fetch('/api/game/leave', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({room_id: window.RID}),
+        credentials: 'same-origin',
+      });
+    } catch(e) {}
+  }
+  window.RID        = null;
+  window.CUR_STATE  = null;
+  window.PREV_STATE = null;
+  _animating.clear();
+  _diceAnimating  = false;
+  _rollInFlight   = false;
+  clearTimeout(_diceWatchdog);
+  _diceWatchdog   = null;
+  if (typeof pg === 'function') pg('home');
+};
+
+window.buildBoard       = _buildBoard;
+window.initCanvas       = _buildBoard;
+window.startRenderLoop  = function(){};
+
+console.log('[LudoKz] ludo_board_v2.js v10 — dado nunca mais trava ao voltar do background');
