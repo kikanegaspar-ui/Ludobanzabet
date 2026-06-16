@@ -320,7 +320,13 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
             <input id="lp-phone" type="tel" placeholder="9XX XXX XXX" style="flex:1" onkeydown="if(event.key==='Enter')document.getElementById('lp-pw').focus()">
           </div>
         </div>
-        <div class="fl"><label>Senha</label><input id="lp-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div class="fl">
+          <label>Senha</label>
+          <div style="position:relative">
+            <input id="lp-pw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:50px">
+            <button type="button" onclick="togglePassword('lp-pw')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:5px;transition:color 0.2s" onmouseover="this.style.color='var(--g1)'" onmouseout="this.style.color='var(--t3)'">👁️</button>
+          </div>
+        </div>
         <div class="errt" id="lerr"></div>
         <button class="btn bg bfw" id="btn-login" onclick="doLogin()" style="margin-top:6px;font-size:15px">Entrar</button>
         <div style="text-align:center;margin-top:13px">
@@ -339,7 +345,13 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
             </div>
             <div id="op-badge" style="font-size:11px;color:var(--jade);margin-top:4px;font-weight:700"></div>
           </div>
-          <div class="fl"><label>Senha</label><input id="rp" type="password" placeholder="Mínimo 6 caracteres"></div>
+          <div class="fl">
+            <label>Senha</label>
+            <div style="position:relative">
+              <input id="rp" type="password" placeholder="Mínimo 6 caracteres" style="padding-right:50px">
+              <button type="button" onclick="togglePassword('rp')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:5px;transition:color 0.2s" onmouseover="this.style.color='var(--g1)'" onmouseout="this.style.color='var(--t3)'">👁️</button>
+            </div>
+          </div>
           <div class="fl"><label>Código de Referido <span style="color:var(--jade);font-size:10px">Até 500 Kz bónus</span></label><input id="rref" placeholder="Opcional"></div>
           <div class="errt" id="rerr"></div>
           <button class="btn bg bfw" id="btn-send-otp" onclick="enviarOTP()" style="font-size:14px">📱 Enviar Código SMS</button>
@@ -415,7 +427,13 @@ nav{height:68px;background:rgba(2,2,8,.92);backdrop-filter:blur(28px) saturate(1
         </div>
         <div id="rst2" class="hidden" style="margin-top:14px">
           <div class="fl"><label>Código SMS</label><input id="rst-code" type="number" placeholder="123456" style="font-size:20px;text-align:center;letter-spacing:4px"></div>
-          <div class="fl"><label>Nova Senha</label><input id="rst-pw" type="password" placeholder="Mínimo 6 caracteres"></div>
+          <div class="fl">
+            <label>Nova Senha</label>
+            <div style="position:relative">
+              <input id="rst-pw" type="password" placeholder="Mínimo 6 caracteres" style="padding-right:50px">
+              <button type="button" onclick="togglePassword('rst-pw')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:5px;transition:color 0.2s" onmouseover="this.style.color='var(--g1)'" onmouseout="this.style.color='var(--t3)'">👁️</button>
+            </div>
+          </div>
           <div class="errt" id="rst2-err"></div>
           <div class="okt" id="rst2-ok"></div>
           <button class="btn bg bfw" onclick="doResetConf()" style="font-size:13px">Confirmar Nova Senha</button>
@@ -802,7 +820,7 @@ function _scheduleSSEReconnect(){
 
 /* AUTH */
 let REG_PHONE="",OTP_TIMER=null,AGE_CONFIRMED=false,PHONE_VERIFIED=false;
-function atab(t){document.querySelectorAll(".tab").forEach((el,i)=>el.classList.toggle("on",i===(t==="in"?0:1)));document.getElementById("fin").classList.toggle("hidden",t!=="in");document.getElementById("fup").classList.toggle("hidden",t!=="up");document.getElementById("frst").classList.add("hidden");}
+
 async function doLogin(){
   const phone="+244"+document.getElementById("lp-phone").value.trim().replace(/\s/g,"");
   const pw=document.getElementById("lp-pw").value;
